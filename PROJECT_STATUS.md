@@ -28,7 +28,7 @@ _Last updated: 6 October 2026_
 
 ## Next milestone: Expo development build
 
-Not started yet. No native alarm code (AlarmKit, notification fallback or Android alarms) has been written.
+**Project setup done** on branch `phase-1/dev-build-setup`: `expo-dev-client` installed, `eas.json` added, and `npm run start:go` added to keep using Expo Go. No development build has been made yet. No native alarm code (AlarmKit, notification fallback or Android alarms) has been written.
 
 Before work starts, the owner needs:
 - [ ] A free Expo account (https://expo.dev/signup)
@@ -36,4 +36,4 @@ Before work starts, the owner needs:
 - [ ] The iPhone's iOS version noted (AlarmKit needs iOS 26 or later)
 - [ ] A decision on whether this Phase 0 branch becomes `main` first
 
-A step-by-step guide (docs/DEV-BUILD.md) will be added with the development-build setup work.
+Step-by-step guide: [docs/DEV-BUILD.md](docs/DEV-BUILD.md).
