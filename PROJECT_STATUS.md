@@ -26,6 +26,22 @@ _Last updated: 6 October 2026_
 ### Notes from on-device testing
 - If the iPhone can't reach the PC over Wi-Fi, use `npx expo start --tunnel`. Expo may offer to install `@expo/ngrok` for this. That is a local tool only and is not committed to the project.
 
+## Phase 1 progress: work that doesn't need Apple (in progress)
+
+Built while the Apple Developer team is waiting for approval. **No alarm can ring yet.** Native triggering isn't implemented, and the app says so on the Alarms screen.
+
+| Item | Status |
+|---|---|
+| Dev-build config checked (iOS + Android); Android APK steps added to DEV-BUILD.md | ✅ |
+| Alarm data model: time, repeat days, on/off, mission, snooze, main wake-up alarm | ✅ |
+| Alarm list + editor screens | ✅ Tested by the owner on iPhone via Expo Go (editor, saving, on/off, maths practice) |
+| Local saving in SQLite (`expo-sqlite`, in Expo Go) | ✅ |
+| `AlarmService` interface with a "not implemented" version | ✅ |
+| Maths mission: Easy/Medium/Hard, 3/5/10 questions, retry, result, practice screen | ✅ |
+| AlarmKit (iOS) / AlarmManager (Android) ringing, ring screen | ⏳ Not started |
+
+Checks: `npm run check` passes (73 unit tests), `npx expo-doctor` 21/21, and iOS, Android and web bundles export without errors.
+
 ## Next milestone: Expo development build
 
 **Project setup done** on branch `phase-1/dev-build-setup`: `expo-dev-client` installed, `eas.json` added, and `npm run start:go` added to keep using Expo Go. No development build has been made yet. No native alarm code (AlarmKit, notification fallback or Android alarms) has been written.

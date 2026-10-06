@@ -65,17 +65,27 @@ docs/
 ## Example: a shared native interface
 
 ```ts
-// src/services/alarm-scheduler/index.ts (Phase 1)
-export interface AlarmScheduler {
-  getCapabilities(): Promise<{ ringsInSilentMode: boolean; needsPermission: boolean }>;
-  requestPermission(): Promise<'granted' | 'denied'>;
-  schedule(alarm: AlarmSpec): Promise<string>;
-  cancel(id: string): Promise<void>;
-  list(): Promise<ScheduledAlarm[]>;
+// src/services/alarm-scheduler/types.ts (Phase 1)
+export interface AlarmService {
+  getCapabilities(): Promise<AlarmCapabilities>; // status: 'not-implemented' | 'needs-permission' | 'ready'
+  requestPermission(): Promise<'granted' | 'denied' | 'not-implemented'>;
+  schedule(alarm: AlarmSpec): Promise<ScheduleResult>;
+  cancel(alarmId: string): Promise<void>;
 }
 ```
 
-The iOS and Android modules each implement this interface. The web/Expo Go build uses a mock version so the UI can still be previewed.
+The iOS and Android modules will each implement this interface, added as `index.ios.ts` and `index.android.ts` next to `index.ts`. Until then, every platform uses `not-implemented.ts`. It never claims an alarm was scheduled, and the UI shows "Alarms can't ring yet".
+
+## Alarm data flow (Phase 1)
+
+```
+Alarm screens ──► alarmStore (src/features/alarms/alarm-store.ts)
+                    ├─► AlarmRepository ─► SQLite `alarms` table (iOS/Android)
+                    │                     └► in-memory (web preview, tests)
+                    └─► AlarmService.schedule / cancel (src/services/alarm-scheduler)
+```
+
+Settings are always saved to the device first, then passed to `AlarmService`. The schema lives in `src/services/storage/migrations.ts`, which uses SQLite's `PRAGMA user_version` to track versions.
 
 ## Data model (first draft, Supabase)
 - `profiles`: id, display_name, timezone, rank, created_at

@@ -75,6 +75,30 @@ npm start
 Open **Terbit MY** (your build, not Expo Go) on the iPhone. Tap **Fetch development servers** and choose the server shown, or scan the QR code in PowerShell.
 If Wi-Fi doesn't work, use `npx expo start --tunnel`.
 
+## Android development build (no Apple account needed)
+
+You can make an Android development build at any time. It doesn't need the Apple Developer Program or a Google Play account. The `development` profile in `eas.json` already builds an **APK**, a file you can install straight onto an Android phone.
+
+### On the Android phone (once)
+1. Settings → **About phone** → tap **Build number** 7 times to turn on Developer options. (Not strictly required, but useful later.)
+2. Be ready to allow **Install unknown apps** for your browser or camera app when Android asks. This lets you install an APK that isn't from the Play Store.
+
+### Build and install
+```powershell
+npx eas-cli@latest login            # skip if you're already logged in
+npx eas-cli@latest build --platform android --profile development
+```
+- On the first run, EAS asks to **generate a new Android keystore**. Answer **Yes**. EAS keeps it safe for you. (A keystore is the file that signs the app.)
+- When the build finishes, scan the QR code with the Android phone and install the APK.
+
+### Run it
+```powershell
+npm start
+```
+Open **Terbit MY** on the Android phone and connect to the development server, the same as on iPhone.
+
+> Android alarm ringing (`AlarmManager`) isn't built yet. The build lets you test the alarm settings screens, local saving and the maths mission on a real Android phone.
+
 ## Day-to-day after this
 
 - Normal coding: run `npm start`, open Terbit MY on your phone, and edits appear instantly, like Expo Go.
