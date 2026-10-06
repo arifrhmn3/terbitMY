@@ -17,7 +17,8 @@ import {
 
 type MathMissionViewProps = {
   config: MathMissionConfig;
-  onDone: (result: MathMissionResult) => void;
+  /** Called once, when the last question is answered correctly. */
+  onComplete: (result: MathMissionResult) => void;
 };
 
 const feedbackText = {
@@ -26,8 +27,11 @@ const feedbackText = {
   invalid: 'Type a whole number.',
 } as const;
 
-/** Runs one maths mission: questions, retries on wrong answers, then a result. */
-export function MathMissionView({ config, onDone }: MathMissionViewProps) {
+/**
+ * Runs one maths mission: questions, with a retry after each wrong answer.
+ * The parent decides what to show once `onComplete` fires.
+ */
+export function MathMissionView({ config, onComplete }: MathMissionViewProps) {
   const theme = useTheme();
   const [session, setSession] = useState(() => startMathSession(config, Date.now(), Date.now()));
   const [input, setInput] = useState('');
@@ -36,37 +40,15 @@ export function MathMissionView({ config, onDone }: MathMissionViewProps) {
   const question = currentQuestion(session);
 
   function submit() {
+    if (!question) return;
     const next = submitMathAnswer(session, input, Date.now());
     setSession(next);
     if (next.lastCheck !== 'invalid') setInput('');
-    inputRef.current?.focus();
-  }
-
-  function restart() {
-    setSession(startMathSession(config, Date.now(), Date.now()));
-    setInput('');
-  }
-
-  if (session.result) {
-    const { result } = session;
-    return (
-      <View style={styles.container}>
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <ThemedText type="title">Mission complete</ThemedText>
-          <ThemedText themeColor="textSecondary">
-            {result.questionCount} questions · {Math.round(result.accuracy * 100)}% accuracy
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">
-            {result.wrongAttempts === 0
-              ? 'No wrong answers'
-              : `${result.wrongAttempts} wrong ${result.wrongAttempts === 1 ? 'answer' : 'answers'}`}{' '}
-            · {Math.round(result.durationMs / 1000)} s
-          </ThemedText>
-        </ThemedView>
-        <Button title="Done" onPress={() => onDone(result)} />
-        <Button title="Try again" variant="secondary" onPress={restart} />
-      </View>
-    );
+    if (next.result) {
+      onComplete(next.result);
+    } else {
+      inputRef.current?.focus();
+    }
   }
 
   if (!question) return null;
@@ -105,6 +87,30 @@ export function MathMissionView({ config, onDone }: MathMissionViewProps) {
       <Button title="Check answer" onPress={submit} disabled={input.trim() === ''} />
     </View>
   );
+}
+
+/** Accuracy, mistakes and time for a finished mission. */
+export function MathResultSummary({ result }: { result: MathMissionResult }) {
+  const mistakes =
+    result.wrongAttempts === 0
+      ? 'No wrong answers'
+      : `${result.wrongAttempts} wrong ${result.wrongAttempts === 1 ? 'answer' : 'answers'}`;
+
+  return (
+    <>
+      <ThemedText themeColor="textSecondary">
+        {result.questionCount} questions · {Math.round(result.accuracy * 100)}% accuracy
+      </ThemedText>
+      <ThemedText themeColor="textSecondary">
+        {mistakes} · {formatDuration(result.durationMs)}
+      </ThemedText>
+    </>
+  );
+}
+
+export function formatDuration(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 }
 
 const styles = StyleSheet.create({

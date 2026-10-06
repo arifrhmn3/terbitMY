@@ -38,9 +38,17 @@ Built while the Apple Developer team is waiting for approval. **No alarm can rin
 | Local saving in SQLite (`expo-sqlite`, in Expo Go) | ✅ |
 | `AlarmService` interface with a "not implemented" version | ✅ |
 | Maths mission: Easy/Medium/Hard, 3/5/10 questions, retry, result, practice screen | ✅ |
-| AlarmKit (iOS) / AlarmManager (Android) ringing, ring screen | ⏳ Not started |
+| Alarm occurrences: status tracking, duplicate protection, missed/cancelled handling | ✅ |
+| Shared full-screen ringing screen (clock, label, mission, Start Mission, snooze placeholder, Emergency Dismiss) | ✅ ⏳ awaiting owner test on iPhone |
+| Maths mission connected to occurrences; morning-complete confirmation | ✅ ⏳ awaiting owner test on iPhone |
+| "Simulate alarm now" (developer builds only, clearly labelled as a simulation) | ✅ ⏳ awaiting owner test on iPhone |
+| "Recent mornings" history | ✅ ⏳ awaiting owner test on iPhone |
+| iOS / Android `AlarmService` placeholders + docs/NATIVE-ALARMS.md | ✅ (placeholders only) |
+| iOS and Android development builds installed and running on the owner's phones | ✅ |
+| Native alarm milestone 1: one-time AlarmKit (iOS 26+) / AlarmManager alarms + developer "Native alarm test" | ✅ Code written · ⏳ needs new dev builds + physical-device test |
+| Saved repeating alarms ringing natively, alarm → mission hand-off, snooze, reboot rescheduling | ⏳ Not started |
 
-Checks: `npm run check` passes (73 unit tests), `npx expo-doctor` 21/21, and iOS, Android and web bundles export without errors.
+Checks: `npm run check` passes (130 unit tests, including real SQLite queries), `npx expo-doctor` 21/21, and iOS, Android and web bundles export without errors. The Swift and Kotlin code is first compiled by EAS Build; there's no local Xcode or Android SDK.
 
 ## Next milestone: Expo development build
 

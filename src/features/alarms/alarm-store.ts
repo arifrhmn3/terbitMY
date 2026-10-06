@@ -38,8 +38,13 @@ export function toAlarmSpec(alarm: Alarm): AlarmSpec {
 export function createAlarmStore(
   getRepository: () => Promise<AlarmRepository>,
   service: AlarmService,
-  now: () => number = Date.now,
+  options: {
+    now?: () => number;
+    /** Called after an alarm is deleted, e.g. to cancel its active occurrence. */
+    onRemove?: (id: string) => Promise<void>;
+  } = {},
 ) {
+  const { now = Date.now, onRemove } = options;
   let state: AlarmStoreState = { status: 'idle', alarms: [], error: null };
   const listeners = new Set<() => void>();
 
@@ -102,10 +107,18 @@ export function createAlarmStore(
     await repository.remove(id);
     setState({ alarms: state.alarms.filter((a) => a.id !== id) });
     await service.cancel(id);
+    await onRemove?.(id);
+  }
+
+  /** Looks up a saved alarm, loading from storage first if needed. */
+  async function find(id: string) {
+    if (state.status !== 'ready') await load();
+    return state.alarms.find((a) => a.id === id) ?? null;
   }
 
   return {
     getState: () => state,
+    find,
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => listeners.delete(listener);

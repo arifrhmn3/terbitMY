@@ -13,10 +13,12 @@ type ListRowProps = {
   icon: SymbolViewProps['name'];
   /** When set, the row navigates to this route and shows a chevron. */
   href?: Href;
+  /** When set (and no `href`), the row is a button. */
+  onPress?: () => void;
 };
 
 /** A single row inside a `Section`. */
-export function ListRow({ title, subtitle, value, icon, href }: ListRowProps) {
+export function ListRow({ title, subtitle, value, icon, href, onPress }: ListRowProps) {
   const theme = useTheme();
 
   const content = (
@@ -45,16 +47,20 @@ export function ListRow({ title, subtitle, value, icon, href }: ListRowProps) {
     </View>
   );
 
+  const pressedStyle = ({ pressed }: { pressed: boolean }) => pressed && { backgroundColor: theme.backgroundSelected };
+
   if (!href) {
-    return content;
+    if (!onPress) return content;
+    return (
+      <Pressable accessibilityRole="button" accessibilityHint={subtitle} onPress={onPress} style={pressedStyle}>
+        {content}
+      </Pressable>
+    );
   }
 
   return (
     <Link href={href} asChild>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint={subtitle}
-        style={({ pressed }) => pressed && { backgroundColor: theme.backgroundSelected }}>
+      <Pressable accessibilityRole="button" accessibilityHint={subtitle} style={pressedStyle}>
         {content}
       </Pressable>
     </Link>

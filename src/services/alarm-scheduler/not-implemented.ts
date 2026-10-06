@@ -1,17 +1,28 @@
-import type { AlarmService } from './types';
+import type { AlarmService, NativeAlarmStatus } from './types';
+
+const DEFAULT_SUMMARY = 'Alarms are saved on this phone, but they can’t ring yet. Ringing is still being built.';
+
+const UNAVAILABLE: NativeAlarmStatus = {
+  available: false,
+  backend: 'none',
+  permission: 'unavailable',
+  fullScreenAllowed: null,
+  detail: 'Native alarms need the Terbit MY development build (not Expo Go or the web preview).',
+};
 
 /**
- * Used on every platform until the native alarm module is built. It never
- * pretends to schedule anything: every call reports `not-implemented`.
+ * Used where no native alarm code is available (Expo Go, web, tests). It
+ * never pretends to schedule anything: every call reports `not-implemented`,
+ * and it never reports that an alarm fired.
  */
-export function createNotImplementedAlarmService(): AlarmService {
+export function createNotImplementedAlarmService(summary = DEFAULT_SUMMARY): AlarmService {
   return {
     async getCapabilities() {
       return {
         status: 'not-implemented',
         backend: 'none',
         ringsInSilentMode: false,
-        summary: 'Alarms are saved on this phone, but they can’t ring yet. Ringing is still being built.',
+        summary,
       };
     },
     async requestPermission() {
@@ -22,6 +33,27 @@ export function createNotImplementedAlarmService(): AlarmService {
     },
     async cancel() {
       // Nothing was scheduled, so there is nothing to cancel.
+    },
+    async getLaunchEvent() {
+      return null;
+    },
+    addFiredListener() {
+      return () => {};
+    },
+    async getNativeAlarmStatus() {
+      return UNAVAILABLE;
+    },
+    async requestNativeAlarmPermission() {
+      return UNAVAILABLE;
+    },
+    async scheduleOneTime() {
+      return { status: 'not-implemented' };
+    },
+    async listNativeAlarms() {
+      return [];
+    },
+    async openNativeAlarmSettings() {
+      // No native settings to open.
     },
   };
 }

@@ -74,7 +74,7 @@ export interface AlarmService {
 }
 ```
 
-The iOS and Android modules will each implement this interface, added as `index.ios.ts` and `index.android.ts` next to `index.ts`. Until then, every platform uses `not-implemented.ts`. It never claims an alarm was scheduled, and the UI shows "Alarms can't ring yet".
+The iOS and Android modules will each implement this interface, in `ios-alarmkit.ts` and `android-alarm-manager.ts`; `index.ts` picks one by platform. Both are placeholders today that never claim an alarm was scheduled or fired, and the UI shows "Alarms can't ring yet". The full contract is in [NATIVE-ALARMS.md](NATIVE-ALARMS.md).
 
 ## Alarm data flow (Phase 1)
 
@@ -86,6 +86,21 @@ Alarm screens ──► alarmStore (src/features/alarms/alarm-store.ts)
 ```
 
 Settings are always saved to the device first, then passed to `AlarmService`. The schema lives in `src/services/storage/migrations.ts`, which uses SQLite's `PRAGMA user_version` to track versions.
+
+## Alarm occurrences (Phase 1)
+
+Each time an alarm rings (or is simulated) creates an **occurrence**, stored separately from the alarm's settings in the `alarm_occurrences` table:
+
+```
+scheduled ─► started ─► mission_in_progress ─► completed
+                 └─(no mission)──────────────► completed
+any active status ─► dismissed | missed | cancelled
+```
+
+- `src/features/alarms/occurrence.ts`: pure state rules. Finished occurrences can never change.
+- `src/features/alarms/occurrence-manager.ts`: trigger, start mission, complete, dismiss, mark missed (active for over an hour), cancel (alarm deleted).
+- Duplicate protection on two levels. The database has `UNIQUE (alarm_id, scheduled_at)`, plus a partial unique index allowing only one active occurrence per alarm. Every status change is a compare-and-set (`UPDATE … WHERE status = <expected>`), so an occurrence completes at most once. Future XP must be awarded per occurrence ID, which makes double rewards impossible.
+- `/alarm/[occurrenceId]` is the shared full-screen ringing screen. "Recent mornings" (`/alarms/history`) lists the latest 30 occurrences.
 
 ## Data model (first draft, Supabase)
 - `profiles`: id, display_name, timezone, rank, created_at

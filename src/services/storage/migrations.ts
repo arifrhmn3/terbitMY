@@ -19,6 +19,30 @@ export const migrations: readonly string[] = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );`,
+
+  // 2: alarm occurrences (each time an alarm rings or is simulated)
+  `CREATE TABLE IF NOT EXISTS alarm_occurrences (
+    id TEXT PRIMARY KEY NOT NULL,
+    alarm_id TEXT NOT NULL,
+    scheduled_at INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    status TEXT NOT NULL,
+    alarm_label TEXT NOT NULL DEFAULT '',
+    mission TEXT NOT NULL,
+    snooze_minutes INTEGER,
+    started_at INTEGER,
+    mission_started_at INTEGER,
+    mission_completed_at INTEGER,
+    ended_at INTEGER,
+    result TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE (alarm_id, scheduled_at)
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS alarm_occurrences_one_active_per_alarm
+    ON alarm_occurrences (alarm_id)
+    WHERE status IN ('scheduled', 'started', 'mission_in_progress');
+  CREATE INDEX IF NOT EXISTS alarm_occurrences_by_time ON alarm_occurrences (scheduled_at);`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

@@ -15,7 +15,7 @@ function setup() {
     cancel: jest.fn(base.cancel),
   };
   let time = 1000;
-  const store = createAlarmStore(async () => repository, service, () => time++);
+  const store = createAlarmStore(async () => repository, service, { now: () => time++ });
   return { store, repository, service };
 }
 

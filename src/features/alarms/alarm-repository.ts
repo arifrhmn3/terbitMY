@@ -53,7 +53,7 @@ export function alarmToRow(alarm: Alarm): AlarmRow {
 }
 
 /** Reads the stored mission, falling back to the default if it can't be understood. */
-function parseMission(json: string): AlarmMission {
+export function parseMission(json: string): AlarmMission {
   try {
     const value = JSON.parse(json) as Partial<Record<string, unknown>>;
     if (value?.type === 'none') return { type: 'none' };

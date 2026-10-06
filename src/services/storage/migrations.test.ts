@@ -29,6 +29,20 @@ describe('migrate', () => {
     expect(fake.executed[0]).toContain('CREATE TABLE IF NOT EXISTS alarms');
   });
 
+  it('creates the occurrences table with duplicate protection in the database', () => {
+    const sql = migrations[1];
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS alarm_occurrences');
+    expect(sql).toContain('UNIQUE (alarm_id, scheduled_at)');
+    expect(sql).toMatch(/CREATE UNIQUE INDEX[\s\S]+ON alarm_occurrences \(alarm_id\)[\s\S]+WHERE status IN/);
+  });
+
+  it('only runs new migrations on an older database', async () => {
+    const fake = fakeDatabase(1);
+    expect(await migrate(fake.db)).toBe(migrations.length - 1);
+    expect(fake.executed[0]).toContain('alarm_occurrences');
+    expect(fake.version()).toBe(migrations.length);
+  });
+
   it('does nothing when the database is up to date', async () => {
     const fake = fakeDatabase(migrations.length);
     expect(await migrate(fake.db)).toBe(0);

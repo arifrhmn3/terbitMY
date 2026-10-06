@@ -15,7 +15,7 @@ import {
   type AlarmDraft,
   type AlarmMission,
 } from '@/features/alarms/alarm';
-import { alarmStore } from '@/features/alarms/alarms';
+import { alarmStore, occurrences } from '@/features/alarms/alarms';
 import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
 import { MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
 import { useTheme } from '@/hooks/use-theme';
@@ -62,6 +62,17 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
     } catch (error) {
       setSaving(false);
       Alert.alert('Couldn’t save alarm', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function simulate(id: string) {
+    try {
+      const saved = await alarmStore.find(id);
+      if (!saved) return;
+      const occurrence = await occurrences.trigger(saved, { scheduledAt: Date.now(), source: 'simulated' });
+      router.push({ pathname: '/alarm/[occurrenceId]', params: { occurrenceId: occurrence.id } });
+    } catch (error) {
+      Alert.alert('Couldn’t start simulation', error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -166,6 +177,20 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
           />
         )}
       </Section>
+
+      {/* Developer/testing only: hidden in release builds. */}
+      {__DEV__ && alarmId && (
+        <Section
+          title="Testing"
+          footer="Simulation only: opens the alarm screen as if this alarm rang, using its saved settings. No real system alarm fires.">
+          <ListRow
+            icon={{ ios: 'bell.badge', android: 'notifications_active', web: 'notifications_active' }}
+            title="Simulate alarm now"
+            subtitle="Test the ringing screen and mission"
+            onPress={() => simulate(alarmId)}
+          />
+        </Section>
+      )}
 
       <View style={styles.actions}>
         <Button title={alarmId ? 'Save changes' : 'Save alarm'} onPress={save} disabled={saving} />

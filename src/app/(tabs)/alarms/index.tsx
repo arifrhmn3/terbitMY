@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { alarmStore, useAlarms } from '@/features/alarms/alarms';
 import { AlarmRow } from '@/features/alarms/components/alarm-row';
+import { NativeAlarmTest } from '@/features/alarms/components/native-alarm-test';
 import { RingingStatus } from '@/features/alarms/components/ringing-status';
 
 export default function AlarmsScreen() {
@@ -27,6 +28,15 @@ export default function AlarmsScreen() {
           icon={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }}
           title="Add alarm"
           href={{ pathname: '/alarms/[id]', params: { id: 'new' } }}
+        />
+      </Section>
+
+      <Section>
+        <ListRow
+          icon={{ ios: 'clock.arrow.circlepath', android: 'history', web: 'history' }}
+          title="Recent mornings"
+          subtitle="Completed, dismissed and missed alarms"
+          href="/alarms/history"
         />
       </Section>
 
@@ -50,6 +60,9 @@ export default function AlarmsScreen() {
           subtitle="Read or recite a passage, then reflect"
         />
       </Section>
+
+      {/* Developer test tool, hidden in release builds. */}
+      {__DEV__ && <NativeAlarmTest />}
 
       <ComingSoon
         phase={1}
