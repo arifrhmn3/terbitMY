@@ -19,6 +19,7 @@ New to this? Start with **[docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)**.
 
 | Doc | What it covers |
 |---|---|
+| [PROJECT_STATUS.md](PROJECT_STATUS.md) | Where the project is now and what comes next |
 | [docs/PRD.md](docs/PRD.md) | Product requirements |
 | [docs/FEASIBILITY.md](docs/FEASIBILITY.md) | What iOS and Android allow (alarms, Screen Time, Play policy) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Project structure and technical design |
