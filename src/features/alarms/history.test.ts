@@ -46,7 +46,7 @@ describe('toHistoryEntry', () => {
       status: 'Stopped with phone controls · Mission not done',
       successful: false,
       completion: 'Alarm stopped with phone controls at 06:31',
-      source: 'Real alarm (reported by Android)',
+      source: 'Real alarm (confirmed by the phone)',
     });
   });
 

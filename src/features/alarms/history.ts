@@ -26,7 +26,7 @@ function time(ms: number) {
 
 const SOURCE_TEXT = {
   app: 'Simulated in Terbit MY',
-  system: 'Real alarm (reported by Android)',
+  system: 'Real alarm (confirmed by the phone)',
   schedule: 'Real alarm (AlarmKit schedule)',
 } as const;
 
