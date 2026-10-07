@@ -1,4 +1,4 @@
-import type { NativeRecordPayload } from '../../../modules/terbit-alarms';
+import type { NativeAlarmAction, NativeRecordPayload } from '../../../modules/terbit-alarms';
 
 import type { AlarmBackend, AlarmFiredEvent, AlarmSpec } from './types';
 
@@ -56,12 +56,23 @@ export function androidFireEvents(records: NativeRecordPayload[], since: number)
   );
 }
 
+/** An AlarmKit button tap belongs to the alarm that was due up to this long before it. */
+export const ACTION_MATCH_WINDOW_MS = 90 * 60 * 1000;
+
 /**
  * iOS: AlarmKit doesn't tell apps when an alarm fires, so the due times of
- * each registered alarm are worked out from its schedule ('schedule' evidence),
- * only for the period it was actually registered.
+ * each registered alarm are worked out from its schedule ('schedule'
+ * evidence), only for the period it was actually registered. A tap on the
+ * alarm's buttons (recorded by Terbit MY's App Intents) confirms the fire
+ * ('system' evidence) and says how it was stopped: 'mission' for
+ * "Stop & Open Terbit" / "Stop & Start Mission", 'stop' for the system Stop.
  */
-export function alarmKitFireEvents(records: NativeRecordPayload[], since: number, now: number): AlarmFiredEvent[] {
+export function alarmKitFireEvents(
+  records: NativeRecordPayload[],
+  since: number,
+  now: number,
+  actions: NativeAlarmAction[] = [],
+): AlarmFiredEvent[] {
   const events: AlarmFiredEvent[] = [];
   for (const r of records) {
     if (!isSaved(r) || r.hour == null || r.minute == null) continue;
@@ -69,7 +80,14 @@ export function alarmKitFireEvents(records: NativeRecordPayload[], since: number
     const to = Math.min(now, r.cancelledAt ?? now);
     const schedule = { hour: r.hour, minute: r.minute, weekdays: r.weekdays ?? [], fireAt: r.fireAt };
     for (const due of dueTimesBetween(schedule, from, to)) {
-      events.push({ alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'schedule', stoppedAt: null, stopAction: null });
+      const action = actions
+        .filter((a) => (a.nativeId === r.nativeId || a.alarmId === r.alarmId) && a.at >= due && a.at < due + ACTION_MATCH_WINDOW_MS)
+        .sort((a, b) => a.at - b.at)[0];
+      events.push(
+        action
+          ? { alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'system', stoppedAt: action.at, stopAction: action.action }
+          : { alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'schedule', stoppedAt: null, stopAction: null },
+      );
     }
   }
   return uniqueSorted(events);
@@ -86,6 +104,8 @@ export function isNativeUpToDate(records: NativeRecordPayload[], spec: AlarmSpec
     }
     return (
       ALARMKIT_LIVE.includes(r.state) &&
+      // Mode decides the button label, so a mode change needs a new AlarmKit alarm.
+      (r.completionMode == null || r.completionMode === spec.completionMode) &&
       r.hour === spec.hour &&
       r.minute === spec.minute &&
       sameDays(r.weekdays ?? [], spec.weekdays) &&

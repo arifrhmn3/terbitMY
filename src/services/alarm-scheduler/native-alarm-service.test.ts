@@ -38,6 +38,8 @@ const spec: AlarmSpec = {
   title: 'Subuh',
   nextFireAt: 1_000_000,
   completionMode: 'challenge',
+  actionLabel: 'Stop & Start Mission',
+  soundId: 'system-default',
 };
 
 const request = { alarmId: 'native-test', occurrenceId: 'test-1', fireAt: 1_000_000, title: 'Test' };
@@ -56,7 +58,33 @@ describe('native alarm service: saved alarms', () => {
       title: 'Subuh',
       missionRequired: true,
       completionMode: 'challenge',
+      actionLabel: 'Stop & Start Mission',
     });
+  });
+
+  it('iOS: reads AlarmKit button taps to confirm fires', async () => {
+    const record: NativeRecordPayload = {
+      kind: 'saved',
+      alarmId: 'alarm-1',
+      occurrenceId: null,
+      nativeId: 'uuid-1',
+      fireAt: 0,
+      createdAt: 0,
+      state: 'scheduled',
+      firedAt: null,
+      stoppedAt: null,
+      cancelledAt: null,
+      hour: 0,
+      minute: 0,
+      weekdays: [0, 1, 2, 3, 4, 5, 6],
+    };
+    const dueToday = new Date(2026, 9, 7, 0, 0).getTime();
+    const native = fakeModule(
+      { listActionsAsync: async () => [{ alarmId: 'alarm-1', nativeId: 'uuid-1', action: 'mission', at: dueToday + 60_000 }] },
+      [record],
+    );
+    const events = await createNativeAlarmService(native, 'alarmkit').getFireEvents(dueToday - 1, dueToday + 120_000);
+    expect(events).toEqual([expect.objectContaining({ scheduledAt: dueToday, evidence: 'system', stopAction: 'mission' })]);
   });
 
   it('maps permission errors to permission-denied and other errors to failed', async () => {

@@ -49,6 +49,19 @@ export type SavedAlarmOptions = {
   /** True when the alarm has a mission (Android shows "Start mission"). */
   missionRequired: boolean;
   completionMode: 'reward' | 'challenge' | 'gentle';
+  /** Label for the one-tap "stop and open the mission" button. */
+  actionLabel: string;
+};
+
+/** iOS: a tap on the AlarmKit buttons, recorded natively by an App Intent. */
+export type NativeAlarmAction = {
+  alarmId: string;
+  /** The AlarmKit alarm UUID. */
+  nativeId: string;
+  /** 'mission' = "Stop & Open Terbit" / "Stop & Start Mission". 'stop' = the system Stop button. */
+  action: 'mission' | 'stop';
+  /** ms since 1970 */
+  at: number;
 };
 
 export type NativeScheduleResult =
@@ -78,6 +91,8 @@ export type NativeRecordPayload = {
   hour?: number | null;
   minute?: number | null;
   weekdays?: number[] | null;
+  /** iOS saved alarms: the mode the AlarmKit alarm was created with (decides its button label). */
+  completionMode?: 'reward' | 'challenge' | 'gentle' | null;
 };
 
 export type TerbitAlarmsNativeModule = {
@@ -93,4 +108,10 @@ export type TerbitAlarmsNativeModule = {
   listAsync(): Promise<NativeRecordPayload[]>;
   /** Opens the system settings page where the missing permission can be turned on. */
   openSettingsAsync(): Promise<void>;
+  /** iOS only: recent taps on the AlarmKit buttons, newest first. */
+  listActionsAsync?(): Promise<NativeAlarmAction[]>;
+  /** iOS only: local notification reminders (Gentle mode). */
+  requestReminderPermissionAsync?(): Promise<'granted' | 'denied'>;
+  scheduleReminderAsync?(options: { id: string; title: string; body: string; fireAt: number }): Promise<boolean>;
+  cancelReminderAsync?(id: string): Promise<void>;
 };

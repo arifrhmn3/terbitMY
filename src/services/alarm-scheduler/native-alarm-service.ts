@@ -85,6 +85,7 @@ export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backe
           title: spec.title,
           missionRequired: spec.missionRequired,
           completionMode: spec.completionMode,
+          actionLabel: spec.actionLabel,
         }),
       );
     },
@@ -105,7 +106,9 @@ export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backe
 
     async getFireEvents(since, now) {
       const records = await native.listAsync();
-      return backend === 'alarmkit' ? alarmKitFireEvents(records, since, now) : androidFireEvents(records, since);
+      if (backend !== 'alarmkit') return androidFireEvents(records, since);
+      const actions = native.listActionsAsync ? await native.listActionsAsync() : [];
+      return alarmKitFireEvents(records, since, now, actions);
     },
 
     getNativeAlarmStatus: status,

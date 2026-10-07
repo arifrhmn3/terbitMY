@@ -10,6 +10,7 @@ import { alarmStore, useAlarms } from '@/features/alarms/alarms';
 import { AlarmRow } from '@/features/alarms/components/alarm-row';
 import { NativeAlarmTest } from '@/features/alarms/components/native-alarm-test';
 import { RingingStatus } from '@/features/alarms/components/ringing-status';
+import { EntitlementDevPanel } from '@/features/entitlements/components/entitlement-dev-panel';
 
 export default function AlarmsScreen() {
   const { status, alarms } = useAlarms();
@@ -63,10 +64,11 @@ export default function AlarmsScreen() {
 
       {/* Developer test tool, hidden in release builds. */}
       {__DEV__ && <NativeAlarmTest />}
+      {__DEV__ && <EntitlementDevPanel />}
 
       <ComingSoon
         phase={1}
-        description="Native alarms that ring on time, even offline or on silent, are still being built. Saved alarms will start ringing once they are ready."
+        description="Snooze, more alarm sounds and more missions are still to come."
       />
     </Screen>
   );

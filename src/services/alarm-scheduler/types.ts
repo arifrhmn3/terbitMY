@@ -17,6 +17,9 @@ export type AlarmSpec = {
   /** The next time it should ring (ms since 1970). Native code repeats weekly alarms itself after that. */
   nextFireAt: number;
   completionMode: 'reward' | 'challenge' | 'gentle';
+  /** The one-tap button on the system alarm, e.g. "Stop & Open Terbit". */
+  actionLabel: string;
+  soundId: string;
 };
 
 /** Which native system rings alarms on this device. */

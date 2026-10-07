@@ -9,6 +9,10 @@ import { Section } from '@/components/section';
 import { SwitchRow } from '@/components/switch-row';
 import { Spacing } from '@/constants/theme';
 import { MODE_POLICIES } from '@/features/alarms/accountability';
+import { isModeAvailable, MODE_FEATURE } from '@/features/alarms/alarm-features';
+import { findSound } from '@/features/alarms/sounds';
+import { useEntitlement } from '@/features/entitlements/entitlements';
+import { FEATURE_LABEL } from '@/features/entitlements/features';
 import {
   COMPLETION_MODE_LABEL,
   COMPLETION_MODES,
@@ -18,12 +22,14 @@ import {
   SNOOZE_MINUTES,
   type AlarmDraft,
   type AlarmMission,
+  type CompletionMode,
 } from '@/features/alarms/alarm';
 import { alarmStore, occurrences } from '@/features/alarms/alarms';
 import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
 import { MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
 import { useTheme } from '@/hooks/use-theme';
 import { getAlarmService } from '@/services/alarm-scheduler';
+import { getReminderService } from '@/services/notifications';
 
 import { RingingStatus } from './ringing-status';
 import { TimeField } from './time-field';
@@ -47,7 +53,6 @@ const difficultyOptions: { value: MathDifficulty; label: string }[] = [
 ];
 
 const countOptions = MATH_QUESTION_COUNTS.map((count) => ({ value: count, label: `${count} questions` }));
-const modeOptions = COMPLETION_MODES.map((mode) => ({ value: mode, label: COMPLETION_MODE_LABEL[mode] }));
 const gentleOptions = GENTLE_REMINDER_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 const snoozeOptions = SNOOZE_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 
@@ -58,13 +63,38 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   const [draft, setDraft] = useState(initial);
   const [saving, setSaving] = useState(false);
 
+  const { has, isPremium } = useEntitlement();
+
   const update = (changes: Partial<AlarmDraft>) => setDraft((current) => ({ ...current, ...changes }));
   const mission = draft.mission;
+  const savedModeLocked = !isModeAvailable(draft.completionMode, has);
+
+  // Labels come from the entitlement layer: nothing here decides what is premium.
+  const modeChoices = COMPLETION_MODES.map((mode) => ({
+    value: mode,
+    label:
+      !isModeAvailable(mode, has) && isPremium(MODE_FEATURE[mode])
+        ? `${COMPLETION_MODE_LABEL[mode]} 🔒`
+        : COMPLETION_MODE_LABEL[mode],
+  }));
+
+  function chooseMode(completionMode: CompletionMode) {
+    if (!isModeAvailable(completionMode, has)) {
+      Alert.alert(
+        `${COMPLETION_MODE_LABEL[completionMode]} Mode isn’t included in your plan`,
+        `${FEATURE_LABEL[MODE_FEATURE[completionMode]]} is a premium feature. Purchases aren’t available yet.`,
+      );
+      return;
+    }
+    update({ completionMode });
+  }
 
   async function save() {
     setSaving(true);
     try {
       const { result } = await alarmStore.save(draft, alarmId);
+      // Gentle mode follow-ups use local notifications: ask once, when it's first needed.
+      if (draft.completionMode === 'gentle' && draft.enabled) await getReminderService().requestPermission();
       if (result?.status === 'permission-denied' || result?.status === 'failed') {
         // Saved in Terbit MY, but the phone couldn't schedule it.
         Alert.alert(
@@ -97,7 +127,8 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
     try {
       const saved = await alarmStore.find(id);
       if (!saved) return;
-      const occurrence = await occurrences.trigger(saved, { scheduledAt: Date.now(), source: 'simulated' });
+      // Simulate with the mode the alarm would really ring with (entitlement-adjusted).
+      const occurrence = await occurrences.trigger(alarmStore.effective(saved), { scheduledAt: Date.now(), source: 'simulated' });
       router.push({ pathname: '/alarm/[occurrenceId]', params: { occurrenceId: occurrence.id } });
     } catch (error) {
       Alert.alert('Couldn’t start simulation', error instanceof Error ? error.message : String(error));
@@ -194,12 +225,12 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
       {mission.type !== 'none' && (
         <Section
           title="Accountability mode (beta)"
-          footer={`${MODE_POLICIES[draft.completionMode].description} The phone’s own Stop button always works.`}>
-          <ChoiceRow
-            options={modeOptions}
-            value={draft.completionMode}
-            onChange={(completionMode) => update({ completionMode })}
-          />
+          footer={
+            savedModeLocked
+              ? `Saved as ${COMPLETION_MODE_LABEL[draft.completionMode]}, which isn’t in your plan, so this alarm behaves as Reward. The phone’s own Stop button always works.`
+              : `${MODE_POLICIES[draft.completionMode].description} The phone’s own Stop button always works.`
+          }>
+          <ChoiceRow options={modeChoices} value={draft.completionMode} onChange={chooseMode} />
           {draft.completionMode === 'gentle' && (
             <ChoiceRow
               title="Follow up after"
@@ -210,6 +241,14 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
           )}
         </Section>
       )}
+
+      <Section title="Sound">
+        <ListRow
+          icon={{ ios: 'speaker.wave.2', android: 'volume_up', web: 'volume_up' }}
+          title="Alarm sound"
+          value={findSound(draft.soundId).label}
+        />
+      </Section>
 
       <Section title="Snooze">
         <SwitchRow

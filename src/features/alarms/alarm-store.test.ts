@@ -169,8 +169,30 @@ describe('alarm store', () => {
   });
 });
 
+const alarm = (overrides: Partial<Alarm> = {}): Alarm => ({ ...createAlarmDraft(overrides), id: 'a', createdAt: 0, updatedAt: 0 });
+
+describe('entitlement-adjusted scheduling', () => {
+  it('schedules a locked Challenge alarm as Reward, keeping the saved setting', async () => {
+    const repository = createMemoryAlarmRepository();
+    const schedule = jest.fn(async (_spec: AlarmSpec) => ({ status: 'scheduled' as const }));
+    const service: AlarmService = { ...createNotImplementedAlarmService(), schedule };
+    const store = createAlarmStore(async () => repository, service, {
+      now: () => TUESDAY_7AM,
+      effective: (a) => (a.completionMode === 'challenge' ? { ...a, completionMode: 'reward' } : a),
+    });
+    await store.load();
+    const { alarm: saved } = await store.save(createAlarmDraft({ completionMode: 'challenge' }));
+    expect(saved.completionMode).toBe('challenge');
+    expect(schedule.mock.calls[0][0]).toMatchObject({ completionMode: 'reward', actionLabel: 'Stop & Open Terbit' });
+  });
+});
+
 describe('toAlarmSpec', () => {
-  const alarm = (overrides: Partial<Alarm> = {}): Alarm => ({ ...createAlarmDraft(overrides), id: 'a', createdAt: 0, updatedAt: 0 });
+  it('uses the mode’s one-tap action label', () => {
+    expect(toAlarmSpec(alarm({ completionMode: 'challenge' }), TUESDAY_7AM).actionLabel).toBe('Stop & Start Mission');
+    expect(toAlarmSpec(alarm({ completionMode: 'reward' }), TUESDAY_7AM).actionLabel).toBe('Stop & Open Terbit');
+    expect(toAlarmSpec(alarm({ completionMode: 'gentle' }), TUESDAY_7AM).actionLabel).toBe('Stop & Open Terbit');
+  });
 
   it('computes the next ring for one-off and weekly alarms', () => {
     // One-off 06:30 at Tuesday 07:00 → Wednesday 06:30; one-off 08:00 → today 08:00.

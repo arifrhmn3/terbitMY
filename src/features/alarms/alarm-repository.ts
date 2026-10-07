@@ -37,6 +37,7 @@ export type AlarmRow = {
   is_primary: number;
   completion_mode: string;
   gentle_reminder_minutes: number;
+  sound_id: string;
   created_at: number;
   updated_at: number;
 };
@@ -55,6 +56,7 @@ export function alarmToRow(alarm: Alarm): AlarmRow {
     is_primary: alarm.isPrimary ? 1 : 0,
     completion_mode: alarm.completionMode,
     gentle_reminder_minutes: alarm.gentleReminderMinutes,
+    sound_id: alarm.soundId,
     created_at: alarm.createdAt,
     updated_at: alarm.updatedAt,
   };
@@ -107,6 +109,7 @@ export function rowToAlarm(row: AlarmRow): Alarm {
     gentleReminderMinutes: GENTLE_REMINDER_MINUTES.includes(row.gentle_reminder_minutes as GentleReminderMinutes)
       ? (row.gentle_reminder_minutes as GentleReminderMinutes)
       : 10,
+    soundId: row.sound_id || 'system-default',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -131,8 +134,8 @@ export function createSqliteAlarmRepository(db: AlarmDatabase): AlarmRepository 
         await db.runAsync(
           `INSERT OR REPLACE INTO alarms
             (id, hour, minute, weekdays, enabled, label, mission, snooze_enabled, snooze_minutes, is_primary,
-             completion_mode, gentle_reminder_minutes, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             completion_mode, gentle_reminder_minutes, sound_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           row.id,
           row.hour,
           row.minute,
@@ -145,6 +148,7 @@ export function createSqliteAlarmRepository(db: AlarmDatabase): AlarmRepository 
           row.is_primary,
           row.completion_mode,
           row.gentle_reminder_minutes,
+          row.sound_id,
           row.created_at,
           row.updated_at,
         );

@@ -63,6 +63,15 @@ export const migrations: readonly string[] = [
   ALTER TABLE alarm_occurrences ADD COLUMN fire_evidence TEXT NOT NULL DEFAULT 'app';
   ALTER TABLE alarm_occurrences ADD COLUMN alarm_stopped_at INTEGER;
   ALTER TABLE alarm_occurrences ADD COLUMN alarm_stop_reason TEXT;`,
+
+  // 5: alarm sound per alarm (catalog decides basic/premium), and a small
+  // key-value table for local app settings such as the mock entitlement.
+  `ALTER TABLE alarms ADD COLUMN sound_id TEXT NOT NULL DEFAULT 'system-default';
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

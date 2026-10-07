@@ -21,9 +21,18 @@ Each alarm has a `completionMode`, copied onto every occurrence. The rules live 
 
 | Mode | Alarm screen | Counts for reward / streak | Extra |
 |---|---|---|---|
-| **Reward** (default; existing alarms migrated here) | Start mission, or Skip (no reward) | Mission completed, then or later that morning | — |
-| **Challenge** | Opens straight into the mission; "Give up" is recorded as an incomplete Challenge morning | Mission completed | System alarm title says "open Terbit MY for your mission" |
-| **Gentle** | Start mission, or Later | Mission completed, including after the follow-up | Follow-up due `gentleReminderMinutes` after the alarm stops, shown in the app. Reminder notifications aren't sent yet. |
+| **Reward** *(free/core; existing alarms migrated here)* | One-tap **Stop & Open Terbit** → straight into the mission; or Skip (no reward) | Mission completed, then or later that morning | — |
+| **Challenge** *(premium-capable)* | One-tap **Stop & Start Mission** → straight into the mission; "Give up" = incomplete Challenge morning | Mission completed | Needs the `challenge_mode` entitlement; otherwise the alarm behaves as Reward (it still rings) |
+| **Gentle** *(free/core)* | One-tap **Stop & Open Terbit** → the mission; or Later | Mission completed, including after the follow-up | Local reminder notification `gentleReminderMinutes` (5/10/15) after the alarm stops (iOS; Android in the parity phase) |
+
+The mode belongs to **each alarm**, so different alarms can use different modes. Availability comes from the entitlement layer (see [MONETISATION.md](MONETISATION.md)).
+
+### One-tap action ("Stop & Open Terbit")
+- **iOS:** the AlarmKit alert has the system **Stop** button plus a secondary button with the mode's label. Its App Intent (`TerbitOpenMissionIntent`, `supportedModes: .foreground(.immediate)`) stops that alert, records `{alarmId, nativeId, action: 'mission', at}`, and asks iOS to open Terbit MY.
+  - On launch, the hand-off reads the record, creates the morning (with 'system' evidence) and goes straight into the mission.
+  - The Stop button's intent (`TerbitStopIntent`, background) records a system stop.
+  - AlarmKit has no route-into-a-screen API, so this record-then-reconcile hand-off is the supported pattern. iOS may also show other system dismiss controls that don't run Terbit MY's intents.
+- **Android:** the native alarm screen's primary button is **Stop & Open Terbit** (**Stop & Start Mission** in Challenge mode). It stops the sound and opens `terbitmy://alarm-fired?…&start=1`. **Stop alarm** stays available.
 
 The completion deadline is one hour after the alarm was due. For Gentle it's one hour after the follow-up.
 
@@ -63,14 +72,15 @@ App opens / returns to foreground → handOff.sync()                  src/featur
 ## Known limitations
 
 - **iOS:**
-  - AlarmKit doesn't tell apps when an alarm fires or is stopped. Fires are worked out from the schedule when Terbit MY opens, and a stop isn't known. A morning nobody acts on in the app closes as "Missed (no response recorded)".
-  - The iOS alarm can't open the mission directly. The user opens Terbit MY, which then routes to the mission. This could be improved later with an AlarmKit App Intent button.
+  - AlarmKit doesn't report fires to apps. Without a button tap, fires are worked out from the schedule when Terbit MY opens. Taps on Stop / Stop & Open Terbit are recorded by App Intents and confirm the fire.
+  - Some system dismiss paths may not run the intents. Those mornings close as "Missed (no response recorded)".
+  - Running App Intents from inside our Expo module follows a pattern used by another published Expo AlarmKit module, but is unverified until tested on the iPhone.
 - **iOS before 26:** no native alarms. The app says so.
 - **Android:**
   - The alarm sound is a repeating alarm-category notification, not yet a foreground service.
   - Saved alarms are put back after a restart (`RescheduleReceiver`), but not before the first unlock after a restart.
 - **Snooze:** not available on either platform yet.
-- **Gentle:** the follow-up is shown in the app only. No notification is sent yet.
+- **Gentle:** the follow-up is a local notification on iOS. It's scheduled when Terbit MY learns the alarm stopped (normally when the app opens via Stop & Open Terbit or afterwards), not by the system Stop alone. Android shows it in the app only, until the parity phase.
 
 ## Android notes
 

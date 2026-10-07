@@ -18,6 +18,8 @@ struct NativeAlarmRecord: Codable {
   var hour: Int?
   var minute: Int?
   var weekdays: [Int]?
+  /// Saved alarms: the mode the AlarmKit alarm was created with (decides its button label).
+  var completionMode: String?
 }
 
 enum NativeAlarmRecords {
@@ -38,5 +40,28 @@ enum NativeAlarmRecords {
 
   static func nowMs() -> Double {
     Date().timeIntervalSince1970 * 1000
+  }
+}
+
+/// Taps on the AlarmKit buttons, recorded by Terbit MY's App Intents (which
+/// run even when the app isn't open). JavaScript reads these on launch to
+/// learn which alarm fired and how it was stopped.
+enum NativeAlarmActions {
+  private static let key = "terbit.nativeAlarmActions.v1"
+  private static let maxActions = 60
+
+  /// action: "mission" (Stop & Open Terbit / Stop & Start Mission) or "stop" (the system Stop button).
+  static func record(alarmId: String, nativeId: String, action: String) {
+    var actions = load()
+    actions.insert(
+      ["alarmId": alarmId, "nativeId": nativeId, "action": action, "at": NativeAlarmRecords.nowMs()],
+      at: 0
+    )
+    UserDefaults.standard.set(Array(actions.prefix(maxActions)), forKey: key)
+  }
+
+  /// Newest first.
+  static func load() -> [[String: Any]] {
+    (UserDefaults.standard.array(forKey: key) as? [[String: Any]]) ?? []
   }
 }

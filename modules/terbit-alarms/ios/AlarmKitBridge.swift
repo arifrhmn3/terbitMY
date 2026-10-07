@@ -28,12 +28,21 @@ enum AlarmKitBridge {
   }
 
   static func scheduleOneTime(alarmId: String, occurrenceId: String?, date: Date, title: String) async throws -> UUID {
-    try await schedule(alarmId: alarmId, occurrenceId: occurrenceId, title: title, schedule: .fixed(date))
+    try await schedule(alarmId: alarmId, occurrenceId: occurrenceId, title: title, schedule: .fixed(date), actionLabel: nil)
   }
 
   /// A saved alarm: weekly at hour:minute on `weekdays` (0 = Sunday), or once at `date` when `weekdays` is empty.
-  /// AlarmKit repeats weekly alarms itself, without Terbit MY running.
-  static func scheduleSaved(alarmId: String, hour: Int, minute: Int, weekdays: [Int], date: Date, title: String) async throws -> UUID {
+  /// AlarmKit repeats weekly alarms itself, without Terbit MY running. `actionLabel` is the one-tap
+  /// "Stop & Open Terbit" / "Stop & Start Mission" button.
+  static func scheduleSaved(
+    alarmId: String,
+    hour: Int,
+    minute: Int,
+    weekdays: [Int],
+    date: Date,
+    title: String,
+    actionLabel: String
+  ) async throws -> UUID {
     let schedule: Alarm.Schedule
     if weekdays.isEmpty {
       schedule = .fixed(date)
@@ -41,34 +50,56 @@ enum AlarmKitBridge {
       let days = weekdays.compactMap { localeWeekdays[$0] }
       schedule = .relative(.init(time: .init(hour: hour, minute: minute), repeats: .weekly(days)))
     }
-    return try await self.schedule(alarmId: alarmId, occurrenceId: nil, title: title, schedule: schedule)
+    return try await self.schedule(
+      alarmId: alarmId,
+      occurrenceId: nil,
+      title: title,
+      schedule: schedule,
+      actionLabel: actionLabel.isEmpty ? "Stop & Open Terbit" : actionLabel
+    )
   }
 
   private static let localeWeekdays: [Int: Locale.Weekday] = [
     0: .sunday, 1: .monday, 2: .tuesday, 3: .wednesday, 4: .thursday, 5: .friday, 6: .saturday,
   ]
 
-  private static func schedule(alarmId: String, occurrenceId: String?, title: String, schedule: Alarm.Schedule) async throws -> UUID {
+  private static func schedule(
+    alarmId: String,
+    occurrenceId: String?,
+    title: String,
+    schedule: Alarm.Schedule,
+    actionLabel: String?
+  ) async throws -> UUID {
     let id = UUID()
-    // The system shows its own Stop control. Terbit MY cannot force a
-    // mission before the alarm stops; the mission happens in the app after.
+    // The system Stop button is always shown and always works. Terbit MY
+    // can't force the mission before the alarm stops. The optional secondary
+    // button ("Stop & Open Terbit") stops the alarm and opens the mission.
     // This initializer is deprecated in newer SDKs but exists in every iOS 26
     // SDK, so it compiles whichever Xcode 26 version EAS uses.
     let alert = AlarmPresentation.Alert(
       title: LocalizedStringResource(stringLiteral: title),
       stopButton: AlarmButton(text: "Stop", textColor: .white, systemImageName: "stop.circle"),
-      secondaryButton: nil,
-      secondaryButtonBehavior: nil
+      secondaryButton: actionLabel.map {
+        AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "sunrise.fill")
+      },
+      secondaryButtonBehavior: actionLabel == nil ? nil : AlarmPresentation.Alert.SecondaryButtonBehavior.custom
     )
     let attributes = AlarmAttributes<TerbitAlarmMetadata>(
       presentation: AlarmPresentation(alert: alert),
       metadata: TerbitAlarmMetadata(alarmId: alarmId, occurrenceId: occurrenceId),
       tintColor: Color.orange
     )
-    let configuration: AlarmManager.AlarmConfiguration<TerbitAlarmMetadata> = .alarm(
-      schedule: schedule,
-      attributes: attributes
-    )
+    let configuration: AlarmManager.AlarmConfiguration<TerbitAlarmMetadata>
+    if actionLabel != nil {
+      configuration = .alarm(
+        schedule: schedule,
+        attributes: attributes,
+        stopIntent: TerbitStopIntent(alarmId: alarmId, nativeId: id.uuidString),
+        secondaryIntent: TerbitOpenMissionIntent(alarmId: alarmId, nativeId: id.uuidString)
+      )
+    } else {
+      configuration = .alarm(schedule: schedule, attributes: attributes)
+    }
     _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
     return id
   }

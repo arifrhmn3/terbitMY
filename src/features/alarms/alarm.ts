@@ -35,8 +35,9 @@ export type SnoozePreference = {
 export type CompletionMode = 'reward' | 'challenge' | 'gentle';
 export const COMPLETION_MODES: readonly CompletionMode[] = ['reward', 'challenge', 'gentle'];
 
-export type GentleReminderMinutes = 5 | 10 | 15 | 30;
-export const GENTLE_REMINDER_MINUTES: readonly GentleReminderMinutes[] = [5, 10, 15, 30];
+/** Provisional beta values; changing them needs no database change (stored as a plain number). */
+export type GentleReminderMinutes = 5 | 10 | 15;
+export const GENTLE_REMINDER_MINUTES: readonly GentleReminderMinutes[] = [5, 10, 15];
 
 /**
  * One alarm as the user configured it. The device copy is the source of
@@ -57,8 +58,10 @@ export type Alarm = {
   /** The user's main wake-up alarm. At most one alarm has this set. */
   isPrimary: boolean;
   completionMode: CompletionMode;
-  /** Gentle mode: minutes after the alarm stops before a follow-up reminder, if the mission isn't done. */
+  /** Gentle mode: minutes after the alarm stops before a follow-up reminder, if the mission isn't done. Kept (unused) in other modes. */
   gentleReminderMinutes: GentleReminderMinutes;
+  /** Alarm sound (see sounds.ts). Basic or premium is decided by the catalog and access policy, not stored here. */
+  soundId: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -77,6 +80,7 @@ export function createAlarmDraft(overrides: Partial<AlarmDraft> = {}): AlarmDraf
     isPrimary: false,
     completionMode: 'reward',
     gentleReminderMinutes: 10,
+    soundId: 'system-default',
     ...overrides,
   };
 }

@@ -39,10 +39,14 @@ _Last updated: 7 October 2026_
 | Native alarm proof of concept (one-time test alarm) | ✅ **Physically verified on iPhone and Android** |
 | **Saved alarms scheduled natively** (create/edit → schedule, disable/delete → cancel, weekday repeats; Android reschedules after restart / time change) | ✅ Built + unit-tested · ⏳ needs new builds + device test |
 | **Genuine alarm → occurrence → configured mission → Recent mornings** | ✅ Built + unit-tested · ⏳ needs new builds + device test |
-| **Accountability modes:** Reward / Challenge / Gentle, with `evaluateMorning`, `isRewardEligible`, `isStreakEligible` | ✅ Built + unit-tested · ⏳ device test |
+| **Accountability modes per alarm:** Reward / Challenge / Gentle, with `evaluateMorning`, `isRewardEligible`, `isStreakEligible` | ✅ Built + unit-tested · ⏳ device test |
+| **One-tap "Stop & Open Terbit" / "Stop & Start Mission"** (iOS AlarmKit App Intents; Android alarm screen) | ✅ Built · ⏳ iOS build + iPhone test |
+| **Gentle reminders** (iOS local notification, 5/10/15 min) | ✅ Built · ⏳ iPhone test |
+| **Entitlement layer** (`isFeatureAvailable`, `useEntitlement`, `FeatureGate`; local mock only; provisional freemium policy) | ✅ Built + unit-tested. See docs/MONETISATION.md |
+| Alarm sound catalog (basic/premium) and share-card architecture | ✅ Prepared (no library, no sharing UI) |
 | Simulated flow ("Simulate alarm now"), developer "Native alarm test" | ✅ Developer builds only |
 
-Checks: `npm run check` passes (192 unit tests, including real SQLite queries), `npx expo-doctor` 21/21, and iOS, Android and web bundles export without errors. Swift and Kotlin are compiled by EAS Build (there's no local Xcode or Android SDK).
+Checks: `npm run check` passes (227 unit tests, including real SQLite queries), `npx expo-doctor` 21/21, and iOS, Android and web bundles export without errors. Swift and Kotlin are compiled by EAS Build (there's no local Xcode or Android SDK).
 
 ### Accountability model (agreed product behaviour)
 
@@ -70,11 +74,18 @@ New features are built and tested on the physical iPhone first. Android stays su
 2. Decide on the remaining items below: fix now on iOS, or move to a later phase.
 3. **Android compatibility check (end of phase):** one Android development build to confirm the project still compiles, plus a quick smoke test of saved alarms. The Android alarm code for this phase is already written and unit-tested in shared code; its full device test belongs to the Android parity phase.
 
+### Provisional product policy (beta may change all of these)
+- **Model A (freemium) is active:** Reward and Gentle are free; Challenge is premium. Model B (7-day trial, then subscription) is prepared (`TRIAL_POLICY`).
+- **Rewards and streaks:** only a completed mission qualifies, in every mode (`MODE_POLICIES`).
+- **Gentle delays:** 5/10/15 minutes. Completion deadline: one hour after the alarm (Gentle: one hour after the follow-up).
+- **No billing, paywall or pricing exists.** Entitlement is a local mock, switchable in developer builds.
+
 ### Known limitations (today)
 - The system Stop control ends the alarm without the mission. This is by design and recorded.
 - **iOS:**
-  - AlarmKit doesn't report fires or stops to apps. Fires are worked out from the schedule when Terbit MY opens, and the user must open Terbit MY for the mission. Stops aren't known.
+  - AlarmKit doesn't report fires to apps. Taps on Stop / "Stop & Open Terbit" are recorded by App Intents; otherwise fires are worked out from the schedule when Terbit MY opens.
+  - Some system dismiss paths may not run the intents.
   - There's no native alarm before iOS 26.
-- **Android:** the alarm sound is a notification sound, not yet a foreground service, and alarms aren't restored before the first unlock after a restart.
+- **Android:** the alarm sound is a notification sound, not yet a foreground service. Alarms aren't restored before the first unlock after a restart. No Gentle reminder notification yet (parity phase).
 - **Snooze:** not implemented.
-- **Gentle:** the follow-up reminder isn't delivered as a notification yet.
+- **Billing:** none. Entitlement is a local mock only.

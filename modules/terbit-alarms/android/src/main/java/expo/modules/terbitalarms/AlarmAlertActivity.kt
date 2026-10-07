@@ -18,7 +18,7 @@ import java.util.Date
 /**
  * Native alarm screen shown over the lock screen. Deliberately plain and
  * native, so it works even before the React Native app loads. For saved
- * alarms with a mission, "Start mission" opens Terbit MY's mission screen;
+ * alarms with a mission, "Stop & Open Terbit" / "Stop & Start Mission" opens the mission;
  * "Stop alarm" is always available and is recorded as a stop.
  */
 class AlarmAlertActivity : Activity() {
@@ -91,7 +91,7 @@ class AlarmAlertActivity : Activity() {
 
       if (saved && missionRequired) {
         // Leads into the mission. "Stop alarm" below always stays available.
-        addView(button("Start mission") {
+        addView(button(if (challenge) "Stop & Start Mission" else "Stop & Open Terbit") {
           AlarmReceiver.stop(this@AlarmAlertActivity, alarmId, fireAt, AlarmReceiver.ACTION_NAME_MISSION)
           openTerbit(alarmId, fireAt, startMission = true)
         })

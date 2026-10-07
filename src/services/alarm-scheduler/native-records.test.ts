@@ -45,6 +45,8 @@ function spec(overrides: Partial<AlarmSpec> = {}): AlarmSpec {
     title: 'Alarm',
     nextFireAt: at(7, 6, 30),
     completionMode: 'reward',
+    actionLabel: 'Stop & Open Terbit',
+    soundId: 'system-default',
     ...overrides,
   };
 }
@@ -114,7 +116,42 @@ describe('alarmKitFireEvents', () => {
   });
 });
 
+describe('alarmKitFireEvents with AlarmKit button taps', () => {
+  const weekly = record({ nativeId: 'uuid-1', createdAt: at(5, 12) });
+
+  it('"Stop & Open Terbit" confirms the fire and asks for the mission', () => {
+    const events = alarmKitFireEvents([weekly], at(6, 0), at(6, 7), [
+      { alarmId: 'a', nativeId: 'uuid-1', action: 'mission', at: at(6, 6, 31) },
+    ]);
+    expect(events).toEqual([
+      { alarmId: 'a', scheduledAt: at(6, 6, 30), firedAt: at(6, 6, 30), evidence: 'system', stoppedAt: at(6, 6, 31), stopAction: 'mission' },
+    ]);
+  });
+
+  it('the system Stop button is recorded as a stop', () => {
+    const [event] = alarmKitFireEvents([weekly], at(6, 0), at(6, 7), [
+      { alarmId: 'a', nativeId: 'uuid-1', action: 'stop', at: at(6, 6, 32) },
+    ]);
+    expect(event).toMatchObject({ evidence: 'system', stopAction: 'stop', stoppedAt: at(6, 6, 32) });
+  });
+
+  it('matches each tap to the alarm it belongs to, not an earlier or later day', () => {
+    const events = alarmKitFireEvents([weekly], at(5, 13), at(7, 7), [
+      { alarmId: 'a', nativeId: 'uuid-1', action: 'mission', at: at(7, 6, 35) },
+    ]);
+    expect(events.map((e) => [e.scheduledAt, e.stopAction])).toEqual([
+      [at(6, 6, 30), null],
+      [at(7, 6, 30), 'mission'],
+    ]);
+  });
+});
+
 describe('isNativeUpToDate', () => {
+  it('iOS: a mode change needs a new AlarmKit alarm (different button label)', () => {
+    expect(isNativeUpToDate([record({ completionMode: 'reward' })], spec({ completionMode: 'challenge' }), 'alarmkit')).toBe(false);
+    expect(isNativeUpToDate([record({ completionMode: 'challenge' })], spec({ completionMode: 'challenge' }), 'alarmkit')).toBe(true);
+  });
+
   it('Android: matches a pending record with the same next fire time', () => {
     expect(isNativeUpToDate([record({})], spec(), 'alarm-manager')).toBe(true);
     expect(isNativeUpToDate([record({})], spec({ nextFireAt: at(8, 6, 30) }), 'alarm-manager')).toBe(false);

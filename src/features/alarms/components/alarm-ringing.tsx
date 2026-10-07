@@ -10,12 +10,13 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { evaluateMorning, MODE_POLICIES } from '@/features/alarms/accountability';
 import { describeMission, formatAlarmTime } from '@/features/alarms/alarm';
-import { occurrences } from '@/features/alarms/alarms';
+import { handOff, occurrences } from '@/features/alarms/alarms';
 import { followUpAt, isActive, type AlarmOccurrence } from '@/features/alarms/occurrence';
 import { OccurrenceError } from '@/features/alarms/occurrence-manager';
 import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import type { MathMissionResult } from '@/features/missions/math/session';
 import { useTheme } from '@/hooks/use-theme';
+import { getReminderService } from '@/services/notifications';
 
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => new Date());
@@ -91,6 +92,8 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
       else Alert.alert('Something went wrong', error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
+      // Finishing or giving up cancels a Gentle reminder; anything still open keeps one.
+      handOff.syncReminders().catch(() => {});
     }
   }
 
@@ -226,9 +229,19 @@ function Ringing(props: {
       <Button title={hasMission ? 'Start mission' : 'Turn off alarm'} onPress={onStart} disabled={busy} />
       {hasMission && mode === 'gentle' && (
         <>
-          <Button title="Later" variant="secondary" onPress={close} disabled={busy} />
+          <Button
+            title="Later"
+            variant="secondary"
+            onPress={() => {
+              handOff.syncReminders().catch(() => {});
+              close();
+            }}
+            disabled={busy}
+          />
           <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-            Follow-up reminders aren’t sent yet. Open Terbit MY again to finish the mission.
+            {getReminderService().available
+              ? `Terbit MY will remind you at ${clock(new Date(followUpAt(occurrence)))} if the mission isn’t done.`
+              : 'Reminders aren’t available on this phone yet. Open Terbit MY again to finish the mission.'}
           </ThemedText>
         </>
       )}

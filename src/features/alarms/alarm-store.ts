@@ -10,6 +10,7 @@ import {
   type Alarm,
   type AlarmDraft,
 } from './alarm';
+import { MODE_POLICIES } from './accountability';
 import type { AlarmRepository } from './alarm-repository';
 import type { AlarmService, AlarmSpec, ScheduleResult } from '@/services/alarm-scheduler';
 
@@ -42,6 +43,8 @@ export function toAlarmSpec(alarm: Alarm, now: number): AlarmSpec {
     // nextOccurrence always finds a time within 8 days for an enabled alarm.
     nextFireAt: next ? next.getTime() : now,
     completionMode: alarm.completionMode,
+    actionLabel: MODE_POLICIES[alarm.completionMode].primaryActionLabel,
+    soundId: alarm.soundId,
   };
 }
 
@@ -57,9 +60,15 @@ export function createAlarmStore(
     now?: () => number;
     /** Called after an alarm is deleted, e.g. to cancel its active occurrence. */
     onRemove?: (id: string) => Promise<void>;
+    /**
+     * How the alarm will actually behave given the user's entitlements (for
+     * example Challenge falls back to Reward when unavailable). Saved settings
+     * are never changed by this. Defaults to "as saved".
+     */
+    effective?: (alarm: Alarm) => Alarm;
   } = {},
 ) {
-  const { now = Date.now, onRemove } = options;
+  const { now = Date.now, onRemove, effective = (alarm: Alarm) => alarm } = options;
   let state: AlarmStoreState = { status: 'idle', alarms: [], error: null };
   const listeners = new Set<() => void>();
 
@@ -69,7 +78,7 @@ export function createAlarmStore(
   }
 
   function sync(alarm: Alarm): Promise<ScheduleResult | null> {
-    if (alarm.enabled) return service.schedule(toAlarmSpec(alarm, now()));
+    if (alarm.enabled) return service.schedule(toAlarmSpec(effective(alarm), now()));
     return service.cancel(alarm.id).then(() => null);
   }
 
@@ -77,7 +86,7 @@ export function createAlarmStore(
   async function syncNative() {
     if (state.status !== 'ready') await load();
     const at = now();
-    await service.syncAll(state.alarms.filter((a) => a.enabled).map((a) => toAlarmSpec(a, at)));
+    await service.syncAll(state.alarms.filter((a) => a.enabled).map((a) => toAlarmSpec(effective(a), at)));
   }
 
   /**
@@ -163,6 +172,8 @@ export function createAlarmStore(
     remove,
     syncNative,
     disableAfterRinging,
+    /** The alarm as it will actually behave now (entitlement-adjusted). */
+    effective,
   };
 }
 

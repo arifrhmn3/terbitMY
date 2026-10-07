@@ -10,6 +10,7 @@ import { createOccurrence, dismissOccurrence, markAlarmFired, type AlarmOccurren
 import { createOccurrenceManager } from './occurrence-manager';
 import { createSqliteOccurrenceRepository, DuplicateOccurrenceError } from './occurrence-repository';
 import { migrate, migrations } from '@/services/storage/migrations';
+import { createSqliteSettingsStore } from '@/services/storage/settings';
 import { openTestDatabase } from '@/services/storage/testing/node-sqlite';
 
 async function database() {
@@ -88,6 +89,11 @@ describe('SQLite migration 4 (accountability modes)', () => {
     );
 
     expect(await migrate(db)).toBe(migrations.length - 3);
+    // Migration 5 also gives every existing alarm the default sound, and adds app settings.
+    expect((await createSqliteAlarmRepository(db).list())[0].soundId).toBe('system-default');
+    const settings = createSqliteSettingsStore(db);
+    await settings.set('entitlement.mock.v1', { tier: 'premium' });
+    expect(await settings.get('entitlement.mock.v1')).toEqual({ tier: 'premium' });
 
     const [alarm] = await createSqliteAlarmRepository(db).list();
     expect(alarm).toMatchObject({ id: 'old', completionMode: 'reward', gentleReminderMinutes: 10, label: 'Subuh' });
@@ -107,11 +113,11 @@ describe('SQLite alarm repository', () => {
     const repo = createSqliteAlarmRepository(await database());
     await repo.save({ ...alarm, id: 'r', completionMode: 'reward' });
     await repo.save({ ...alarm, id: 'c', completionMode: 'challenge', isPrimary: false });
-    await repo.save({ ...alarm, id: 'g', completionMode: 'gentle', gentleReminderMinutes: 30, isPrimary: false });
+    await repo.save({ ...alarm, id: 'g', completionMode: 'gentle', gentleReminderMinutes: 15, isPrimary: false });
     const byId = Object.fromEntries((await repo.list()).map((a) => [a.id, a]));
     expect(byId.r.completionMode).toBe('reward');
     expect(byId.c.completionMode).toBe('challenge');
-    expect(byId.g).toMatchObject({ completionMode: 'gentle', gentleReminderMinutes: 30 });
+    expect(byId.g).toMatchObject({ completionMode: 'gentle', gentleReminderMinutes: 15 });
   });
 
   it('saves, updates, lists and removes alarms', async () => {

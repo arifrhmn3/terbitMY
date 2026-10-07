@@ -109,6 +109,8 @@ any active status ─► dismissed | missed | cancelled
 
 Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy), with no database change. Phase 2 XP and streaks must use these functions, not raw statuses.
 
+**Entitlements** (`src/features/entitlements`, `src/services/entitlements`). Feature screens ask `isFeatureAvailable` / `useEntitlement().has(feature)` / `<FeatureGate>`, never "is premium". Which features are free, trial or premium is provisional policy in `policy.ts`. Each alarm's needs are derived from its settings (`alarm-features.ts`), and a locked mode falls back to Reward so alarms always ring. No billing yet; see [MONETISATION.md](MONETISATION.md).
+
 **Native hand-off** (`alarm-handoff.ts`, `use-alarm-handoff.ts`). When the app opens or returns to the foreground: native fire events become occurrences (safe to repeat), fired one-off alarms are turned off, the native schedule is reconciled, and the newest open native morning opens the alarm screen. Android's "Start mission" opens `terbitmy://alarm-fired?…` straight into the mission.
 
 - `src/features/alarms/occurrence.ts`: pure state rules. Finished occurrences can never change.

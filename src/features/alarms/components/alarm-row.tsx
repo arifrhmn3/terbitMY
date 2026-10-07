@@ -3,7 +3,13 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { describeMission, describeRepeat, formatAlarmTime, type Alarm } from '@/features/alarms/alarm';
+import {
+  COMPLETION_MODE_LABEL,
+  describeMission,
+  describeRepeat,
+  formatAlarmTime,
+  type Alarm,
+} from '@/features/alarms/alarm';
 import { useTheme } from '@/hooks/use-theme';
 
 type AlarmRowProps = {
@@ -15,7 +21,12 @@ type AlarmRowProps = {
 export function AlarmRow({ alarm, onToggle }: AlarmRowProps) {
   const theme = useTheme();
   const time = formatAlarmTime(alarm);
-  const details = [alarm.label, describeRepeat(alarm.weekdays), describeMission(alarm.mission)]
+  const details = [
+    alarm.label,
+    describeRepeat(alarm.weekdays),
+    describeMission(alarm.mission),
+    alarm.mission.type !== 'none' ? COMPLETION_MODE_LABEL[alarm.completionMode] : null,
+  ]
     .filter(Boolean)
     .join(' · ');
 

@@ -1,8 +1,10 @@
 import { createAlarmHandOff } from './alarm-handoff';
+import { withEffectiveSettings } from './alarm-features';
 import { createMemoryAlarmRepository } from './alarm-repository';
 import { createAlarmStore, useAlarmStore } from './alarm-store';
 import { createOccurrenceManager } from './occurrence-manager';
 import { createMemoryOccurrenceRepository } from './occurrence-repository';
+import { entitlements } from '@/features/entitlements/entitlements';
 import { getAlarmService } from '@/services/alarm-scheduler';
 
 const repository = createMemoryAlarmRepository();
@@ -16,9 +18,15 @@ export const occurrences = createOccurrenceManager(async () => occurrenceReposit
 
 export const alarmStore = createAlarmStore(async () => repository, getAlarmService(), {
   onRemove: occurrences.cancelForAlarm,
+  effective: (alarm) => withEffectiveSettings(alarm, entitlements.check()),
 });
 
-export const handOff = createAlarmHandOff({ alarmStore, occurrences, service: getAlarmService() });
+export const handOff = createAlarmHandOff({
+  alarmStore,
+  occurrences,
+  service: getAlarmService(),
+  beforeSync: entitlements.ensureLoaded,
+});
 
 export function useAlarms() {
   return useAlarmStore(alarmStore);

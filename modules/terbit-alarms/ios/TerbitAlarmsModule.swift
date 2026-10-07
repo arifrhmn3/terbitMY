@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import Foundation
 import UIKit
+import UserNotifications
 
 struct OneTimeAlarmOptions: Record {
   @Field var alarmId: String = ""
@@ -21,6 +22,16 @@ struct SavedAlarmOptions: Record {
   @Field var title: String = "Terbit MY alarm"
   @Field var missionRequired: Bool = false
   @Field var completionMode: String = "reward"
+  /// The one-tap button, e.g. "Stop & Open Terbit" / "Stop & Start Mission".
+  @Field var actionLabel: String = "Stop & Open Terbit"
+}
+
+struct ReminderOptions: Record {
+  @Field var id: String = ""
+  @Field var title: String = "Terbit MY"
+  @Field var body: String = ""
+  /// ms since 1970
+  @Field var fireAt: Double = 0
 }
 
 /// iOS side of the TerbitAlarms module. Uses AlarmKit on iOS 26+; on older
@@ -87,8 +98,25 @@ public class TerbitAlarmsModule: Module {
           "hour": TerbitAlarmsModule.orNull(record.hour),
           "minute": TerbitAlarmsModule.orNull(record.minute),
           "weekdays": TerbitAlarmsModule.orNull(record.weekdays),
+          "completionMode": TerbitAlarmsModule.orNull(record.completionMode),
         ]
       }
+    }
+
+    AsyncFunction("listActionsAsync") { () -> [[String: Any]] in
+      NativeAlarmActions.load()
+    }
+
+    AsyncFunction("requestReminderPermissionAsync") { () async -> String in
+      await TerbitAlarmsModule.reminderPermission(askIfNeeded: true) ? "granted" : "denied"
+    }
+
+    AsyncFunction("scheduleReminderAsync") { (options: ReminderOptions) async -> Bool in
+      await TerbitAlarmsModule.scheduleReminder(options)
+    }
+
+    AsyncFunction("cancelReminderAsync") { (id: String) in
+      UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
     }
 
     AsyncFunction("openSettingsAsync") { () in
@@ -193,7 +221,8 @@ public class TerbitAlarmsModule: Module {
         kind: "test",
         hour: nil,
         minute: nil,
-        weekdays: nil
+        weekdays: nil,
+        completionMode: nil
       ))
       NativeAlarmRecords.save(records)
       return ["ok": true, "nativeId": id.uuidString]
@@ -222,7 +251,8 @@ public class TerbitAlarmsModule: Module {
         minute: options.minute,
         weekdays: weekdays,
         date: Date(timeIntervalSince1970: options.fireAt / 1000),
-        title: options.title
+        title: options.title,
+        actionLabel: options.actionLabel
       )
       records.append(NativeAlarmRecord(
         alarmId: options.alarmId,
@@ -234,13 +264,49 @@ public class TerbitAlarmsModule: Module {
         kind: "saved",
         hour: options.hour,
         minute: options.minute,
-        weekdays: weekdays
+        weekdays: weekdays,
+        completionMode: options.completionMode
       ))
       NativeAlarmRecords.save(records)
       return ["ok": true, "nativeId": id.uuidString]
     } catch {
       NativeAlarmRecords.save(records)
       return failure("scheduling_failed", error.localizedDescription)
+    }
+  }
+
+  /// Local notification permission for reminders (asks once if not yet asked).
+  private static func reminderPermission(askIfNeeded: Bool) async -> Bool {
+    let center = UNUserNotificationCenter.current()
+    let settings = await center.notificationSettings()
+    switch settings.authorizationStatus {
+    case .authorized, .provisional, .ephemeral:
+      return true
+    case .notDetermined:
+      guard askIfNeeded else { return false }
+      return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+    default:
+      return false
+    }
+  }
+
+  /// Schedules (or replaces) a one-off local reminder. Device-only; no push.
+  private static func scheduleReminder(_ options: ReminderOptions) async -> Bool {
+    guard !options.id.isEmpty, await reminderPermission(askIfNeeded: true) else { return false }
+    let seconds = options.fireAt / 1000 - Date().timeIntervalSince1970
+    guard seconds > 0 else { return false }
+    let content = UNMutableNotificationContent()
+    content.title = options.title
+    content.body = options.body
+    content.sound = .default
+    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, seconds), repeats: false)
+    let center = UNUserNotificationCenter.current()
+    center.removePendingNotificationRequests(withIdentifiers: [options.id])
+    do {
+      try await center.add(UNNotificationRequest(identifier: options.id, content: content, trigger: trigger))
+      return true
+    } catch {
+      return false
     }
   }
 }
