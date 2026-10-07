@@ -11,7 +11,10 @@ import Foundation
 struct TerbitOpenMissionIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Open Terbit MY mission"
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+  /// Current API (iOS 26): bring the app to the foreground right away.
   static var supportedModes: IntentModes { .foreground(.immediate) }
+  /// Older equivalent used in Apple's own AlarmKit sample; kept for compatibility (deprecated in iOS 26).
+  static var openAppWhenRun: Bool = true
 
   @Parameter(title: "Alarm ID")
   var alarmId: String

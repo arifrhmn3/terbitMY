@@ -20,6 +20,10 @@ struct NativeAlarmRecord: Codable {
   var weekdays: [Int]?
   /// Saved alarms: the mode the AlarmKit alarm was created with (decides its button label).
   var completionMode: String?
+  /// The secondary button label it was created with (nil = no Terbit button).
+  var actionLabel: String?
+  /// Which alert presentation was used (for developer diagnostics).
+  var presentation: String?
 }
 
 enum NativeAlarmRecords {

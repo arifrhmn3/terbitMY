@@ -104,8 +104,10 @@ export function isNativeUpToDate(records: NativeRecordPayload[], spec: AlarmSpec
     }
     return (
       ALARMKIT_LIVE.includes(r.state) &&
-      // Mode decides the button label, so a mode change needs a new AlarmKit alarm.
-      (r.completionMode == null || r.completionMode === spec.completionMode) &&
+      // Mode and button label are part of the AlarmKit alert, so a change (or an alarm
+      // created by an earlier build without the button) needs a new AlarmKit alarm.
+      r.completionMode === spec.completionMode &&
+      r.actionLabel === spec.actionLabel &&
       r.hour === spec.hour &&
       r.minute === spec.minute &&
       sameDays(r.weekdays ?? [], spec.weekdays) &&

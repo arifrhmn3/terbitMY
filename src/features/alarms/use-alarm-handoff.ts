@@ -5,6 +5,8 @@ import { AppState } from 'react-native';
 import { shouldPresent } from './alarm-handoff';
 import { handOff } from './alarms';
 
+const RECHECK_AFTER_MS = 1200;
+
 /** When each occurrence was last shown this session, so closing the alarm screen doesn't reopen it straight away. */
 const presentedAt = new Map<string, number>();
 
@@ -43,11 +45,18 @@ export function useAlarmHandOff() {
     }
 
     check();
+    let retry: ReturnType<typeof setTimeout> | null = null;
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') check();
+      if (state !== 'active') return;
+      check();
+      // iOS may bring the app forward before the alarm button's App Intent has
+      // finished recording the tap, so look again shortly after.
+      if (retry) clearTimeout(retry);
+      retry = setTimeout(check, RECHECK_AFTER_MS);
     });
     return () => {
       active = false;
+      if (retry) clearTimeout(retry);
       subscription.remove();
     };
   }, [navigationReady]);

@@ -29,6 +29,8 @@ function record(overrides: Partial<NativeRecordPayload>): NativeRecordPayload {
     hour: 6,
     minute: 30,
     weekdays: [1, 2, 3, 4, 5],
+    completionMode: 'reward',
+    actionLabel: 'Stop & Open Terbit',
     ...overrides,
   };
 }
@@ -148,8 +150,14 @@ describe('alarmKitFireEvents with AlarmKit button taps', () => {
 
 describe('isNativeUpToDate', () => {
   it('iOS: a mode change needs a new AlarmKit alarm (different button label)', () => {
-    expect(isNativeUpToDate([record({ completionMode: 'reward' })], spec({ completionMode: 'challenge' }), 'alarmkit')).toBe(false);
-    expect(isNativeUpToDate([record({ completionMode: 'challenge' })], spec({ completionMode: 'challenge' }), 'alarmkit')).toBe(true);
+    const challenge = { completionMode: 'challenge' as const, actionLabel: 'Stop & Start Mission' };
+    expect(isNativeUpToDate([record({ completionMode: 'reward' })], spec(challenge), 'alarmkit')).toBe(false);
+    expect(isNativeUpToDate([record(challenge)], spec(challenge), 'alarmkit')).toBe(true);
+  });
+
+  it('iOS: an alarm created without the Terbit button (earlier build) is rescheduled', () => {
+    expect(isNativeUpToDate([record({ actionLabel: null, completionMode: null })], spec(), 'alarmkit')).toBe(false);
+    expect(isNativeUpToDate([record({ actionLabel: undefined, completionMode: undefined })], spec(), 'alarmkit')).toBe(false);
   });
 
   it('Android: matches a pending record with the same next fire time', () => {

@@ -26,6 +26,11 @@ export type NativeStatusPayload = {
   fullScreenAllowed?: boolean;
   /** Plain-language explanation when something is missing. */
   reason?: string;
+  /** iOS diagnostics: alarms AlarmKit holds for this app, and how many Terbit MY doesn't track (left by earlier builds). */
+  registeredAlarmCount?: number;
+  untrackedAlarmCount?: number;
+  /** iOS diagnostics: the alert presentation this iOS version uses. */
+  presentation?: string;
 };
 
 export type OneTimeAlarmOptions = {
@@ -93,6 +98,10 @@ export type NativeRecordPayload = {
   weekdays?: number[] | null;
   /** iOS saved alarms: the mode the AlarmKit alarm was created with (decides its button label). */
   completionMode?: 'reward' | 'challenge' | 'gentle' | null;
+  /** iOS: the Terbit button label it was created with (null = no button). */
+  actionLabel?: string | null;
+  /** iOS: which alert presentation was used (diagnostics). */
+  presentation?: string | null;
 };
 
 export type TerbitAlarmsNativeModule = {
@@ -108,6 +117,8 @@ export type TerbitAlarmsNativeModule = {
   listAsync(): Promise<NativeRecordPayload[]>;
   /** Opens the system settings page where the missing permission can be turned on. */
   openSettingsAsync(): Promise<void>;
+  /** iOS only (developer tool): cancels every AlarmKit alarm of this app. Returns how many. */
+  resetAllAsync?(): Promise<number>;
   /** iOS only: recent taps on the AlarmKit buttons, newest first. */
   listActionsAsync?(): Promise<NativeAlarmAction[]>;
   /** iOS only: local notification reminders (Gentle mode). */

@@ -6,6 +6,7 @@ import {
   describeScheduleResult,
   formatClockTime,
   nativeTestFireTime,
+  savedFlowTestTime,
 } from './native-alarm-test';
 
 describe('native alarm test helpers', () => {
@@ -36,5 +37,13 @@ describe('native alarm test helpers', () => {
   it('describes native states in plain words', () => {
     expect(describeNativeState('alerting')).toBe('Ringing now');
     expect(describeNativeState('something-new')).toBe('something-new');
+  });
+});
+
+describe('saved-alarm flow test time', () => {
+  it('rounds up to a whole minute about two minutes ahead', () => {
+    const now = new Date(2026, 9, 7, 6, 30, 20).getTime();
+    expect(savedFlowTestTime(now)).toEqual({ hour: 6, minute: 33, fireAt: new Date(2026, 9, 7, 6, 33, 0).getTime() });
+    expect(savedFlowTestTime(new Date(2026, 9, 7, 23, 58, 0).getTime())).toMatchObject({ hour: 0, minute: 0 });
   });
 });

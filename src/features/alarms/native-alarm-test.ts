@@ -66,3 +66,13 @@ const STATE_TEXT: Record<string, string> = {
 export function describeNativeState(state: string): string {
   return STATE_TEXT[state] ?? state;
 }
+
+/** Label of the saved alarm the diagnostics panel creates for the real flow test. */
+export const SAVED_FLOW_TEST_LABEL = 'Terbit test';
+
+/** A clock time about two minutes ahead, on a whole minute (saved alarms ring on whole minutes). */
+export function savedFlowTestTime(now: number): { hour: number; minute: number; fireAt: number } {
+  const fireAt = Math.ceil((now + 2 * 60 * 1000) / 60_000) * 60_000;
+  const d = new Date(fireAt);
+  return { hour: d.getHours(), minute: d.getMinutes(), fireAt };
+}

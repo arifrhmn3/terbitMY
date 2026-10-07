@@ -128,6 +128,8 @@ describe('native alarm service: saved alarms', () => {
       hour: 6,
       minute: 30,
       weekdays: [1, 2, 3, 4, 5],
+      completionMode: 'challenge',
+      actionLabel: 'Stop & Start Mission',
       ...extra,
     });
     const native = fakeModule({}, [live('alarm-1'), live('deleted-alarm'), live('alarm-2', { minute: 0 })]);

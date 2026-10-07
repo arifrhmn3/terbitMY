@@ -55,5 +55,11 @@ export function createNotImplementedAlarmService(summary = DEFAULT_SUMMARY): Ala
     async openNativeAlarmSettings() {
       // No native settings to open.
     },
+    async listNativeActions() {
+      return [];
+    },
+    async resetNativeAlarms() {
+      return 0;
+    },
   };
 }

@@ -71,19 +71,31 @@ enum AlarmKitBridge {
     actionLabel: String?
   ) async throws -> UUID {
     let id = UUID()
-    // The system Stop button is always shown and always works. Terbit MY
-    // can't force the mission before the alarm stops. The optional secondary
-    // button ("Stop & Open Terbit") stops the alarm and opens the mission.
-    // This initializer is deprecated in newer SDKs but exists in every iOS 26
-    // SDK, so it compiles whichever Xcode 26 version EAS uses.
-    let alert = AlarmPresentation.Alert(
-      title: LocalizedStringResource(stringLiteral: title),
-      stopButton: AlarmButton(text: "Stop", textColor: .white, systemImageName: "stop.circle"),
-      secondaryButton: actionLabel.map {
-        AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "sunrise.fill")
-      },
-      secondaryButtonBehavior: actionLabel == nil ? nil : AlarmPresentation.Alert.SecondaryButtonBehavior.custom
-    )
+    // Apple's own Stop control is always available; Terbit MY can't remove it
+    // or force the mission first. The secondary button ("Stop & Open Terbit")
+    // supplements it: it stops the alarm and opens the mission.
+    let secondaryButton = actionLabel.map {
+      AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "sunrise.fill")
+    }
+    let secondaryBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior? =
+      actionLabel == nil ? nil : AlarmPresentation.Alert.SecondaryButtonBehavior.custom
+    let alert: AlarmPresentation.Alert
+    if #available(iOS 26.1, *) {
+      // Current API (iOS 26.1+): the system draws its own Stop control; we supply only the secondary button.
+      alert = AlarmPresentation.Alert(
+        title: LocalizedStringResource(stringLiteral: title),
+        secondaryButton: secondaryButton,
+        secondaryButtonBehavior: secondaryBehavior
+      )
+    } else {
+      // iOS 26.0 only: this initializer was deprecated in 26.1 ("stopButton … will no longer be used").
+      alert = AlarmPresentation.Alert(
+        title: LocalizedStringResource(stringLiteral: title),
+        stopButton: AlarmButton(text: "Stop", textColor: .white, systemImageName: "stop.circle"),
+        secondaryButton: secondaryButton,
+        secondaryButtonBehavior: secondaryBehavior
+      )
+    }
     let attributes = AlarmAttributes<TerbitAlarmMetadata>(
       presentation: AlarmPresentation(alert: alert),
       metadata: TerbitAlarmMetadata(alarmId: alarmId, occurrenceId: occurrenceId),
@@ -102,6 +114,22 @@ enum AlarmKitBridge {
     }
     _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
     return id
+  }
+
+  /// Which alert presentation this iOS version uses (shown in developer diagnostics).
+  static func presentationName(hasButton: Bool) -> String {
+    let base: String
+    if #available(iOS 26.1, *) {
+      base = "iOS 26.1+ alert (system Stop)"
+    } else {
+      base = "iOS 26.0 alert (custom Stop)"
+    }
+    return hasButton ? base + " + Terbit button" : base + ", no Terbit button"
+  }
+
+  /// Every alarm AlarmKit holds for this app, including ones from earlier builds that Terbit MY no longer tracks.
+  static func allAlarmIds() -> [String] {
+    ((try? AlarmManager.shared.alarms) ?? []).map { $0.id.uuidString }
   }
 
   static func cancel(nativeId: String) {

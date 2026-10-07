@@ -32,6 +32,10 @@ The mode belongs to **each alarm**, so different alarms can use different modes.
   - On launch, the hand-off reads the record, creates the morning (with 'system' evidence) and goes straight into the mission.
   - The Stop button's intent (`TerbitStopIntent`, background) records a system stop.
   - AlarmKit has no route-into-a-screen API, so this record-then-reconcile hand-off is the supported pattern. iOS may also show other system dismiss controls that don't run Terbit MY's intents.
+- **iOS presentation API:** iOS 26.1+ uses `AlarmPresentation.Alert(title:secondaryButton:secondaryButtonBehavior:)`. The system draws Stop, often as a slider; "Prefer Single Touch Actions" in Accessibility makes it a button. iOS 26.0 falls back to the older `stopButton:` initializer, which Apple deprecated in 26.1 ("stopButton … will no longer be used").
+  - The Terbit button **supplements** Apple's Stop. It can't replace or remove it.
+  - Any AlarmKit alarm created without the current button and mode (for example by an earlier build) is rescheduled automatically when the app opens.
+  - Developer builds have **Alarms → Alarm diagnostics**: a real saved-alarm flow test, each alarm's button and presentation, recent button taps, and "Rebuild native alarms".
 - **Android:** the native alarm screen's primary button is **Stop & Open Terbit** (**Stop & Start Mission** in Challenge mode). It stops the sound and opens `terbitmy://alarm-fired?…&start=1`. **Stop alarm** stays available.
 
 The completion deadline is one hour after the alarm was due. For Gentle it's one hour after the follow-up.

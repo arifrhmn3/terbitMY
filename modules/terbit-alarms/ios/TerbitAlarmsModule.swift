@@ -99,8 +99,29 @@ public class TerbitAlarmsModule: Module {
           "minute": TerbitAlarmsModule.orNull(record.minute),
           "weekdays": TerbitAlarmsModule.orNull(record.weekdays),
           "completionMode": TerbitAlarmsModule.orNull(record.completionMode),
+          "actionLabel": TerbitAlarmsModule.orNull(record.actionLabel),
+          "presentation": TerbitAlarmsModule.orNull(record.presentation),
         ]
       }
+    }
+
+    /// Developer tool: cancels every AlarmKit alarm this app holds (including
+    /// untracked ones from earlier builds). JavaScript then reschedules saved alarms.
+    AsyncFunction("resetAllAsync") { () -> Int in
+      var records = NativeAlarmRecords.load()
+      var cancelled = 0
+      if #available(iOS 26.0, *) {
+        for nativeId in AlarmKitBridge.allAlarmIds() {
+          AlarmKitBridge.cancel(nativeId: nativeId)
+          cancelled += 1
+        }
+      }
+      let now = NativeAlarmRecords.nowMs()
+      for index in records.indices where records[index].cancelledAt == nil {
+        records[index].cancelledAt = now
+      }
+      NativeAlarmRecords.save(records)
+      return cancelled
     }
 
     AsyncFunction("listActionsAsync") { () -> [[String: Any]] in
@@ -144,11 +165,16 @@ public class TerbitAlarmsModule: Module {
       ]
     }
     let current = permission ?? AlarmKitBridge.permission()
+    let registered = AlarmKitBridge.allAlarmIds()
+    let tracked = Set(NativeAlarmRecords.load().filter { $0.cancelledAt == nil }.map { $0.nativeId })
     var result: [String: Any] = [
       "available": true,
       "backend": "alarmkit",
       "permission": current,
       "osVersion": osVersion,
+      "registeredAlarmCount": registered.count,
+      "untrackedAlarmCount": registered.filter { !tracked.contains($0) }.count,
+      "presentation": AlarmKitBridge.presentationName(hasButton: true),
     ]
     if current == "denied" {
       result["reason"] = "Alarms are turned off for Terbit MY. Turn them on in Settings."
@@ -222,7 +248,9 @@ public class TerbitAlarmsModule: Module {
         hour: nil,
         minute: nil,
         weekdays: nil,
-        completionMode: nil
+        completionMode: nil,
+        actionLabel: nil,
+        presentation: AlarmKitBridge.presentationName(hasButton: false)
       ))
       NativeAlarmRecords.save(records)
       return ["ok": true, "nativeId": id.uuidString]
@@ -265,7 +293,9 @@ public class TerbitAlarmsModule: Module {
         hour: options.hour,
         minute: options.minute,
         weekdays: weekdays,
-        completionMode: options.completionMode
+        completionMode: options.completionMode,
+        actionLabel: options.actionLabel,
+        presentation: AlarmKitBridge.presentationName(hasButton: true)
       ))
       NativeAlarmRecords.save(records)
       return ["ok": true, "nativeId": id.uuidString]

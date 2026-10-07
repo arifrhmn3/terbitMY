@@ -14,6 +14,9 @@ export function toNativeAlarmStatus(payload: NativeStatusPayload): NativeAlarmSt
     permission: payload.available ? payload.permission : 'unavailable',
     fullScreenAllowed: payload.fullScreenAllowed ?? null,
     detail: payload.reason ?? null,
+    registeredAlarmCount: payload.registeredAlarmCount,
+    untrackedAlarmCount: payload.untrackedAlarmCount,
+    presentation: payload.presentation,
   };
 }
 
@@ -134,6 +137,14 @@ export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backe
 
     async openNativeAlarmSettings() {
       await native.openSettingsAsync();
+    },
+
+    async listNativeActions() {
+      return native.listActionsAsync ? native.listActionsAsync() : [];
+    },
+
+    async resetNativeAlarms() {
+      return native.resetAllAsync ? native.resetAllAsync() : 0;
     },
   };
   return service;

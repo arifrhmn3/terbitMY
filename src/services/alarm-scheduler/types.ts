@@ -56,6 +56,18 @@ export type NativeAlarmStatus = {
   fullScreenAllowed: boolean | null;
   /** Plain-language explanation when something is missing. */
   detail: string | null;
+  /** iOS diagnostics (developer panel). */
+  registeredAlarmCount?: number;
+  untrackedAlarmCount?: number;
+  presentation?: string;
+};
+
+/** A tap on an AlarmKit alarm's buttons (iOS), recorded natively. */
+export type NativeAlarmActionRecord = {
+  alarmId: string;
+  nativeId: string;
+  action: 'mission' | 'stop';
+  at: number;
 };
 
 export type OneTimeAlarmRequest = {
@@ -79,6 +91,16 @@ export type NativeAlarmRecord = {
   firedAt: number | null;
   stoppedAt: number | null;
   cancelledAt: number | null;
+  /** 'test' (developer raw test) or 'saved' (a saved Terbit MY alarm). */
+  kind?: 'test' | 'saved';
+  stopAction?: 'stop' | 'mission' | null;
+  /** iOS saved alarms: the schedule, mode, button label and presentation AlarmKit was given (diagnostics). */
+  hour?: number | null;
+  minute?: number | null;
+  weekdays?: number[] | null;
+  completionMode?: 'reward' | 'challenge' | 'gentle' | null;
+  actionLabel?: string | null;
+  presentation?: string | null;
 };
 
 /** A genuine native alarm that went off, as reported by `getFireEvents`. */
@@ -128,4 +150,8 @@ export interface AlarmService {
   listNativeAlarms(): Promise<NativeAlarmRecord[]>;
   /** Opens the system settings page for the missing alarm permission. */
   openNativeAlarmSettings(): Promise<void>;
+  /** iOS: recent taps on alarm buttons (developer diagnostics). Empty elsewhere. */
+  listNativeActions(): Promise<NativeAlarmActionRecord[]>;
+  /** Developer tool: cancels every native alarm of this app (then call syncAll). Returns how many. */
+  resetNativeAlarms(): Promise<number>;
 }

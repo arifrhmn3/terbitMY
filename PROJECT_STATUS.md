@@ -40,7 +40,7 @@ _Last updated: 7 October 2026_
 | **Saved alarms scheduled natively** (create/edit → schedule, disable/delete → cancel, weekday repeats; Android reschedules after restart / time change) | ✅ Built + unit-tested · ⏳ needs new builds + device test |
 | **Genuine alarm → occurrence → configured mission → Recent mornings** | ✅ Built + unit-tested · ⏳ needs new builds + device test |
 | **Accountability modes per alarm:** Reward / Challenge / Gentle, with `evaluateMorning`, `isRewardEligible`, `isStreakEligible` | ✅ Built + unit-tested · ⏳ device test |
-| **One-tap "Stop & Open Terbit" / "Stop & Start Mission"** (iOS AlarmKit App Intents; Android alarm screen) | ✅ Built · ⏳ iOS build + iPhone test |
+| **One-tap "Stop & Open Terbit" / "Stop & Start Mission"** (iOS AlarmKit App Intents; Android alarm screen) | ✅ Built · First iPhone test (build 59f24b9): button not visible. Fix: switched to the iOS 26.1+ alert API, rescheduled alarms without the button, added on-device diagnostics. ⏳ New iOS build + retest |
 | **Gentle reminders** (iOS local notification, 5/10/15 min) | ✅ Built · ⏳ iPhone test |
 | **Entitlement layer** (`isFeatureAvailable`, `useEntitlement`, `FeatureGate`; local mock only; provisional freemium policy) | ✅ Built + unit-tested. See docs/MONETISATION.md |
 | Alarm sound catalog (basic/premium) and share-card architecture | ✅ Prepared (no library, no sharing UI) |
