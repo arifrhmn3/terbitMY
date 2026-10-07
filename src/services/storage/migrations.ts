@@ -43,6 +43,14 @@ export const migrations: readonly string[] = [
     ON alarm_occurrences (alarm_id)
     WHERE status IN ('scheduled', 'started', 'mission_in_progress');
   CREATE INDEX IF NOT EXISTS alarm_occurrences_by_time ON alarm_occurrences (scheduled_at);`,
+
+  // 3: rename status 'started' → 'alarm_fired', and rebuild the
+  // one-active-per-alarm index to match.
+  `UPDATE alarm_occurrences SET status = 'alarm_fired' WHERE status = 'started';
+  DROP INDEX IF EXISTS alarm_occurrences_one_active_per_alarm;
+  CREATE UNIQUE INDEX alarm_occurrences_one_active_per_alarm
+    ON alarm_occurrences (alarm_id)
+    WHERE status IN ('scheduled', 'alarm_fired', 'mission_in_progress');`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

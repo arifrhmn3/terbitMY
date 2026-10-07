@@ -94,7 +94,7 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
   } else {
     switch (occurrence.status) {
       case 'scheduled':
-      case 'started':
+      case 'alarm_fired':
         content = (
           <Ringing
             occurrence={occurrence}

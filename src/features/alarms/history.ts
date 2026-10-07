@@ -1,5 +1,5 @@
 import { describeMission, formatAlarmTime } from './alarm';
-import { STATUS_LABEL, type AlarmOccurrence } from './occurrence';
+import { isSuccessfulMorning, morningOutcome, OUTCOME_LABEL, STATUS_LABEL, type AlarmOccurrence } from './occurrence';
 
 export type HistoryEntry = {
   id: string;
@@ -7,7 +7,10 @@ export type HistoryEntry = {
   scheduled: string;
   title: string;
   mission: string;
+  /** The accountability outcome, e.g. "Completed", "Dismissed, no mission", "Mission abandoned". */
   status: string;
+  /** True only for a completed mission, the one outcome that will count toward streaks. */
+  successful: boolean;
   /** e.g. "Done at 06:32 · 1 wrong answer", or null if it never finished properly. */
   completion: string | null;
   simulated: boolean;
@@ -25,6 +28,7 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
     day: 'numeric',
     month: 'short',
   });
+  const outcome = morningOutcome(o);
 
   let completion: string | null = null;
   if (o.status === 'completed' && o.endedAt !== null) {
@@ -35,6 +39,10 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
     }
   } else if (o.status === 'dismissed' && o.endedAt !== null) {
     completion = `Dismissed at ${time(o.endedAt)}`;
+    if (o.result?.kind === 'system_dismiss') completion += ' with the phone’s alarm controls';
+  }
+  if (outcome === 'mission_abandoned' && o.missionStartedAt !== null) {
+    completion = [completion, `mission started ${time(o.missionStartedAt)}`].filter(Boolean).join(' · ');
   }
 
   return {
@@ -42,7 +50,8 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
     scheduled: `${day} · ${time(o.scheduledAt)}`,
     title: o.alarmLabel || 'Alarm',
     mission: describeMission(o.mission),
-    status: STATUS_LABEL[o.status],
+    status: outcome === 'in_progress' ? STATUS_LABEL[o.status] : OUTCOME_LABEL[outcome],
+    successful: isSuccessfulMorning(o),
     completion,
     simulated: o.source === 'simulated',
   };

@@ -1,8 +1,19 @@
 # Native Alarms: What's Left to Build
 
-The shared alarm flow is finished: settings, saving, the ringing screen, the maths mission, history, and the rules that stop an alarm being completed twice. **The only missing piece is making the phone actually ring.** That part is platform code behind `AlarmService`.
+The shared alarm flow is finished: settings, saving, the ringing screen, the maths mission, history, and the rules that stop an alarm being completed twice. Native ringing is proven on both platforms. What's left is connecting the user's saved alarms to it, and handing a fired alarm over to the mission.
 
-> Status: **Milestone 1 (proof of concept) is written but not yet verified on a device.** The local module `modules/terbit-alarms` can schedule, cancel and list **one-time** native alarms:
+## Platform limitation: the system Stop control can't be prevented
+
+On both iOS (AlarmKit) and Android, the operating system always gives the user a way to stop a ringing alarm: the system alarm UI, the notification, or the lock screen. **Terbit MY must not try to disable, hide or bypass these controls.** This was confirmed on real devices in milestone 1.
+
+This is part of the product's accountability model, not a bug:
+- Stopping the alarm without finishing the mission is recorded as **dismissed** (`system_dismiss` when the phone's controls were used, `emergency_dismiss` for the in-app button).
+- A mission that was started but not finished is **mission abandoned**.
+- Only a **completed mission** is a successful morning (`isSuccessfulMorning()` in `src/features/alarms/occurrence.ts`), and only that may earn streaks or XP in Phase 2.
+
+Reporting a system stop back to the app is part of the alarm → mission hand-off milestone. On iOS, an AlarmKit `stopIntent` can run app code when Stop is tapped. On Android, the notification's Stop action is already handled natively.
+
+> Status: **Milestone 1 (proof of concept) is physically verified on an iPhone and an Android phone.** A test alarm was scheduled, it rang, and it was stopped with the system controls. The local module `modules/terbit-alarms` can schedule, cancel and list **one-time** native alarms:
 > - iOS: AlarmKit, iOS 26+. Authorisation, one-time `.fixed` alarms, cancel, state. Terbit MY IDs travel in `AlarmMetadata`.
 > - Android: `AlarmManager.setAlarmClock`. Exact-alarm and notification checks, a receiver that works with the app closed, an alarm notification with repeating alarm sound, and a basic native alarm screen over the lock screen.
 >

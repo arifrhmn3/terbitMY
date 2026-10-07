@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { createAlarmDraft, type Alarm } from './alarm';
-import { createOccurrence, dismissOccurrence, startOccurrence, type AlarmOccurrence } from './occurrence';
+import { createOccurrence, dismissOccurrence, markAlarmFired, type AlarmOccurrence } from './occurrence';
 import {
   createMemoryOccurrenceRepository,
   DuplicateOccurrenceError,
@@ -71,13 +71,13 @@ describe('memory occurrence repository', () => {
     const repo = createMemoryOccurrenceRepository();
     const o = occurrence('o1', 100);
     await repo.insert(o);
-    const started = startOccurrence(o, 101);
+    const started = markAlarmFired(o, 101);
     if (!started.ok) throw new Error();
 
     expect(await repo.update(started.occurrence, 'scheduled')).toBe(true);
     // A second writer still thinks it is 'scheduled': rejected.
     expect(await repo.update(dismissed(o), 'scheduled')).toBe(false);
-    expect((await repo.get('o1'))?.status).toBe('started');
+    expect((await repo.get('o1'))?.status).toBe('alarm_fired');
   });
 
   it('lists recent newest first and active oldest first', async () => {
@@ -88,5 +88,18 @@ describe('memory occurrence repository', () => {
     expect((await repo.listRecent(10)).map((o) => o.id)).toEqual(['a2', 'a1', 'old']);
     expect((await repo.listRecent(1)).map((o) => o.id)).toEqual(['a2']);
     expect((await repo.listActive()).map((o) => o.id)).toEqual(['a1', 'a2']);
+  });
+});
+
+describe('status and result compatibility', () => {
+  it("reads rows saved with the old 'started' status as alarm_fired", () => {
+    const row = { ...occurrenceToRow(occurrence('o1', 100)), status: 'started' };
+    expect(rowToOccurrence(row).status).toBe('alarm_fired');
+  });
+
+  it('round-trips a system dismiss result', () => {
+    const result = dismissOccurrence(occurrence('o1', 100), 101, 'system');
+    if (!result.ok) throw new Error(result.error);
+    expect(rowToOccurrence(occurrenceToRow(result.occurrence)).result).toEqual({ kind: 'system_dismiss' });
   });
 });

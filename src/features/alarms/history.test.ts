@@ -31,7 +31,7 @@ describe('toHistoryEntry', () => {
 
   it('shows dismissed and missed differently from completed', () => {
     expect(toHistoryEntry({ ...base, status: 'dismissed', endedAt: at(6, 31) })).toMatchObject({
-      status: 'Dismissed',
+      status: 'Dismissed, no mission',
       completion: 'Dismissed at 06:31',
     });
     expect(toHistoryEntry({ ...base, status: 'missed', endedAt: at(8, 0) })).toMatchObject({

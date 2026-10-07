@@ -10,8 +10,9 @@ import {
   markMissed,
   shouldMarkMissed,
   startMission,
-  startOccurrence,
+  markAlarmFired,
   type AlarmOccurrence,
+  type DismissReason,
   type OccurrenceSource,
   type TransitionError,
   type TransitionResult,
@@ -74,14 +75,14 @@ export function createOccurrenceManager(
 
     const active = (await repository.listActive()).find((o) => o.alarmId === alarm.id);
     if (active) {
-      return active.status === 'scheduled' ? apply(active.id, startOccurrence) : active;
+      return active.status === 'scheduled' ? apply(active.id, markAlarmFired) : active;
     }
     if (await repository.findByEvent(alarm.id, options.scheduledAt)) {
       throw new OccurrenceError('already-finished');
     }
 
     const at = now();
-    const started = startOccurrence(createOccurrence({ alarm, ...options, now: at }), at);
+    const started = markAlarmFired(createOccurrence({ alarm, ...options, now: at }), at);
     if (!started.ok) throw new OccurrenceError(started.error);
     try {
       await repository.insert(started.occurrence);
@@ -110,7 +111,9 @@ export function createOccurrenceManager(
     completeMission: (id: string, result: MathMissionResult) =>
       apply(id, (o, at) => completeMission(o, result, at)),
     completeWithoutMission: (id: string) => apply(id, completeWithoutMission),
-    dismiss: (id: string) => apply(id, dismissOccurrence),
+    /** `reason: 'system'` is for when native code reports the phone's own Stop control was used. */
+    dismiss: (id: string, reason: DismissReason = 'emergency') =>
+      apply(id, (o, at) => dismissOccurrence(o, at, reason)),
     cancelForAlarm,
     expireStale,
     /** Newest first, after recording any missed ones. */

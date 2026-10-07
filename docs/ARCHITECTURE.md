@@ -92,10 +92,12 @@ Settings are always saved to the device first, then passed to `AlarmService`. Th
 Each time an alarm rings (or is simulated) creates an **occurrence**, stored separately from the alarm's settings in the `alarm_occurrences` table:
 
 ```
-scheduled ─► started ─► mission_in_progress ─► completed
-                 └─(no mission)──────────────► completed
+scheduled ─► alarm_fired ─► mission_in_progress ─► completed
+                 └─(no mission)──────────────────► completed
 any active status ─► dismissed | missed | cancelled
 ```
+
+**Accountability:** the phone's own Stop control can always end an alarm, and Terbit MY never tries to block it. `morningOutcome()` turns each finished occurrence into one of: mission completed, dismissed without mission, mission abandoned, missed, completed without mission, or cancelled. `isSuccessfulMorning()` is true **only** for a completed mission, and Phase 2 streaks and XP must use it. A dismiss records why: `emergency_dismiss` (in the app) or `system_dismiss` (the phone's controls, once native code reports it).
 
 - `src/features/alarms/occurrence.ts`: pure state rules. Finished occurrences can never change.
 - `src/features/alarms/occurrence-manager.ts`: trigger, start mission, complete, dismiss, mark missed (active for over an hour), cancel (alarm deleted).

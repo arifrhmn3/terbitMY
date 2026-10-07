@@ -6,21 +6,25 @@ import type { Alarm, AlarmMission } from './alarm';
  * One time an alarm goes off (or is simulated), kept separate from the
  * alarm's settings so history survives edits and deletes.
  *
- *   scheduled ─► started ─► mission_in_progress ─► completed
- *       │           │  └─(no mission)───────────────► completed
- *       │           └──────────┴──► dismissed | missed
+ *   scheduled ─► alarm_fired ─► mission_in_progress ─► completed
+ *       │            │  └─(no mission)──────────────────► completed
+ *       │            └───────────┴──► dismissed | missed
  *       └─► cancelled | dismissed | missed
+ *
+ * The phone's own Stop control can always end an alarm (it can't and won't
+ * be bypassed). So `dismissed` and `missed` are normal outcomes, and only
+ * a completed mission counts as a successful morning (see `morningOutcome`).
  */
 export type OccurrenceStatus =
   | 'scheduled'
-  | 'started'
+  | 'alarm_fired'
   | 'mission_in_progress'
   | 'completed'
   | 'dismissed'
   | 'missed'
   | 'cancelled';
 
-export const ACTIVE_STATUSES: readonly OccurrenceStatus[] = ['scheduled', 'started', 'mission_in_progress'];
+export const ACTIVE_STATUSES: readonly OccurrenceStatus[] = ['scheduled', 'alarm_fired', 'mission_in_progress'];
 
 /**
  * `simulated` comes from the developer "Simulate alarm now" button.
@@ -31,7 +35,12 @@ export type OccurrenceSource = 'simulated' | 'native';
 export type OccurrenceResult =
   | { kind: 'mission_completed'; mission: MathMissionResult }
   | { kind: 'no_mission' }
-  | { kind: 'emergency_dismiss' };
+  /** Emergency Dismiss inside Terbit MY. */
+  | { kind: 'emergency_dismiss' }
+  /** Stopped with the phone's own alarm controls (reported by native code; hand-off not built yet). */
+  | { kind: 'system_dismiss' };
+
+export type DismissReason = 'emergency' | 'system';
 
 export type AlarmOccurrence = {
   id: string;
@@ -108,9 +117,9 @@ function move(
   return { ok: true, occurrence: { ...occurrence, ...changes, updatedAt: now } };
 }
 
-/** The ringing screen is showing. */
-export function startOccurrence(occurrence: AlarmOccurrence, now: number): TransitionResult {
-  return move(occurrence, ['scheduled'], { status: 'started', startedAt: now }, now);
+/** The alarm went off (real or simulated). `startedAt` records when. */
+export function markAlarmFired(occurrence: AlarmOccurrence, now: number): TransitionResult {
+  return move(occurrence, ['scheduled'], { status: 'alarm_fired', startedAt: now }, now);
 }
 
 /**
@@ -120,7 +129,7 @@ export function startOccurrence(occurrence: AlarmOccurrence, now: number): Trans
 export function startMission(occurrence: AlarmOccurrence, now: number): TransitionResult {
   if (occurrence.mission.type === 'none') return { ok: false, error: 'no-mission' };
   if (occurrence.status === 'mission_in_progress') return { ok: true, occurrence };
-  return move(occurrence, ['started'], { status: 'mission_in_progress', missionStartedAt: now }, now);
+  return move(occurrence, ['alarm_fired'], { status: 'mission_in_progress', missionStartedAt: now }, now);
 }
 
 export function completeMission(
@@ -146,15 +155,22 @@ export function completeWithoutMission(occurrence: AlarmOccurrence, now: number)
   if (occurrence.mission.type !== 'none') {
     return isActive(occurrence) ? { ok: false, error: 'mission-required' } : { ok: false, error: 'already-finished' };
   }
-  return move(occurrence, ['started'], { status: 'completed', endedAt: now, result: { kind: 'no_mission' } }, now);
+  return move(occurrence, ['alarm_fired'], { status: 'completed', endedAt: now, result: { kind: 'no_mission' } }, now);
 }
 
-/** Emergency Dismiss: the alarm was turned off without finishing the mission. */
-export function dismissOccurrence(occurrence: AlarmOccurrence, now: number): TransitionResult {
+/**
+ * The alarm was turned off without finishing the mission: Emergency Dismiss
+ * in the app, or the phone's own Stop control.
+ */
+export function dismissOccurrence(
+  occurrence: AlarmOccurrence,
+  now: number,
+  reason: DismissReason = 'emergency',
+): TransitionResult {
   return move(
     occurrence,
     ACTIVE_STATUSES,
-    { status: 'dismissed', endedAt: now, result: { kind: 'emergency_dismiss' } },
+    { status: 'dismissed', endedAt: now, result: { kind: reason === 'system' ? 'system_dismiss' : 'emergency_dismiss' } },
     now,
   );
 }
@@ -174,10 +190,59 @@ export function shouldMarkMissed(occurrence: AlarmOccurrence, now: number): bool
 
 export const STATUS_LABEL: Record<OccurrenceStatus, string> = {
   scheduled: 'Scheduled',
-  started: 'Ringing',
+  alarm_fired: 'Alarm fired',
   mission_in_progress: 'Mission in progress',
   completed: 'Completed',
   dismissed: 'Dismissed',
   missed: 'Missed',
   cancelled: 'Cancelled',
+};
+
+/**
+ * The accountability outcome of a finished occurrence:
+ * - `mission_completed`: the mission was finished. The only successful morning.
+ * - `completed_without_mission`: the alarm had no mission. Not a successful morning.
+ * - `dismissed_without_mission`: stopped (in the app or by the phone) before the mission started.
+ * - `mission_abandoned`: the mission started but was never finished (dismissed or timed out).
+ * - `missed`: nobody responded to the alarm.
+ * - `cancelled`: the alarm was deleted. Doesn't count either way.
+ * - `in_progress`: still active.
+ */
+export type MorningOutcome =
+  | 'mission_completed'
+  | 'completed_without_mission'
+  | 'dismissed_without_mission'
+  | 'mission_abandoned'
+  | 'missed'
+  | 'cancelled'
+  | 'in_progress';
+
+export function morningOutcome(o: AlarmOccurrence): MorningOutcome {
+  switch (o.status) {
+    case 'completed':
+      return o.result?.kind === 'mission_completed' ? 'mission_completed' : 'completed_without_mission';
+    case 'dismissed':
+      return o.missionStartedAt !== null ? 'mission_abandoned' : 'dismissed_without_mission';
+    case 'missed':
+      return o.missionStartedAt !== null ? 'mission_abandoned' : 'missed';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return 'in_progress';
+  }
+}
+
+/** Only a completed mission counts toward streaks and XP (Phase 2). */
+export function isSuccessfulMorning(o: AlarmOccurrence): boolean {
+  return morningOutcome(o) === 'mission_completed';
+}
+
+export const OUTCOME_LABEL: Record<MorningOutcome, string> = {
+  mission_completed: 'Completed',
+  completed_without_mission: 'Turned off (no mission)',
+  dismissed_without_mission: 'Dismissed, no mission',
+  mission_abandoned: 'Mission abandoned',
+  missed: 'Missed',
+  cancelled: 'Cancelled',
+  in_progress: 'In progress',
 };

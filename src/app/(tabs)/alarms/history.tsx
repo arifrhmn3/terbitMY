@@ -38,7 +38,7 @@ export default function RecentMorningsScreen() {
 
 function HistoryRow({ entry }: { entry: HistoryEntry }) {
   const theme = useTheme();
-  const good = entry.status === 'Completed';
+  const good = entry.successful;
 
   return (
     <View style={styles.row}>

@@ -8,11 +8,13 @@ import {
   createOccurrence,
   dismissOccurrence,
   isActive,
+  isSuccessfulMorning,
   markMissed,
+  morningOutcome,
   MISSED_AFTER_MS,
   shouldMarkMissed,
   startMission,
-  startOccurrence,
+  markAlarmFired,
   type AlarmOccurrence,
   type TransitionResult,
 } from './occurrence';
@@ -40,7 +42,7 @@ function unwrap(result: TransitionResult): AlarmOccurrence {
 }
 
 const created = createOccurrence({ alarm, scheduledAt: 1_000, source: 'simulated', now: 1_000, id: 'occ-1' });
-const started = unwrap(startOccurrence(created, 2_000));
+const started = unwrap(markAlarmFired(created, 2_000));
 const inMission = unwrap(startMission(started, 3_000));
 
 describe('createOccurrence', () => {
@@ -68,7 +70,7 @@ describe('createOccurrence', () => {
 
 describe('state transitions', () => {
   it('scheduled → started → mission_in_progress → completed', () => {
-    expect(started).toMatchObject({ status: 'started', startedAt: 2_000 });
+    expect(started).toMatchObject({ status: 'alarm_fired', startedAt: 2_000 });
     expect(inMission).toMatchObject({ status: 'mission_in_progress', missionStartedAt: 3_000 });
 
     const done = unwrap(completeMission(inMission, missionResult, 30_000));
@@ -91,7 +93,7 @@ describe('state transitions', () => {
   });
 
   it('cannot start an alarm twice', () => {
-    expect(startOccurrence(started, 5_000)).toEqual({ ok: false, error: 'invalid-transition' });
+    expect(markAlarmFired(started, 5_000)).toEqual({ ok: false, error: 'invalid-transition' });
   });
 
   it('requires the mission when the alarm has one', () => {
@@ -100,7 +102,7 @@ describe('state transitions', () => {
 
   it('completes an alarm without a mission', () => {
     const noMission = unwrap(
-      startOccurrence(
+      markAlarmFired(
         createOccurrence({ alarm: { ...alarm, mission: { type: 'none' } }, scheduledAt: 0, source: 'simulated', now: 0 }),
         1,
       ),
@@ -146,7 +148,7 @@ describe('finished occurrences cannot change', () => {
     ];
     for (const final of finals) {
       for (const result of [
-        startOccurrence(final, 1),
+        markAlarmFired(final, 1),
         startMission(final, 1),
         completeMission(final, missionResult, 1),
         completeWithoutMission(final, 1),
@@ -166,5 +168,49 @@ describe('shouldMarkMissed', () => {
     expect(shouldMarkMissed(started, 1_001 + MISSED_AFTER_MS)).toBe(true);
     const done = unwrap(dismissOccurrence(started, 2));
     expect(shouldMarkMissed(done, 1_001 + MISSED_AFTER_MS)).toBe(false);
+  });
+});
+
+describe('accountability outcomes', () => {
+  const noMissionAlarm = { ...alarm, mission: { type: 'none' as const } };
+  const noMissionFired = unwrap(
+    markAlarmFired(createOccurrence({ alarm: noMissionAlarm, scheduledAt: 0, source: 'simulated', now: 0 }), 1),
+  );
+
+  it('counts only a completed mission as a successful morning', () => {
+    const done = unwrap(completeMission(inMission, missionResult, 30_000));
+    expect(morningOutcome(done)).toBe('mission_completed');
+    expect(isSuccessfulMorning(done)).toBe(true);
+
+    const noMission = unwrap(completeWithoutMission(noMissionFired, 2));
+    expect(morningOutcome(noMission)).toBe('completed_without_mission');
+    expect(isSuccessfulMorning(noMission)).toBe(false);
+  });
+
+  it('separates dismissed-before-mission from mission-abandoned', () => {
+    expect(morningOutcome(unwrap(dismissOccurrence(started, 5_000)))).toBe('dismissed_without_mission');
+    expect(morningOutcome(unwrap(dismissOccurrence(inMission, 5_000)))).toBe('mission_abandoned');
+    expect(morningOutcome(unwrap(markMissed(inMission, 5_000)))).toBe('mission_abandoned');
+    expect(morningOutcome(unwrap(markMissed(started, 5_000)))).toBe('missed');
+    expect(morningOutcome(unwrap(cancelOccurrence(started, 5_000)))).toBe('cancelled');
+    expect(morningOutcome(started)).toBe('in_progress');
+  });
+
+  it('records a stop from the phone’s own controls as a system dismiss', () => {
+    const stopped = unwrap(dismissOccurrence(started, 5_000, 'system'));
+    expect(stopped).toMatchObject({ status: 'dismissed', result: { kind: 'system_dismiss' } });
+    expect(isSuccessfulMorning(stopped)).toBe(false);
+  });
+
+  it('never counts an unfinished, dismissed or missed morning as successful', () => {
+    for (const o of [
+      started,
+      inMission,
+      unwrap(dismissOccurrence(started, 1)),
+      unwrap(dismissOccurrence(inMission, 1, 'system')),
+      unwrap(markMissed(started, 1)),
+    ]) {
+      expect(isSuccessfulMorning(o)).toBe(false);
+    }
   });
 });

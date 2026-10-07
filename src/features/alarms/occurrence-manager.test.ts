@@ -44,7 +44,7 @@ describe('occurrence manager', () => {
     const occurrence = await manager.trigger(alarm, { scheduledAt: 10_000, source: 'simulated' });
     expect(occurrence).toMatchObject({
       alarmId: 'alarm-1',
-      status: 'started',
+      status: 'alarm_fired',
       source: 'simulated',
       startedAt: 10_000,
       alarmLabel: 'Subuh',

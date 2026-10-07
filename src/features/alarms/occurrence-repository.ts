@@ -78,10 +78,19 @@ function parseResult(json: string | null): OccurrenceResult | null {
   if (!json) return null;
   try {
     const value = JSON.parse(json) as OccurrenceResult;
-    return ['mission_completed', 'no_mission', 'emergency_dismiss'].includes(value?.kind) ? value : null;
+    return ['mission_completed', 'no_mission', 'emergency_dismiss', 'system_dismiss'].includes(value?.kind)
+      ? value
+      : null;
   } catch {
     return null;
   }
+}
+
+function parseStatus(status: string): OccurrenceStatus {
+  // 'started' was renamed 'alarm_fired' (migration 3); old rows may still say it.
+  if (status === 'started') return 'alarm_fired';
+  // An unknown status can't be trusted to be active; treat it as cancelled.
+  return STATUSES.includes(status as OccurrenceStatus) ? (status as OccurrenceStatus) : 'cancelled';
 }
 
 export function rowToOccurrence(row: OccurrenceRow): AlarmOccurrence {
@@ -90,8 +99,7 @@ export function rowToOccurrence(row: OccurrenceRow): AlarmOccurrence {
     alarmId: row.alarm_id,
     scheduledAt: row.scheduled_at,
     source: (row.source === 'native' ? 'native' : 'simulated') satisfies OccurrenceSource,
-    // An unknown status can't be trusted to be active; treat it as cancelled.
-    status: STATUSES.includes(row.status as OccurrenceStatus) ? (row.status as OccurrenceStatus) : 'cancelled',
+    status: parseStatus(row.status),
     alarmLabel: row.alarm_label,
     mission: parseMission(row.mission),
     snoozeMinutes: row.snooze_minutes,

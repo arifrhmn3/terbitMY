@@ -6,7 +6,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { createAlarmDraft, type Alarm } from './alarm';
 import { createSqliteAlarmRepository } from './alarm-repository';
-import { createOccurrence, dismissOccurrence, startOccurrence, type AlarmOccurrence } from './occurrence';
+import { createOccurrence, dismissOccurrence, markAlarmFired, type AlarmOccurrence } from './occurrence';
 import { createOccurrenceManager } from './occurrence-manager';
 import { createSqliteOccurrenceRepository, DuplicateOccurrenceError } from './occurrence-repository';
 import { migrate, migrations } from '@/services/storage/migrations';
@@ -36,6 +36,37 @@ describe('SQLite migrations', () => {
       user_version: migrations.length,
     });
     expect(await migrate(db)).toBe(0);
+  });
+
+  it("migration 3 turns old 'started' rows into alarm_fired and keeps one active per alarm", async () => {
+    // A database as phones had it before migration 3.
+    const db = openTestDatabase();
+    for (const [i, sql] of migrations.slice(0, 2).entries()) {
+      await db.execAsync(sql);
+      await db.execAsync(`PRAGMA user_version = ${i + 1}`);
+    }
+    const legacy = { ...occurrence('old-active', 100), status: 'started' };
+    await db.runAsync(
+      `INSERT INTO alarm_occurrences (id, alarm_id, scheduled_at, source, status, alarm_label, mission, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      legacy.id,
+      legacy.alarmId,
+      legacy.scheduledAt,
+      legacy.source,
+      legacy.status,
+      legacy.alarmLabel,
+      JSON.stringify(legacy.mission),
+      legacy.createdAt,
+      legacy.updatedAt,
+    );
+
+    expect(await migrate(db)).toBe(migrations.length - 2);
+    expect(await db.getFirstAsync('SELECT status FROM alarm_occurrences WHERE id = ?', 'old-active')).toEqual({
+      status: 'alarm_fired',
+    });
+    // The rebuilt index still blocks a second active occurrence for the same alarm.
+    const repo = createSqliteOccurrenceRepository(db);
+    await expect(repo.insert(occurrence('new', 200))).rejects.toBeInstanceOf(DuplicateOccurrenceError);
   });
 });
 
@@ -94,12 +125,12 @@ describe('SQLite occurrence repository', () => {
     const repo = createSqliteOccurrenceRepository(await database());
     const o = occurrence('o1', 100);
     await repo.insert(o);
-    const started = startOccurrence(o, 101);
+    const started = markAlarmFired(o, 101);
     if (!started.ok) throw new Error();
 
     expect(await repo.update(started.occurrence, 'scheduled')).toBe(true);
     expect(await repo.update(started.occurrence, 'scheduled')).toBe(false);
-    expect((await repo.get('o1'))?.status).toBe('started');
+    expect((await repo.get('o1'))?.status).toBe('alarm_fired');
   });
 
   it('lists active and recent occurrences', async () => {
