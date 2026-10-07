@@ -62,14 +62,14 @@ public class TerbitAlarmsModule: Module {
         }
         return [
           "alarmId": record.alarmId,
-          "occurrenceId": orNull(record.occurrenceId),
+          "occurrenceId": TerbitAlarmsModule.orNull(record.occurrenceId),
           "nativeId": record.nativeId,
           "fireAt": record.fireAt,
           "createdAt": record.createdAt,
           "state": state,
           "firedAt": NSNull(),
           "stoppedAt": NSNull(),
-          "cancelledAt": orNull(record.cancelledAt),
+          "cancelledAt": TerbitAlarmsModule.orNull(record.cancelledAt),
         ]
       }
     }
