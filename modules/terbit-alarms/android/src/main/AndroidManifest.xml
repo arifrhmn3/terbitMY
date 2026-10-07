@@ -8,11 +8,25 @@
   <!-- Opening the alarm screen over the lock screen. -->
   <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
   <uses-permission android:name="android.permission.VIBRATE" />
+  <!-- Put saved alarms back after a restart (Android forgets alarms on reboot). -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
   <application>
     <receiver
       android:name="expo.modules.terbitalarms.AlarmReceiver"
       android:exported="false" />
+
+    <!-- System broadcasts reach non-exported receivers; other apps can't trigger it. -->
+    <receiver
+      android:name="expo.modules.terbitalarms.RescheduleReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+      </intent-filter>
+    </receiver>
 
     <activity
       android:name="expo.modules.terbitalarms.AlarmAlertActivity"

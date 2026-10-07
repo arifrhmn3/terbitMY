@@ -8,9 +8,10 @@ import { Notice } from '@/components/notice';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { evaluateMorning, MODE_POLICIES } from '@/features/alarms/accountability';
 import { describeMission, formatAlarmTime } from '@/features/alarms/alarm';
 import { occurrences } from '@/features/alarms/alarms';
-import { isActive, type AlarmOccurrence } from '@/features/alarms/occurrence';
+import { followUpAt, isActive, type AlarmOccurrence } from '@/features/alarms/occurrence';
 import { OccurrenceError } from '@/features/alarms/occurrence-manager';
 import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import type { MathMissionResult } from '@/features/missions/math/session';
@@ -35,9 +36,10 @@ function clock(date: Date) {
 }
 
 /**
- * The full-screen alarm: ringing → mission → morning complete (or
- * dismissed). Used for simulated alarms now, and for real AlarmKit /
- * AlarmManager alarms once they exist.
+ * The full-screen alarm screen: alarm → mission → morning complete (or
+ * not). Used for genuine native alarms (opened after the phone's alarm, which
+ * the phone's own controls can stop) and for simulated ones. Behaviour
+ * depends on the alarm's accountability mode.
  */
 export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
   const theme = useTheme();
@@ -53,6 +55,23 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
       current = false;
     };
   }, [occurrenceId]);
+
+  // Challenge mode leads straight into the mission (the phone's Stop control still works).
+  const autoStart =
+    occurrence?.completionMode === 'challenge' &&
+    occurrence.status === 'alarm_fired' &&
+    occurrence.mission.type !== 'none';
+  useEffect(() => {
+    if (!autoStart) return;
+    let current = true;
+    occurrences
+      .startMission(occurrenceId)
+      .then((o) => current && setOccurrence(o))
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [autoStart, occurrenceId]);
 
   // While the alarm is active, Android's back button must not skip the mission.
   const active = occurrence ? isActive(occurrence) : false;
@@ -76,12 +95,19 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
   }
 
   function confirmDismiss() {
+    const challenge = occurrence?.completionMode === 'challenge';
     Alert.alert(
-      'Emergency dismiss?',
-      'The alarm stops without the mission. This morning will be recorded as dismissed, not completed.',
+      challenge ? 'Give up this morning?' : 'Skip the mission?',
+      challenge
+        ? 'This Challenge morning will be recorded as incomplete.'
+        : 'This morning will be recorded without the mission, so it won’t count for rewards or streaks.',
       [
         { text: 'Keep going', style: 'cancel' },
-        { text: 'Dismiss', style: 'destructive', onPress: () => run(() => occurrences.dismiss(occurrenceId)) },
+        {
+          text: challenge ? 'Give up' : 'Skip',
+          style: 'destructive',
+          onPress: () => run(() => occurrences.dismiss(occurrenceId)),
+        },
       ],
     );
   }
@@ -123,19 +149,12 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
         content = <MorningComplete occurrence={occurrence} />;
         break;
       case 'dismissed':
-        content = (
-          <Finished
-            title="Alarm dismissed"
-            description="Recorded as dismissed, not completed. You can see it in Recent mornings."
-          />
-        );
-        break;
       case 'missed':
       case 'cancelled':
         content = (
           <Finished
-            title={occurrence.status === 'missed' ? 'Alarm missed' : 'Alarm cancelled'}
-            description="This alarm is no longer active."
+            title={evaluateMorning(occurrence).summary}
+            description="Recorded in Recent mornings. Only a completed mission counts for rewards and streaks."
           />
         );
         break;
@@ -171,6 +190,21 @@ function Ringing(props: {
   const { occurrence, busy, onStart, onDismiss } = props;
   const now = useNow();
   const hasMission = occurrence.mission.type !== 'none';
+  const mode = occurrence.completionMode;
+  const scheduled = clock(new Date(occurrence.scheduledAt));
+
+  let alarmLine = 'Alarm ringing';
+  if (occurrence.alarmStopReason === 'system' && occurrence.alarmStoppedAt !== null) {
+    alarmLine = `Your ${scheduled} alarm was stopped at ${clock(new Date(occurrence.alarmStoppedAt))}`;
+  } else if (occurrence.fireEvidence === 'schedule') {
+    alarmLine = `Your ${scheduled} alarm went off`;
+  }
+
+  const modeLine = {
+    reward: 'Complete the mission to earn this morning’s reward and streak.',
+    challenge: 'This morning stays incomplete until the mission is done.',
+    gentle: `Do the mission now or later. Follow-up due at ${clock(new Date(followUpAt(occurrence)))}.`,
+  }[mode];
 
   return (
     <>
@@ -179,18 +213,38 @@ function Ringing(props: {
           {clock(now)}
         </ThemedText>
         <ThemedText type="headline">{occurrence.alarmLabel || 'Alarm'}</ThemedText>
+        <ThemedText themeColor="textSecondary">{alarmLine}</ThemedText>
         <ThemedText themeColor="textSecondary">{describeMission(occurrence.mission)}</ThemedText>
       </View>
 
-      <Button title={hasMission ? 'Start mission' : 'Turn off alarm'} onPress={onStart} disabled={busy} />
-      <Button title="Snooze (not available yet)" variant="secondary" onPress={() => {}} disabled />
-      <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-        {occurrence.snoozeMinutes === null
-          ? 'Snooze is off for this alarm.'
-          : `Snooze (${occurrence.snoozeMinutes} min) needs native alarms, which aren’t built yet.`}
-      </ThemedText>
+      {hasMission && (
+        <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+          {MODE_POLICIES[mode].label} mode · {modeLine}
+        </ThemedText>
+      )}
 
-      {hasMission && <DismissLink onPress={onDismiss} disabled={busy} />}
+      <Button title={hasMission ? 'Start mission' : 'Turn off alarm'} onPress={onStart} disabled={busy} />
+      {hasMission && mode === 'gentle' && (
+        <>
+          <Button title="Later" variant="secondary" onPress={close} disabled={busy} />
+          <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+            Follow-up reminders aren’t sent yet. Open Terbit MY again to finish the mission.
+          </ThemedText>
+        </>
+      )}
+      {occurrence.alarmStoppedAt === null && (
+        <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+          {occurrence.snoozeMinutes === null ? 'Snooze is off for this alarm.' : 'Snooze isn’t available yet.'}
+        </ThemedText>
+      )}
+
+      {hasMission && (
+        <DismissLink
+          label={mode === 'challenge' ? 'Give up (Challenge incomplete)' : 'Skip mission (no reward)'}
+          onPress={onDismiss}
+          disabled={busy}
+        />
+      )}
     </>
   );
 }
@@ -213,7 +267,10 @@ function Mission(props: {
         config={{ difficulty: occurrence.mission.difficulty, questionCount: occurrence.mission.questionCount }}
         onComplete={onComplete}
       />
-      <DismissLink onPress={onDismiss} />
+      <DismissLink
+        label={occurrence.completionMode === 'challenge' ? 'Give up (Challenge incomplete)' : 'Skip mission (no reward)'}
+        onPress={onDismiss}
+      />
     </>
   );
 }
@@ -232,6 +289,11 @@ function MorningComplete({ occurrence }: { occurrence: AlarmOccurrence }) {
         {tookMs !== null && (
           <ThemedText themeColor="textSecondary">From alarm to done: {formatDuration(tookMs)}</ThemedText>
         )}
+        <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+          {evaluateMorning(occurrence).rewardEligible
+            ? 'This morning qualifies for rewards and streaks (coming in Phase 2).'
+            : 'This morning doesn’t qualify for rewards (no mission was set).'}
+        </ThemedText>
       </ThemedView>
       <Button title="Done" onPress={close} />
     </>
@@ -252,16 +314,16 @@ function Finished({ title, description }: { title: string; description: string }
   );
 }
 
-function DismissLink({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) {
+function DismissLink({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityHint="Stops the alarm without the mission. Recorded as dismissed."
+      accessibilityHint="Ends this morning without the mission. It won’t count for rewards or streaks."
       onPress={onPress}
       disabled={disabled}
       style={styles.dismiss}>
       <ThemedText type="small" style={styles.dismissText}>
-        Emergency dismiss
+        {label}
       </ThemedText>
     </Pressable>
   );

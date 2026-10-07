@@ -9,9 +9,10 @@ struct TerbitAlarmMetadata: AlarmMetadata {
   var occurrenceId: String?
 }
 
-/// The only file that talks to AlarmKit. Milestone 1: authorisation,
-/// one-time alarms, cancel and state. No repeats, snooze or countdown, so no
-/// widget extension is needed (Apple only requires one for countdowns).
+/// The only file that talks to AlarmKit: authorisation, one-off and weekly
+/// alarms, cancel and state. No snooze or countdown, so no widget extension is
+/// needed (Apple only requires one for countdowns). The system's own Stop
+/// control is always shown; Terbit MY never hides or bypasses it.
 @available(iOS 26.0, *)
 enum AlarmKitBridge {
   static func permission() -> String {
@@ -27,6 +28,27 @@ enum AlarmKitBridge {
   }
 
   static func scheduleOneTime(alarmId: String, occurrenceId: String?, date: Date, title: String) async throws -> UUID {
+    try await schedule(alarmId: alarmId, occurrenceId: occurrenceId, title: title, schedule: .fixed(date))
+  }
+
+  /// A saved alarm: weekly at hour:minute on `weekdays` (0 = Sunday), or once at `date` when `weekdays` is empty.
+  /// AlarmKit repeats weekly alarms itself, without Terbit MY running.
+  static func scheduleSaved(alarmId: String, hour: Int, minute: Int, weekdays: [Int], date: Date, title: String) async throws -> UUID {
+    let schedule: Alarm.Schedule
+    if weekdays.isEmpty {
+      schedule = .fixed(date)
+    } else {
+      let days = weekdays.compactMap { localeWeekdays[$0] }
+      schedule = .relative(.init(time: .init(hour: hour, minute: minute), repeats: .weekly(days)))
+    }
+    return try await self.schedule(alarmId: alarmId, occurrenceId: nil, title: title, schedule: schedule)
+  }
+
+  private static let localeWeekdays: [Int: Locale.Weekday] = [
+    0: .sunday, 1: .monday, 2: .tuesday, 3: .wednesday, 4: .thursday, 5: .friday, 6: .saturday,
+  ]
+
+  private static func schedule(alarmId: String, occurrenceId: String?, title: String, schedule: Alarm.Schedule) async throws -> UUID {
     let id = UUID()
     // The system shows its own Stop control. Terbit MY cannot force a
     // mission before the alarm stops; the mission happens in the app after.
@@ -44,7 +66,7 @@ enum AlarmKitBridge {
       tintColor: Color.orange
     )
     let configuration: AlarmManager.AlarmConfiguration<TerbitAlarmMetadata> = .alarm(
-      schedule: .fixed(date),
+      schedule: schedule,
       attributes: attributes
     )
     _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)

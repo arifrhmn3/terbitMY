@@ -1,3 +1,4 @@
+import { createAlarmHandOff } from './alarm-handoff';
 import { createSqliteAlarmRepository } from './alarm-repository';
 import { createAlarmStore, useAlarmStore } from './alarm-store';
 import { createOccurrenceManager } from './occurrence-manager';
@@ -14,6 +15,9 @@ export const alarmStore = createAlarmStore(
   getAlarmService(),
   { onRemove: occurrences.cancelForAlarm },
 );
+
+/** Connects genuine native alarms to mornings and missions. */
+export const handOff = createAlarmHandOff({ alarmStore, occurrences, service: getAlarmService() });
 
 export function useAlarms() {
   return useAlarmStore(alarmStore);

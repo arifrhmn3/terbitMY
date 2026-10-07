@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 
 import {
   createAlarmId,
+  nextOccurrence,
   normalizeWeekdays,
   sortAlarms,
   validateAlarm,
@@ -18,7 +19,17 @@ export type AlarmStoreState = {
   error: string | null;
 };
 
-export function toAlarmSpec(alarm: Alarm): AlarmSpec {
+/** The text the system alarm shows. Challenge mode points the user at the mission. */
+export function alarmTitle(alarm: Alarm): string {
+  const name = alarm.label || 'Terbit MY alarm';
+  return alarm.completionMode === 'challenge' && alarm.mission.type !== 'none'
+    ? `${name} · Challenge: open Terbit MY for your mission`
+    : name;
+}
+
+/** What the native layer needs to schedule this alarm, as of `now`. */
+export function toAlarmSpec(alarm: Alarm, now: number): AlarmSpec {
+  const next = nextOccurrence({ ...alarm, enabled: true }, new Date(now));
   return {
     id: alarm.id,
     hour: alarm.hour,
@@ -27,13 +38,17 @@ export function toAlarmSpec(alarm: Alarm): AlarmSpec {
     label: alarm.label,
     snoozeMinutes: alarm.snooze.enabled ? alarm.snooze.minutes : null,
     missionRequired: alarm.mission.type !== 'none',
+    title: alarmTitle(alarm),
+    // nextOccurrence always finds a time within 8 days for an enabled alarm.
+    nextFireAt: next ? next.getTime() : now,
+    completionMode: alarm.completionMode,
   };
 }
 
 /**
  * Holds the saved alarms for the UI. Every change is written to the
- * repository first, then passed to `AlarmService`, which decides whether the
- * phone can actually ring it (today it always answers `not-implemented`).
+ * repository first, then passed to `AlarmService`: enabled alarms are
+ * scheduled (or rescheduled) natively, disabled and deleted ones cancelled.
  */
 export function createAlarmStore(
   getRepository: () => Promise<AlarmRepository>,
@@ -54,8 +69,27 @@ export function createAlarmStore(
   }
 
   function sync(alarm: Alarm): Promise<ScheduleResult | null> {
-    if (alarm.enabled) return service.schedule(toAlarmSpec(alarm));
+    if (alarm.enabled) return service.schedule(toAlarmSpec(alarm, now()));
     return service.cancel(alarm.id).then(() => null);
+  }
+
+  /** Makes the native schedule match the enabled saved alarms (run when the app opens). */
+  async function syncNative() {
+    if (state.status !== 'ready') await load();
+    const at = now();
+    await service.syncAll(state.alarms.filter((a) => a.enabled).map((a) => toAlarmSpec(a, at)));
+  }
+
+  /**
+   * A one-off alarm has rung: turn it off in Terbit MY without touching the
+   * native alarm (cancelling could silence it while it's still ringing).
+   */
+  async function disableAfterRinging(id: string, firedAt: number) {
+    const alarm = await find(id);
+    if (!alarm || !alarm.enabled || alarm.weekdays.length > 0 || alarm.updatedAt > firedAt) return;
+    const updated = { ...alarm, enabled: false, updatedAt: now() };
+    await (await getRepository()).save(updated);
+    setState({ alarms: sortAlarms(state.alarms.map((a) => (a.id === id ? updated : a))) });
   }
 
   async function load() {
@@ -127,6 +161,8 @@ export function createAlarmStore(
     save,
     setEnabled,
     remove,
+    syncNative,
+    disableAfterRinging,
   };
 }
 

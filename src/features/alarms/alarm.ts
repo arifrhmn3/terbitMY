@@ -29,6 +29,16 @@ export type SnoozePreference = {
 };
 
 /**
+ * How strictly the morning is judged (beta experiment). The phone's own Stop
+ * control works in every mode. See `src/features/alarms/accountability.ts`.
+ */
+export type CompletionMode = 'reward' | 'challenge' | 'gentle';
+export const COMPLETION_MODES: readonly CompletionMode[] = ['reward', 'challenge', 'gentle'];
+
+export type GentleReminderMinutes = 5 | 10 | 15 | 30;
+export const GENTLE_REMINDER_MINUTES: readonly GentleReminderMinutes[] = [5, 10, 15, 30];
+
+/**
  * One alarm as the user configured it. The device copy is the source of
  * truth; whether it can actually ring is decided by `AlarmService`.
  */
@@ -46,6 +56,9 @@ export type Alarm = {
   snooze: SnoozePreference;
   /** The user's main wake-up alarm. At most one alarm has this set. */
   isPrimary: boolean;
+  completionMode: CompletionMode;
+  /** Gentle mode: minutes after the alarm stops before a follow-up reminder, if the mission isn't done. */
+  gentleReminderMinutes: GentleReminderMinutes;
   createdAt: number;
   updatedAt: number;
 };
@@ -62,6 +75,8 @@ export function createAlarmDraft(overrides: Partial<AlarmDraft> = {}): AlarmDraf
     mission: { type: 'math', difficulty: 'easy', questionCount: 3 },
     snooze: { enabled: true, minutes: 5 },
     isPrimary: false,
+    completionMode: 'reward',
+    gentleReminderMinutes: 10,
     ...overrides,
   };
 }
@@ -113,6 +128,12 @@ export function describeMission(mission: AlarmMission): string {
   const level = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }[mission.difficulty];
   return `Maths · ${level} · ${mission.questionCount} questions`;
 }
+
+export const COMPLETION_MODE_LABEL: Record<CompletionMode, string> = {
+  reward: 'Reward',
+  challenge: 'Challenge',
+  gentle: 'Gentle',
+};
 
 export function describeSnooze(snooze: SnoozePreference): string {
   return snooze.enabled ? `${snooze.minutes} min` : 'Off';

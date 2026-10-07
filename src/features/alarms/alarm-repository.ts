@@ -3,10 +3,14 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import {
   createAlarmDraft,
   normalizeWeekdays,
+  COMPLETION_MODES,
+  GENTLE_REMINDER_MINUTES,
   SNOOZE_MINUTES,
   sortAlarms,
   type Alarm,
   type AlarmMission,
+  type CompletionMode,
+  type GentleReminderMinutes,
   type SnoozeMinutes,
   type Weekday,
 } from './alarm';
@@ -31,6 +35,8 @@ export type AlarmRow = {
   snooze_enabled: number;
   snooze_minutes: number;
   is_primary: number;
+  completion_mode: string;
+  gentle_reminder_minutes: number;
   created_at: number;
   updated_at: number;
 };
@@ -47,6 +53,8 @@ export function alarmToRow(alarm: Alarm): AlarmRow {
     snooze_enabled: alarm.snooze.enabled ? 1 : 0,
     snooze_minutes: alarm.snooze.minutes,
     is_primary: alarm.isPrimary ? 1 : 0,
+    completion_mode: alarm.completionMode,
+    gentle_reminder_minutes: alarm.gentleReminderMinutes,
     created_at: alarm.createdAt,
     updated_at: alarm.updatedAt,
   };
@@ -70,6 +78,11 @@ export function parseMission(json: string): AlarmMission {
   return createAlarmDraft().mission;
 }
 
+/** Unknown or missing values fall back to Reward, the default mode. */
+export function parseCompletionMode(value: string | null | undefined): CompletionMode {
+  return COMPLETION_MODES.includes(value as CompletionMode) ? (value as CompletionMode) : 'reward';
+}
+
 export function rowToAlarm(row: AlarmRow): Alarm {
   const weekdays = row.weekdays
     .split(',')
@@ -90,6 +103,10 @@ export function rowToAlarm(row: AlarmRow): Alarm {
     mission: parseMission(row.mission),
     snooze: { enabled: row.snooze_enabled === 1, minutes: snoozeMinutes },
     isPrimary: row.is_primary === 1,
+    completionMode: parseCompletionMode(row.completion_mode),
+    gentleReminderMinutes: GENTLE_REMINDER_MINUTES.includes(row.gentle_reminder_minutes as GentleReminderMinutes)
+      ? (row.gentle_reminder_minutes as GentleReminderMinutes)
+      : 10,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -113,8 +130,9 @@ export function createSqliteAlarmRepository(db: AlarmDatabase): AlarmRepository 
         }
         await db.runAsync(
           `INSERT OR REPLACE INTO alarms
-            (id, hour, minute, weekdays, enabled, label, mission, snooze_enabled, snooze_minutes, is_primary, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, hour, minute, weekdays, enabled, label, mission, snooze_enabled, snooze_minutes, is_primary,
+             completion_mode, gentle_reminder_minutes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           row.id,
           row.hour,
           row.minute,
@@ -125,6 +143,8 @@ export function createSqliteAlarmRepository(db: AlarmDatabase): AlarmRepository 
           row.snooze_enabled,
           row.snooze_minutes,
           row.is_primary,
+          row.completion_mode,
+          row.gentle_reminder_minutes,
           row.created_at,
           row.updated_at,
         );

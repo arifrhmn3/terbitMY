@@ -1,11 +1,11 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
-import { useNativeAlarmLaunch } from '@/features/alarms/use-native-alarm-launch';
+import { useAlarmHandOff } from '@/features/alarms/use-alarm-handoff';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  useNativeAlarmLaunch();
+  useAlarmHandOff();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

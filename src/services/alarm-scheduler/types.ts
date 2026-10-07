@@ -10,8 +10,13 @@ export type AlarmSpec = {
   weekdays: number[];
   label: string;
   snoozeMinutes: number | null;
-  /** True when a mission must be completed before the alarm can be dismissed. */
+  /** True when the alarm has a mission (the phone's Stop control still works). */
   missionRequired: boolean;
+  /** Text the system alarm shows. */
+  title: string;
+  /** The next time it should ring (ms since 1970). Native code repeats weekly alarms itself after that. */
+  nextFireAt: number;
+  completionMode: 'reward' | 'challenge' | 'gentle';
 };
 
 /** Which native system rings alarms on this device. */
@@ -35,10 +40,9 @@ export type ScheduleResult =
   | { status: 'failed'; message: string; code?: string };
 
 /**
- * Whether this device can schedule a one-time native alarm (milestone 1:
- * AlarmKit on iOS 26+, AlarmManager on Android). Separate from
- * `AlarmCapabilities`, which covers the user's saved repeating alarms and
- * stays `not-implemented` until those ring natively.
+ * Whether this device can schedule native alarms (AlarmKit on iOS 26+,
+ * AlarmManager on Android), with the permission detail the developer test
+ * panel shows.
  */
 export type NativeAlarmStatus = {
   /** False in Expo Go, on web, and on iOS older than 26. */
@@ -74,11 +78,22 @@ export type NativeAlarmRecord = {
   cancelledAt: number | null;
 };
 
-/** Sent by native code when a real system alarm goes off. */
+/** A genuine native alarm that went off, as reported by `getFireEvents`. */
 export type AlarmFiredEvent = {
   alarmId: string;
-  /** When the alarm was due, in ms since 1970. */
+  /** When the alarm was due, in ms since 1970. With `alarmId` this identifies the event. */
   scheduledAt: number;
+  /** When it actually went off, if the platform reports it. */
+  firedAt?: number | null;
+  /**
+   * `system`: Android ran Terbit MY's code when it fired.
+   * `schedule`: the AlarmKit alarm's time passed (iOS doesn't tell apps when an alarm fires).
+   */
+  evidence?: 'system' | 'schedule';
+  /** Android: when the alarm screen / notification was used to stop it. */
+  stoppedAt?: number | null;
+  /** `stop`: stopped with the alarm controls. `mission`: "Start mission" was chosen. */
+  stopAction?: 'stop' | 'mission' | null;
 };
 
 /**
@@ -89,13 +104,17 @@ export type AlarmFiredEvent = {
 export interface AlarmService {
   getCapabilities(): Promise<AlarmCapabilities>;
   requestPermission(): Promise<AlarmPermission>;
-  /** Schedules or reschedules one alarm with the operating system. */
+  /** Schedules or reschedules one saved alarm with the operating system (repeats included). */
   schedule(alarm: AlarmSpec): Promise<ScheduleResult>;
+  /** Cancels every native alarm for this Terbit MY alarm ID. */
   cancel(alarmId: string): Promise<void>;
-  /** The alarm that launched the app from closed, if any. Read once at startup. */
-  getLaunchEvent(): Promise<AlarmFiredEvent | null>;
-  /** Called when an alarm fires while the app is running. Returns an unsubscribe function. */
-  addFiredListener(listener: (event: AlarmFiredEvent) => void): () => void;
+  /**
+   * Makes the native schedule match exactly these enabled alarms: schedules
+   * missing or changed ones, cancels future native alarms for anything else.
+   */
+  syncAll(alarms: AlarmSpec[]): Promise<void>;
+  /** Saved alarms that went off at or after `since` (ms since 1970), oldest first. */
+  getFireEvents(since: number, now: number): Promise<AlarmFiredEvent[]>;
 
   // Native one-time alarms (milestone 1 proof of concept).
   getNativeAlarmStatus(): Promise<NativeAlarmStatus>;

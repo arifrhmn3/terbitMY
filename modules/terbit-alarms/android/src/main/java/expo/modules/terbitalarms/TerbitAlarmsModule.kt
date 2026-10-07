@@ -22,6 +22,18 @@ class OneTimeAlarmOptions : Record {
   @Field var title: String = "Terbit MY"
 }
 
+class SavedAlarmOptions : Record {
+  @Field var alarmId: String = ""
+  @Field var hour: Int = 0
+  @Field var minute: Int = 0
+  @Field var weekdays: List<Int> = emptyList()
+  /** ms since 1970: the next ring */
+  @Field var fireAt: Double = 0.0
+  @Field var title: String = "Terbit MY alarm"
+  @Field var missionRequired: Boolean = false
+  @Field var completionMode: String = "reward"
+}
+
 /** Android side of the TerbitAlarms module (AlarmManager.setAlarmClock). */
 class TerbitAlarmsModule : Module() {
   private val context: Context
@@ -53,10 +65,15 @@ class TerbitAlarmsModule : Module() {
       scheduleOneTime(options)
     }
 
+    AsyncFunction("scheduleAlarmAsync") { options: SavedAlarmOptions ->
+      scheduleSaved(options)
+    }
+
     AsyncFunction("cancelAsync") { alarmId: String ->
       val now = System.currentTimeMillis()
       AlarmScheduler.cancel(context, alarmId)
       AlarmNotifications.dismiss(context, alarmId)
+      SavedAlarms.remove(context, alarmId)
       val records = NativeAlarmRecords.load(context)
       var cancelled = 0
       records.replaceAll {
@@ -82,6 +99,8 @@ class TerbitAlarmsModule : Module() {
           else -> "missing"
         }
         mapOf(
+          "kind" to r.kind,
+          "stopAction" to r.stopAction,
           "alarmId" to r.alarmId,
           "occurrenceId" to r.occurrenceId,
           "nativeId" to r.nativeId,
@@ -136,22 +155,51 @@ class TerbitAlarmsModule : Module() {
 
   private fun failure(code: String, message: String) = mapOf("ok" to false, "code" to code, "message" to message)
 
-  private fun scheduleOneTime(options: OneTimeAlarmOptions): Map<String, Any?> {
+  /** Common permission and time checks. Returns a failure map, or null when it's fine to schedule. */
+  private fun precheck(alarmId: String, fireAt: Long): Map<String, Any?>? {
     val ctx = context
-    val fireAt = options.fireAt.toLong()
     val now = System.currentTimeMillis()
-    if (options.alarmId.isEmpty() || fireAt <= 0L) {
-      return failure("invalid_arguments", "An alarm ID and time are required.")
-    }
-    if (fireAt - now < 5_000L) {
-      return failure("time_in_past", "The alarm time must be in the future.")
-    }
+    if (alarmId.isEmpty() || fireAt <= 0L) return failure("invalid_arguments", "An alarm ID and time are required.")
+    if (fireAt <= now) return failure("time_in_past", "The alarm time must be in the future.")
     if (!AlarmScheduler.canScheduleExact(ctx)) {
       return failure("exact_alarm_not_allowed", "Turn on \"Alarms & reminders\" for Terbit MY in Settings.")
     }
     if (!AlarmNotifications.notificationsAllowed(ctx)) {
       return failure("not_authorized", "Turn on notifications for Terbit MY so the alarm can show and ring.")
     }
+    return null
+  }
+
+  /** A saved alarm: stored natively so weekly repeats and reboot rescheduling work without the app. */
+  private fun scheduleSaved(options: SavedAlarmOptions): Map<String, Any?> {
+    val fireAt = options.fireAt.toLong()
+    precheck(options.alarmId, fireAt)?.let { return it }
+    val definition = AlarmDefinition(
+      alarmId = options.alarmId,
+      hour = options.hour,
+      minute = options.minute,
+      weekdays = options.weekdays.filter { it in 0..6 }.distinct().sorted(),
+      fireAt = fireAt,
+      title = options.title,
+      missionRequired = options.missionRequired,
+      completionMode = options.completionMode,
+    )
+    return try {
+      SavedAlarms.put(context, definition)
+      SavedAlarms.schedule(context, definition, fireAt)
+      mapOf("ok" to true, "nativeId" to "alarm-manager:" + AlarmScheduler.requestCode(options.alarmId))
+    } catch (e: SecurityException) {
+      failure("exact_alarm_not_allowed", e.message ?: "Exact alarms are not allowed.")
+    } catch (e: Exception) {
+      failure("scheduling_failed", e.message ?: e.toString())
+    }
+  }
+
+  private fun scheduleOneTime(options: OneTimeAlarmOptions): Map<String, Any?> {
+    val ctx = context
+    val fireAt = options.fireAt.toLong()
+    val now = System.currentTimeMillis()
+    precheck(options.alarmId, fireAt)?.let { return it }
 
     // Replace any earlier active alarm with the same Terbit MY ID.
     val records = NativeAlarmRecords.load(ctx)

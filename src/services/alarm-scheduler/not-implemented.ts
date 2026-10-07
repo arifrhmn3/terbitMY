@@ -1,6 +1,6 @@
 import type { AlarmService, NativeAlarmStatus } from './types';
 
-const DEFAULT_SUMMARY = 'Alarms are saved on this phone, but they can’t ring yet. Ringing is still being built.';
+const DEFAULT_SUMMARY = 'Alarms are saved on this phone, but they can’t ring here. Use the Terbit MY development build.';
 
 const UNAVAILABLE: NativeAlarmStatus = {
   available: false,
@@ -34,11 +34,11 @@ export function createNotImplementedAlarmService(summary = DEFAULT_SUMMARY): Ala
     async cancel() {
       // Nothing was scheduled, so there is nothing to cancel.
     },
-    async getLaunchEvent() {
-      return null;
+    async syncAll() {
+      // Nothing to sync.
     },
-    addFiredListener() {
-      return () => {};
+    async getFireEvents() {
+      return [];
     },
     async getNativeAlarmStatus() {
       return UNAVAILABLE;

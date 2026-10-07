@@ -14,12 +14,16 @@ data class NativeAlarmRecord(
   val firedAt: Long? = null,
   val stoppedAt: Long? = null,
   val cancelledAt: Long? = null,
+  /** "test" (developer test alarm) or "saved" (a saved Terbit MY alarm). */
+  val kind: String = "test",
+  /** How it was stopped: "stop" (alarm controls) or "mission" (Start mission). */
+  val stopAction: String? = null,
 )
 
 object NativeAlarmRecords {
   private const val PREFS = "terbit_native_alarms"
   private const val KEY = "records_v1"
-  private const val MAX_RECORDS = 20
+  private const val MAX_RECORDS = 60
 
   @Synchronized
   fun load(context: Context): MutableList<NativeAlarmRecord> {
@@ -59,6 +63,8 @@ object NativeAlarmRecords {
     put("firedAt", r.firedAt ?: JSONObject.NULL)
     put("stoppedAt", r.stoppedAt ?: JSONObject.NULL)
     put("cancelledAt", r.cancelledAt ?: JSONObject.NULL)
+    put("kind", r.kind)
+    put("stopAction", r.stopAction ?: JSONObject.NULL)
   }
 
   private fun fromJson(o: JSONObject): NativeAlarmRecord {
@@ -72,6 +78,8 @@ object NativeAlarmRecords {
       firedAt = optLong("firedAt"),
       stoppedAt = optLong("stoppedAt"),
       cancelledAt = optLong("cancelledAt"),
+      kind = o.optString("kind", "test"),
+      stopAction = if (o.isNull("stopAction")) null else o.optString("stopAction", null),
     )
   }
 }

@@ -10,8 +10,23 @@ struct OneTimeAlarmOptions: Record {
   @Field var title: String = "Terbit MY"
 }
 
+struct SavedAlarmOptions: Record {
+  @Field var alarmId: String = ""
+  @Field var hour: Int = 0
+  @Field var minute: Int = 0
+  /// 0 = Sunday … 6 = Saturday. Empty = one-off at `fireAt`.
+  @Field var weekdays: [Int] = []
+  /// ms since 1970: the next ring
+  @Field var fireAt: Double = 0
+  @Field var title: String = "Terbit MY alarm"
+  @Field var missionRequired: Bool = false
+  @Field var completionMode: String = "reward"
+}
+
 /// iOS side of the TerbitAlarms module. Uses AlarmKit on iOS 26+; on older
 /// versions every call reports `unsupported_os` instead of failing.
+/// Note: static helpers must be called as `TerbitAlarmsModule.x` inside
+/// `definition()`, which is an instance method.
 public class TerbitAlarmsModule: Module {
   public func definition() -> ModuleDefinition {
     Name("TerbitAlarms")
@@ -31,16 +46,13 @@ public class TerbitAlarmsModule: Module {
       await TerbitAlarmsModule.scheduleOneTime(options)
     }
 
+    AsyncFunction("scheduleAlarmAsync") { (options: SavedAlarmOptions) async -> [String: Any] in
+      await TerbitAlarmsModule.scheduleSaved(options)
+    }
+
     AsyncFunction("cancelAsync") { (alarmId: String) -> Int in
       var records = NativeAlarmRecords.load()
-      var cancelled = 0
-      for index in records.indices where records[index].alarmId == alarmId && records[index].cancelledAt == nil {
-        if #available(iOS 26.0, *) {
-          AlarmKitBridge.cancel(nativeId: records[index].nativeId)
-        }
-        records[index].cancelledAt = NativeAlarmRecords.nowMs()
-        cancelled += 1
-      }
+      let cancelled = TerbitAlarmsModule.cancelActive(alarmId: alarmId, in: &records)
       NativeAlarmRecords.save(records)
       return cancelled
     }
@@ -61,6 +73,7 @@ public class TerbitAlarmsModule: Module {
           state = "finished"
         }
         return [
+          "kind": record.kind ?? "test",
           "alarmId": record.alarmId,
           "occurrenceId": TerbitAlarmsModule.orNull(record.occurrenceId),
           "nativeId": record.nativeId,
@@ -70,6 +83,10 @@ public class TerbitAlarmsModule: Module {
           "firedAt": NSNull(),
           "stoppedAt": NSNull(),
           "cancelledAt": TerbitAlarmsModule.orNull(record.cancelledAt),
+          "stopAction": NSNull(),
+          "hour": TerbitAlarmsModule.orNull(record.hour),
+          "minute": TerbitAlarmsModule.orNull(record.minute),
+          "weekdays": TerbitAlarmsModule.orNull(record.weekdays),
         ]
       }
     }
@@ -115,18 +132,30 @@ public class TerbitAlarmsModule: Module {
     ["ok": false, "code": code, "message": message]
   }
 
-  private static func scheduleOneTime(_ options: OneTimeAlarmOptions) async -> [String: Any] {
+  /// Cancels every not-yet-cancelled native alarm for this Terbit MY ID. Returns how many.
+  private static func cancelActive(alarmId: String, in records: inout [NativeAlarmRecord]) -> Int {
+    var cancelled = 0
+    for index in records.indices where records[index].alarmId == alarmId && records[index].cancelledAt == nil {
+      if #available(iOS 26.0, *) {
+        AlarmKitBridge.cancel(nativeId: records[index].nativeId)
+      }
+      records[index].cancelledAt = NativeAlarmRecords.nowMs()
+      cancelled += 1
+    }
+    return cancelled
+  }
+
+  /// Shared checks: iOS version, arguments, time and AlarmKit permission (asked for if not yet asked).
+  private static func precheck(alarmId: String, fireAt: Double) async -> [String: Any]? {
     guard #available(iOS 26.0, *) else {
       return failure("unsupported_os", "AlarmKit needs iOS 26 or later.")
     }
-    guard !options.alarmId.isEmpty, options.fireAt > 0 else {
+    guard !alarmId.isEmpty, fireAt > 0 else {
       return failure("invalid_arguments", "An alarm ID and time are required.")
     }
-    let date = Date(timeIntervalSince1970: options.fireAt / 1000)
-    guard date.timeIntervalSinceNow > 5 else {
+    guard Date(timeIntervalSince1970: fireAt / 1000).timeIntervalSinceNow > 0 else {
       return failure("time_in_past", "The alarm time must be in the future.")
     }
-
     var permission = AlarmKitBridge.permission()
     if permission == "undetermined" {
       permission = await AlarmKitBridge.requestPermission()
@@ -134,19 +163,24 @@ public class TerbitAlarmsModule: Module {
     guard permission == "granted" else {
       return failure("not_authorized", "Terbit MY isn't allowed to set alarms. Turn on Alarms in Settings.")
     }
+    return nil
+  }
 
-    // Replace any earlier active alarm with the same Terbit MY ID.
-    var records = NativeAlarmRecords.load()
-    for index in records.indices where records[index].alarmId == options.alarmId && records[index].cancelledAt == nil {
-      AlarmKitBridge.cancel(nativeId: records[index].nativeId)
-      records[index].cancelledAt = NativeAlarmRecords.nowMs()
+  private static func scheduleOneTime(_ options: OneTimeAlarmOptions) async -> [String: Any] {
+    if let problem = await precheck(alarmId: options.alarmId, fireAt: options.fireAt) {
+      return problem
+    }
+    guard #available(iOS 26.0, *) else {
+      return failure("unsupported_os", "AlarmKit needs iOS 26 or later.")
     }
 
+    var records = NativeAlarmRecords.load()
+    _ = cancelActive(alarmId: options.alarmId, in: &records)
     do {
       let id = try await AlarmKitBridge.scheduleOneTime(
         alarmId: options.alarmId,
         occurrenceId: options.occurrenceId,
-        date: date,
+        date: Date(timeIntervalSince1970: options.fireAt / 1000),
         title: options.title
       )
       records.append(NativeAlarmRecord(
@@ -155,7 +189,52 @@ public class TerbitAlarmsModule: Module {
         nativeId: id.uuidString,
         fireAt: options.fireAt,
         createdAt: NativeAlarmRecords.nowMs(),
-        cancelledAt: nil
+        cancelledAt: nil,
+        kind: "test",
+        hour: nil,
+        minute: nil,
+        weekdays: nil
+      ))
+      NativeAlarmRecords.save(records)
+      return ["ok": true, "nativeId": id.uuidString]
+    } catch {
+      NativeAlarmRecords.save(records)
+      return failure("scheduling_failed", error.localizedDescription)
+    }
+  }
+
+  /// A saved alarm: one AlarmKit alarm (weekly repeats handled by AlarmKit). Replaces any earlier one.
+  private static func scheduleSaved(_ options: SavedAlarmOptions) async -> [String: Any] {
+    if let problem = await precheck(alarmId: options.alarmId, fireAt: options.fireAt) {
+      return problem
+    }
+    guard #available(iOS 26.0, *) else {
+      return failure("unsupported_os", "AlarmKit needs iOS 26 or later.")
+    }
+    let weekdays = Array(Set(options.weekdays.filter { (0...6).contains($0) })).sorted()
+
+    var records = NativeAlarmRecords.load()
+    _ = cancelActive(alarmId: options.alarmId, in: &records)
+    do {
+      let id = try await AlarmKitBridge.scheduleSaved(
+        alarmId: options.alarmId,
+        hour: options.hour,
+        minute: options.minute,
+        weekdays: weekdays,
+        date: Date(timeIntervalSince1970: options.fireAt / 1000),
+        title: options.title
+      )
+      records.append(NativeAlarmRecord(
+        alarmId: options.alarmId,
+        occurrenceId: nil,
+        nativeId: id.uuidString,
+        fireAt: options.fireAt,
+        createdAt: NativeAlarmRecords.nowMs(),
+        cancelledAt: nil,
+        kind: "saved",
+        hour: options.hour,
+        minute: options.minute,
+        weekdays: weekdays
       ))
       NativeAlarmRecords.save(records)
       return ["ok": true, "nativeId": id.uuidString]

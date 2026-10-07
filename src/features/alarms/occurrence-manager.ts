@@ -1,4 +1,5 @@
 import type { MathMissionResult } from '@/features/missions/math/session';
+import type { AlarmFiredEvent } from '@/services/alarm-scheduler';
 
 import type { Alarm } from './alarm';
 import {
@@ -7,10 +8,12 @@ import {
   completeWithoutMission,
   createOccurrence,
   dismissOccurrence,
-  markMissed,
-  shouldMarkMissed,
-  startMission,
+  expireOccurrence,
+  isActive,
   markAlarmFired,
+  recordSystemStop,
+  shouldExpire,
+  startMission,
   type AlarmOccurrence,
   type DismissReason,
   type OccurrenceSource,
@@ -30,12 +33,17 @@ export class OccurrenceError extends Error {
 
 /**
  * Runs the alarm → ringing → mission → result flow and records it. Each
- * change is saved with a status check, so an occurrence can only finish once.
+ * change is saved with a status (and last-update) check, so an occurrence
+ * can only finish once.
  */
 export function createOccurrenceManager(
   getRepository: () => Promise<OccurrenceRepository>,
   now: () => number = Date.now,
 ) {
+  async function save(repository: OccurrenceRepository, next: AlarmOccurrence, previous: AlarmOccurrence) {
+    return repository.update(next, previous.status, previous.updatedAt);
+  }
+
   async function apply(id: string, transition: (o: AlarmOccurrence, at: number) => TransitionResult) {
     const repository = await getRepository();
     const current = await repository.get(id);
@@ -45,26 +53,36 @@ export function createOccurrenceManager(
     if (!result.ok) throw new OccurrenceError(result.error);
     if (result.occurrence === current) return current; // nothing changed
 
-    const saved = await repository.update(result.occurrence, current.status);
-    if (!saved) throw new OccurrenceError('conflict');
+    if (!(await save(repository, result.occurrence, current))) throw new OccurrenceError('conflict');
     return result.occurrence;
   }
 
-  /** Records active occurrences that were left too long (app closed, phone off) as missed. */
+  /** Closes active occurrences past their completion deadline (dismissed if stopped by the phone, else missed). */
   async function expireStale() {
     const repository = await getRepository();
     const at = now();
     for (const occurrence of await repository.listActive()) {
-      if (!shouldMarkMissed(occurrence, at)) continue;
-      const result = markMissed(occurrence, at);
-      if (result.ok) await repository.update(result.occurrence, occurrence.status);
+      if (!shouldExpire(occurrence, at)) continue;
+      const result = expireOccurrence(occurrence, at);
+      if (result.ok) await save(repository, result.occurrence, occurrence);
     }
   }
 
+  async function insertFired(repository: OccurrenceRepository, fired: TransitionResult) {
+    if (!fired.ok) throw new OccurrenceError(fired.error);
+    try {
+      await repository.insert(fired.occurrence);
+    } catch (error) {
+      if (error instanceof DuplicateOccurrenceError) throw new OccurrenceError('conflict');
+      throw error;
+    }
+    return fired.occurrence;
+  }
+
   /**
-   * The alarm is ringing: create the occurrence and mark it started. If this
-   * alarm already has an active occurrence, that one is returned instead, so
-   * the same alarm can never have two running at once.
+   * SIMULATION: the developer "Simulate alarm now" button. If this alarm
+   * already has an active occurrence, that one is returned instead, so the
+   * same alarm can never have two running at once.
    */
   async function trigger(
     alarm: Alarm,
@@ -82,15 +100,51 @@ export function createOccurrenceManager(
     }
 
     const at = now();
-    const started = markAlarmFired(createOccurrence({ alarm, ...options, now: at }), at);
-    if (!started.ok) throw new OccurrenceError(started.error);
-    try {
-      await repository.insert(started.occurrence);
-    } catch (error) {
-      if (error instanceof DuplicateOccurrenceError) throw new OccurrenceError('conflict');
-      throw error;
+    return insertFired(repository, markAlarmFired(createOccurrence({ alarm, ...options, now: at }), at));
+  }
+
+  /**
+   * A genuine native alarm went off. Safe to call repeatedly for the same
+   * event (it finds the existing occurrence). An older unfinished morning for
+   * the same alarm is closed first. Records a stop with the phone's controls
+   * when native code reports one.
+   */
+  async function recordNativeFire(alarm: Alarm, event: AlarmFiredEvent): Promise<AlarmOccurrence> {
+    await expireStale();
+    const repository = await getRepository();
+
+    let occurrence = await repository.findByEvent(alarm.id, event.scheduledAt);
+    if (!occurrence) {
+      for (const older of (await repository.listActive()).filter((o) => o.alarmId === alarm.id)) {
+        const closed = expireOccurrence(older, now());
+        if (closed.ok) await save(repository, closed.occurrence, older);
+      }
+      const at = now();
+      const created = createOccurrence({
+        alarm,
+        scheduledAt: event.scheduledAt,
+        source: 'native',
+        fireEvidence: event.evidence ?? 'system',
+        now: at,
+      });
+      try {
+        occurrence = await insertFired(repository, markAlarmFired(created, at, event.firedAt ?? event.scheduledAt));
+      } catch (error) {
+        // Another call recorded the same event at the same moment.
+        const existing = await repository.findByEvent(alarm.id, event.scheduledAt);
+        if (!existing) throw error;
+        occurrence = existing;
+      }
     }
-    return started.occurrence;
+
+    if (event.stopAction === 'stop' && event.stoppedAt != null && isActive(occurrence) && occurrence.alarmStoppedAt === null) {
+      const stoppedAt = event.stoppedAt;
+      occurrence = await apply(occurrence.id, (o, at) => recordSystemStop(o, at, stoppedAt));
+    }
+    if (shouldExpire(occurrence, now())) {
+      occurrence = await apply(occurrence.id, expireOccurrence);
+    }
+    return occurrence;
   }
 
   async function cancelForAlarm(alarmId: string) {
@@ -98,7 +152,7 @@ export function createOccurrenceManager(
     for (const occurrence of await repository.listActive()) {
       if (occurrence.alarmId !== alarmId) continue;
       const result = cancelOccurrence(occurrence, now());
-      if (result.ok) await repository.update(result.occurrence, occurrence.status);
+      if (result.ok) await save(repository, result.occurrence, occurrence);
     }
   }
 
@@ -106,17 +160,27 @@ export function createOccurrenceManager(
     async get(id: string) {
       return (await getRepository()).get(id);
     },
+    async findForEvent(alarmId: string, scheduledAt: number) {
+      return (await getRepository()).findByEvent(alarmId, scheduledAt);
+    },
+    async listActive() {
+      await expireStale();
+      return (await getRepository()).listActive();
+    },
     trigger,
+    recordNativeFire,
+    /** The phone's own Stop control ended the alarm; the mission can still be completed. */
+    recordSystemStop: (id: string) => apply(id, recordSystemStop),
     startMission: (id: string) => apply(id, startMission),
     completeMission: (id: string, result: MathMissionResult) =>
       apply(id, (o, at) => completeMission(o, result, at)),
     completeWithoutMission: (id: string) => apply(id, completeWithoutMission),
-    /** `reason: 'system'` is for when native code reports the phone's own Stop control was used. */
+    /** Gives up on the morning without the mission (Emergency Dismiss / skip). */
     dismiss: (id: string, reason: DismissReason = 'emergency') =>
       apply(id, (o, at) => dismissOccurrence(o, at, reason)),
     cancelForAlarm,
     expireStale,
-    /** Newest first, after recording any missed ones. */
+    /** Newest first, after closing any past their deadline. */
     async listRecent(limit = 30) {
       await expireStale();
       return (await getRepository()).listRecent(limit);

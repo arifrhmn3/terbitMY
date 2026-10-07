@@ -8,8 +8,12 @@ import { ListRow } from '@/components/list-row';
 import { Section } from '@/components/section';
 import { SwitchRow } from '@/components/switch-row';
 import { Spacing } from '@/constants/theme';
+import { MODE_POLICIES } from '@/features/alarms/accountability';
 import {
+  COMPLETION_MODE_LABEL,
+  COMPLETION_MODES,
   describeRepeat,
+  GENTLE_REMINDER_MINUTES,
   MAX_LABEL_LENGTH,
   SNOOZE_MINUTES,
   type AlarmDraft,
@@ -19,6 +23,7 @@ import { alarmStore, occurrences } from '@/features/alarms/alarms';
 import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
 import { MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
 import { useTheme } from '@/hooks/use-theme';
+import { getAlarmService } from '@/services/alarm-scheduler';
 
 import { RingingStatus } from './ringing-status';
 import { TimeField } from './time-field';
@@ -42,6 +47,8 @@ const difficultyOptions: { value: MathDifficulty; label: string }[] = [
 ];
 
 const countOptions = MATH_QUESTION_COUNTS.map((count) => ({ value: count, label: `${count} questions` }));
+const modeOptions = COMPLETION_MODES.map((mode) => ({ value: mode, label: COMPLETION_MODE_LABEL[mode] }));
+const gentleOptions = GENTLE_REMINDER_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 const snoozeOptions = SNOOZE_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 
 const defaultMathMission: AlarmMission = { type: 'math', difficulty: 'easy', questionCount: 3 };
@@ -57,7 +64,28 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   async function save() {
     setSaving(true);
     try {
-      await alarmStore.save(draft, alarmId);
+      const { result } = await alarmStore.save(draft, alarmId);
+      if (result?.status === 'permission-denied' || result?.status === 'failed') {
+        // Saved in Terbit MY, but the phone couldn't schedule it.
+        Alert.alert(
+          'Alarm saved, but it can’t ring yet',
+          result.message ?? 'Terbit MY doesn’t have permission to set alarms.',
+          [
+            { text: 'OK', onPress: () => router.back() },
+            {
+              text: 'Fix permissions',
+              onPress: async () => {
+                const service = getAlarmService();
+                const status = await service.requestNativeAlarmPermission();
+                if (status.permission !== 'granted') await service.openNativeAlarmSettings();
+                else await alarmStore.syncNative();
+                router.back();
+              },
+            },
+          ],
+        );
+        return;
+      }
       router.back();
     } catch (error) {
       setSaving(false);
@@ -162,6 +190,26 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
           />
         )}
       </Section>
+
+      {mission.type !== 'none' && (
+        <Section
+          title="Accountability mode (beta)"
+          footer={`${MODE_POLICIES[draft.completionMode].description} The phone’s own Stop button always works.`}>
+          <ChoiceRow
+            options={modeOptions}
+            value={draft.completionMode}
+            onChange={(completionMode) => update({ completionMode })}
+          />
+          {draft.completionMode === 'gentle' && (
+            <ChoiceRow
+              title="Follow up after"
+              options={gentleOptions}
+              value={draft.gentleReminderMinutes}
+              onChange={(gentleReminderMinutes) => update({ gentleReminderMinutes })}
+            />
+          )}
+        </Section>
+      )}
 
       <Section title="Snooze">
         <SwitchRow

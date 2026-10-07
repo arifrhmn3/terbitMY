@@ -1,3 +1,4 @@
+import { createAlarmHandOff } from './alarm-handoff';
 import { createMemoryAlarmRepository } from './alarm-repository';
 import { createAlarmStore, useAlarmStore } from './alarm-store';
 import { createOccurrenceManager } from './occurrence-manager';
@@ -9,13 +10,15 @@ const occurrenceRepository = createMemoryOccurrenceRepository();
 
 /*
  * Web preview only: alarms and history are kept in memory and are lost when
- * the page reloads. Phones use SQLite (see alarms.ts).
+ * the page reloads. Phones use SQLite (see alarms.ts). Nothing rings on web.
  */
 export const occurrences = createOccurrenceManager(async () => occurrenceRepository);
 
 export const alarmStore = createAlarmStore(async () => repository, getAlarmService(), {
   onRemove: occurrences.cancelForAlarm,
 });
+
+export const handOff = createAlarmHandOff({ alarmStore, occurrences, service: getAlarmService() });
 
 export function useAlarms() {
   return useAlarmStore(alarmStore);

@@ -70,7 +70,50 @@ describe('SQLite migrations', () => {
   });
 });
 
+describe('SQLite migration 4 (accountability modes)', () => {
+  it('turns existing alarms and occurrences into Reward mode with safe defaults', async () => {
+    const db = openTestDatabase();
+    for (const [i, sql] of migrations.slice(0, 3).entries()) {
+      await db.execAsync(sql);
+      await db.execAsync(`PRAGMA user_version = ${i + 1}`);
+    }
+    // An alarm and a simulated occurrence as they were saved before migration 4.
+    await db.runAsync(
+      `INSERT INTO alarms (id, hour, minute, weekdays, enabled, label, mission, snooze_enabled, snooze_minutes, is_primary, created_at, updated_at)
+       VALUES ('old', 6, 30, '1,2,3,4,5', 1, 'Subuh', '{"type":"math","difficulty":"easy","questionCount":3}', 1, 5, 1, 1, 1)`,
+    );
+    await db.runAsync(
+      `INSERT INTO alarm_occurrences (id, alarm_id, scheduled_at, source, status, alarm_label, mission, created_at, updated_at)
+       VALUES ('occ', 'old', 100, 'simulated', 'completed', 'Subuh', '{"type":"none"}', 100, 100)`,
+    );
+
+    expect(await migrate(db)).toBe(migrations.length - 3);
+
+    const [alarm] = await createSqliteAlarmRepository(db).list();
+    expect(alarm).toMatchObject({ id: 'old', completionMode: 'reward', gentleReminderMinutes: 10, label: 'Subuh' });
+    const occurrence = await createSqliteOccurrenceRepository(db).get('occ');
+    expect(occurrence).toMatchObject({
+      completionMode: 'reward',
+      gentleReminderMinutes: 10,
+      fireEvidence: 'app',
+      alarmStoppedAt: null,
+      alarmStopReason: null,
+    });
+  });
+});
+
 describe('SQLite alarm repository', () => {
+  it('saves and loads each completion mode and gentle delay', async () => {
+    const repo = createSqliteAlarmRepository(await database());
+    await repo.save({ ...alarm, id: 'r', completionMode: 'reward' });
+    await repo.save({ ...alarm, id: 'c', completionMode: 'challenge', isPrimary: false });
+    await repo.save({ ...alarm, id: 'g', completionMode: 'gentle', gentleReminderMinutes: 30, isPrimary: false });
+    const byId = Object.fromEntries((await repo.list()).map((a) => [a.id, a]));
+    expect(byId.r.completionMode).toBe('reward');
+    expect(byId.c.completionMode).toBe('challenge');
+    expect(byId.g).toMatchObject({ completionMode: 'gentle', gentleReminderMinutes: 30 });
+  });
+
   it('saves, updates, lists and removes alarms', async () => {
     const repo = createSqliteAlarmRepository(await database());
     await repo.save(alarm);
@@ -162,5 +205,29 @@ describe('SQLite occurrence repository', () => {
       status: 'completed',
       result: { kind: 'mission_completed', mission: result },
     });
+  });
+});
+
+describe('SQLite occurrence accountability fields', () => {
+  it('round-trips a native occurrence stopped by the phone, then completed late', async () => {
+    const db = await database();
+    const manager = createOccurrenceManager(async () => createSqliteOccurrenceRepository(db), () => 10_000);
+    const fired = await manager.recordNativeFire(
+      { ...alarm, completionMode: 'gentle', gentleReminderMinutes: 15 },
+      { alarmId: alarm.id, scheduledAt: 9_000, firedAt: 9_010, evidence: 'system', stoppedAt: 9_500, stopAction: 'stop' },
+    );
+    expect(await createSqliteOccurrenceRepository(db).get(fired.id)).toMatchObject({
+      completionMode: 'gentle',
+      gentleReminderMinutes: 15,
+      fireEvidence: 'system',
+      startedAt: 9_010,
+      alarmStoppedAt: 9_500,
+      alarmStopReason: 'system',
+      status: 'alarm_fired',
+    });
+    await manager.startMission(fired.id);
+    const result = { difficulty: 'easy', questionCount: 3, attempts: 3, wrongAttempts: 0, accuracy: 1, durationMs: 1 } as const;
+    const done = await manager.completeMission(fired.id, result);
+    expect(done).toMatchObject({ status: 'completed', alarmStopReason: 'system' });
   });
 });

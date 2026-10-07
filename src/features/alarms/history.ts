@@ -1,25 +1,34 @@
+import { evaluateMorning, MODE_POLICIES } from './accountability';
 import { describeMission, formatAlarmTime } from './alarm';
-import { isSuccessfulMorning, morningOutcome, OUTCOME_LABEL, STATUS_LABEL, type AlarmOccurrence } from './occurrence';
+import type { AlarmOccurrence } from './occurrence';
 
 export type HistoryEntry = {
   id: string;
   /** e.g. "Tue, 6 Oct · 06:30" */
   scheduled: string;
   title: string;
+  /** e.g. "Maths · Easy · 3 questions · Reward mode" */
   mission: string;
-  /** The accountability outcome, e.g. "Completed", "Dismissed, no mission", "Mission abandoned". */
+  /** Plain-language outcome, e.g. "Mission completed", "Stopped with phone controls · Mission not done". */
   status: string;
-  /** True only for a completed mission, the one outcome that will count toward streaks. */
+  /** Qualifies for a streak day under the alarm's mode (Phase 2 will use this). */
   successful: boolean;
-  /** e.g. "Done at 06:32 · 1 wrong answer", or null if it never finished properly. */
+  /** e.g. "Done at 06:32 · 1 wrong answer", or null. */
   completion: string | null;
-  simulated: boolean;
+  /** How Terbit MY knows the alarm went off. */
+  source: string;
 };
 
 function time(ms: number) {
   const date = new Date(ms);
   return formatAlarmTime({ hour: date.getHours(), minute: date.getMinutes() });
 }
+
+const SOURCE_TEXT = {
+  app: 'Simulated in Terbit MY',
+  system: 'Real alarm (reported by Android)',
+  schedule: 'Real alarm (AlarmKit schedule)',
+} as const;
 
 /** Turns an occurrence into the text shown in "Recent mornings". */
 export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
@@ -28,31 +37,34 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
     day: 'numeric',
     month: 'short',
   });
-  const outcome = morningOutcome(o);
+  const evaluation = evaluateMorning(o);
 
-  let completion: string | null = null;
+  const details: string[] = [];
+  if (o.alarmStopReason === 'system' && o.alarmStoppedAt !== null) {
+    details.push(`Alarm stopped with phone controls at ${time(o.alarmStoppedAt)}`);
+  }
+  if (o.missionStartedAt !== null && evaluation.missionOutcome !== 'completed') {
+    details.push(`mission started ${time(o.missionStartedAt)}`);
+  }
   if (o.status === 'completed' && o.endedAt !== null) {
-    completion = `Done at ${time(o.endedAt)}`;
+    let done = `Done at ${time(o.endedAt)}`;
     if (o.result?.kind === 'mission_completed') {
       const wrong = o.result.mission.wrongAttempts;
-      completion += wrong === 0 ? ' · no wrong answers' : ` · ${wrong} wrong ${wrong === 1 ? 'answer' : 'answers'}`;
+      done += wrong === 0 ? ' · no wrong answers' : ` · ${wrong} wrong ${wrong === 1 ? 'answer' : 'answers'}`;
     }
-  } else if (o.status === 'dismissed' && o.endedAt !== null) {
-    completion = `Dismissed at ${time(o.endedAt)}`;
-    if (o.result?.kind === 'system_dismiss') completion += ' with the phone’s alarm controls';
-  }
-  if (outcome === 'mission_abandoned' && o.missionStartedAt !== null) {
-    completion = [completion, `mission started ${time(o.missionStartedAt)}`].filter(Boolean).join(' · ');
+    details.push(done);
+  } else if (o.status === 'dismissed' && o.result?.kind === 'emergency_dismiss' && o.endedAt !== null) {
+    details.push(`Ended in Terbit MY at ${time(o.endedAt)}`);
   }
 
   return {
     id: o.id,
     scheduled: `${day} · ${time(o.scheduledAt)}`,
     title: o.alarmLabel || 'Alarm',
-    mission: describeMission(o.mission),
-    status: outcome === 'in_progress' ? STATUS_LABEL[o.status] : OUTCOME_LABEL[outcome],
-    successful: isSuccessfulMorning(o),
-    completion,
-    simulated: o.source === 'simulated',
+    mission: `${describeMission(o.mission)} · ${MODE_POLICIES[o.completionMode].label} mode`,
+    status: evaluation.summary,
+    successful: evaluation.streakEligible,
+    completion: details.length > 0 ? details.join(' · ') : null,
+    source: SOURCE_TEXT[o.fireEvidence],
   };
 }

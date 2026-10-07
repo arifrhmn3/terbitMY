@@ -1,10 +1,12 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { parseMission } from './alarm-repository';
+import { parseCompletionMode, parseMission } from './alarm-repository';
 import {
   ACTIVE_STATUSES,
   isActive,
   type AlarmOccurrence,
+  type AlarmStopReason,
+  type FireEvidence,
   type OccurrenceResult,
   type OccurrenceSource,
   type OccurrenceStatus,
@@ -28,10 +30,11 @@ export interface OccurrenceRepository {
   insert(occurrence: AlarmOccurrence): Promise<void>;
   /**
    * Saves the new state only if the stored status still equals
-   * `expectedStatus`. Returns false if something else changed it first,
-   * which is what stops an occurrence being completed twice.
+   * `expectedStatus` (and `updatedAt` equals `expectedUpdatedAt`, when
+   * given). Returns false if something else changed it first, which is what
+   * stops an occurrence being completed twice.
    */
-  update(occurrence: AlarmOccurrence, expectedStatus: OccurrenceStatus): Promise<boolean>;
+  update(occurrence: AlarmOccurrence, expectedStatus: OccurrenceStatus, expectedUpdatedAt?: number): Promise<boolean>;
 }
 
 export type OccurrenceRow = {
@@ -43,7 +46,12 @@ export type OccurrenceRow = {
   alarm_label: string;
   mission: string;
   snooze_minutes: number | null;
+  completion_mode: string;
+  gentle_reminder_minutes: number;
+  fire_evidence: string;
   started_at: number | null;
+  alarm_stopped_at: number | null;
+  alarm_stop_reason: string | null;
   mission_started_at: number | null;
   mission_completed_at: number | null;
   ended_at: number | null;
@@ -64,7 +72,12 @@ export function occurrenceToRow(o: AlarmOccurrence): OccurrenceRow {
     alarm_label: o.alarmLabel,
     mission: JSON.stringify(o.mission),
     snooze_minutes: o.snoozeMinutes,
+    completion_mode: o.completionMode,
+    gentle_reminder_minutes: o.gentleReminderMinutes,
+    fire_evidence: o.fireEvidence,
     started_at: o.startedAt,
+    alarm_stopped_at: o.alarmStoppedAt,
+    alarm_stop_reason: o.alarmStopReason,
     mission_started_at: o.missionStartedAt,
     mission_completed_at: o.missionCompletedAt,
     ended_at: o.endedAt,
@@ -86,6 +99,9 @@ function parseResult(json: string | null): OccurrenceResult | null {
   }
 }
 
+const FIRE_EVIDENCE: readonly FireEvidence[] = ['app', 'system', 'schedule'];
+const STOP_REASONS: readonly AlarmStopReason[] = ['system', 'mission', 'dismiss', 'turn_off'];
+
 function parseStatus(status: string): OccurrenceStatus {
   // 'started' was renamed 'alarm_fired' (migration 3); old rows may still say it.
   if (status === 'started') return 'alarm_fired';
@@ -103,7 +119,14 @@ export function rowToOccurrence(row: OccurrenceRow): AlarmOccurrence {
     alarmLabel: row.alarm_label,
     mission: parseMission(row.mission),
     snoozeMinutes: row.snooze_minutes,
+    completionMode: parseCompletionMode(row.completion_mode),
+    gentleReminderMinutes: row.gentle_reminder_minutes ?? 10,
+    fireEvidence: FIRE_EVIDENCE.includes(row.fire_evidence as FireEvidence) ? (row.fire_evidence as FireEvidence) : 'app',
     startedAt: row.started_at,
+    alarmStoppedAt: row.alarm_stopped_at,
+    alarmStopReason: STOP_REASONS.includes(row.alarm_stop_reason as AlarmStopReason)
+      ? (row.alarm_stop_reason as AlarmStopReason)
+      : null,
     missionStartedAt: row.mission_started_at,
     missionCompletedAt: row.mission_completed_at,
     endedAt: row.ended_at,
@@ -150,9 +173,10 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
       try {
         await db.runAsync(
           `INSERT INTO alarm_occurrences
-            (id, alarm_id, scheduled_at, source, status, alarm_label, mission, snooze_minutes, started_at,
-             mission_started_at, mission_completed_at, ended_at, result, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, alarm_id, scheduled_at, source, status, alarm_label, mission, snooze_minutes,
+             completion_mode, gentle_reminder_minutes, fire_evidence, started_at, alarm_stopped_at,
+             alarm_stop_reason, mission_started_at, mission_completed_at, ended_at, result, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           r.id,
           r.alarm_id,
           r.scheduled_at,
@@ -161,7 +185,12 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
           r.alarm_label,
           r.mission,
           r.snooze_minutes,
+          r.completion_mode,
+          r.gentle_reminder_minutes,
+          r.fire_evidence,
           r.started_at,
+          r.alarm_stopped_at,
+          r.alarm_stop_reason,
           r.mission_started_at,
           r.mission_completed_at,
           r.ended_at,
@@ -175,15 +204,17 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
       }
     },
 
-    async update(o, expectedStatus) {
+    async update(o, expectedStatus, expectedUpdatedAt) {
       const r = occurrenceToRow(o);
       const { changes } = await db.runAsync(
         `UPDATE alarm_occurrences
-            SET status = ?, started_at = ?, mission_started_at = ?, mission_completed_at = ?,
-                ended_at = ?, result = ?, updated_at = ?
-          WHERE id = ? AND status = ?`,
+            SET status = ?, started_at = ?, alarm_stopped_at = ?, alarm_stop_reason = ?, mission_started_at = ?,
+                mission_completed_at = ?, ended_at = ?, result = ?, updated_at = ?
+          WHERE id = ? AND status = ? AND (? IS NULL OR updated_at = ?)`,
         r.status,
         r.started_at,
+        r.alarm_stopped_at,
+        r.alarm_stop_reason,
         r.mission_started_at,
         r.mission_completed_at,
         r.ended_at,
@@ -191,6 +222,8 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
         r.updated_at,
         r.id,
         expectedStatus,
+        expectedUpdatedAt ?? null,
+        expectedUpdatedAt ?? null,
       );
       return changes === 1;
     },
@@ -239,8 +272,13 @@ export function createMemoryOccurrenceRepository(): OccurrenceRepository {
       rows = [...rows, occurrenceToRow(o)];
     },
 
-    async update(o, expectedStatus) {
-      const index = rows.findIndex((r) => r.id === o.id && r.status === expectedStatus);
+    async update(o, expectedStatus, expectedUpdatedAt) {
+      const index = rows.findIndex(
+        (r) =>
+          r.id === o.id &&
+          r.status === expectedStatus &&
+          (expectedUpdatedAt === undefined || r.updated_at === expectedUpdatedAt),
+      );
       if (index === -1) return false;
       rows = rows.map((r, i) => (i === index ? occurrenceToRow(o) : r));
       return true;

@@ -1,6 +1,10 @@
-import type { NativeStatusPayload, TerbitAlarmsNativeModule } from '../../../modules/terbit-alarms';
+import type {
+  NativeScheduleResult,
+  NativeStatusPayload,
+  TerbitAlarmsNativeModule,
+} from '../../../modules/terbit-alarms';
 
-import { createNotImplementedAlarmService } from './not-implemented';
+import { alarmKitFireEvents, androidFireEvents, isNativeUpToDate, staleSavedAlarmIds } from './native-records';
 import type { AlarmBackend, AlarmService, NativeAlarmStatus, ScheduleResult } from './types';
 
 export function toNativeAlarmStatus(payload: NativeStatusPayload): NativeAlarmStatus {
@@ -17,57 +21,108 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * Connects the shared `AlarmService` to the TerbitAlarms native module.
- * Same TypeScript for both platforms; the module is Swift on iOS and Kotlin
- * on Android.
- *
- * Milestone 1 only adds one-time native alarms. The user's saved (repeating)
- * alarms still go through `schedule()`, which stays `not-implemented`, so
- * nothing claims those ring yet.
- */
-export function createNativeAlarmService(
-  native: TerbitAlarmsNativeModule,
-  backend: AlarmBackend,
-  summary: string,
-): AlarmService {
-  const base = createNotImplementedAlarmService(summary);
+function toScheduleResult(result: NativeScheduleResult): ScheduleResult {
+  if (result.ok) return { status: 'scheduled', nativeId: result.nativeId };
+  if (result.code === 'not_authorized' || result.code === 'exact_alarm_not_allowed') {
+    return { status: 'permission-denied', message: result.message };
+  }
+  return { status: 'failed', code: result.code, message: result.message };
+}
 
-  return {
-    ...base,
+/**
+ * Connects the shared `AlarmService` to the TerbitAlarms native module. Same
+ * TypeScript for both platforms; the module is Swift (AlarmKit) on iOS and
+ * Kotlin (AlarmManager) on Android. The phone's own Stop controls are never
+ * blocked.
+ */
+export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backend: AlarmBackend): AlarmService {
+  async function status(): Promise<NativeAlarmStatus> {
+    try {
+      return toNativeAlarmStatus(await native.getStatusAsync());
+    } catch (error) {
+      return { available: false, backend, permission: 'unavailable', fullScreenAllowed: null, detail: errorMessage(error) };
+    }
+  }
+
+  async function guarded(action: () => Promise<NativeScheduleResult>): Promise<ScheduleResult> {
+    try {
+      return toScheduleResult(await action());
+    } catch (error) {
+      return { status: 'failed', code: 'native_error', message: errorMessage(error) };
+    }
+  }
+
+  const service: AlarmService = {
+    async getCapabilities() {
+      const s = await status();
+      if (!s.available) {
+        return { status: 'not-implemented', backend, ringsInSilentMode: false, summary: s.detail ?? 'Native alarms aren’t available on this phone.' };
+      }
+      if (s.permission !== 'granted') {
+        return {
+          status: 'needs-permission',
+          backend,
+          ringsInSilentMode: backend === 'alarmkit',
+          summary: s.detail ?? 'Allow alarms for Terbit MY so your saved alarms can ring.',
+        };
+      }
+      return { status: 'ready', backend, ringsInSilentMode: backend === 'alarmkit', summary: 'Your saved alarms ring on this phone.' };
+    },
+
+    async requestPermission() {
+      const s = toNativeAlarmStatus(await native.requestPermissionAsync());
+      return s.permission === 'granted' ? 'granted' : 'denied';
+    },
+
+    schedule(spec) {
+      return guarded(() =>
+        native.scheduleAlarmAsync({
+          alarmId: spec.id,
+          hour: spec.hour,
+          minute: spec.minute,
+          weekdays: [...spec.weekdays],
+          fireAt: spec.nextFireAt,
+          title: spec.title,
+          missionRequired: spec.missionRequired,
+          completionMode: spec.completionMode,
+        }),
+      );
+    },
 
     async cancel(alarmId) {
       await native.cancelAsync(alarmId);
     },
 
-    async getNativeAlarmStatus() {
-      try {
-        return toNativeAlarmStatus(await native.getStatusAsync());
-      } catch (error) {
-        return { available: false, backend, permission: 'unavailable', fullScreenAllowed: null, detail: errorMessage(error) };
+    async syncAll(specs) {
+      const records = await native.listAsync();
+      for (const id of staleSavedAlarmIds(records, new Set(specs.map((s) => s.id)))) {
+        await native.cancelAsync(id);
+      }
+      for (const spec of specs) {
+        if (!isNativeUpToDate(records, spec, backend)) await service.schedule(spec);
       }
     },
+
+    async getFireEvents(since, now) {
+      const records = await native.listAsync();
+      return backend === 'alarmkit' ? alarmKitFireEvents(records, since, now) : androidFireEvents(records, since);
+    },
+
+    getNativeAlarmStatus: status,
 
     async requestNativeAlarmPermission() {
       return toNativeAlarmStatus(await native.requestPermissionAsync());
     },
 
-    async scheduleOneTime(request): Promise<ScheduleResult> {
-      try {
-        const result = await native.scheduleOneTimeAsync({
+    scheduleOneTime(request) {
+      return guarded(() =>
+        native.scheduleOneTimeAsync({
           alarmId: request.alarmId,
           occurrenceId: request.occurrenceId,
           fireAt: request.fireAt,
           title: request.title,
-        });
-        if (result.ok) return { status: 'scheduled', nativeId: result.nativeId };
-        if (result.code === 'not_authorized' || result.code === 'exact_alarm_not_allowed') {
-          return { status: 'permission-denied', message: result.message };
-        }
-        return { status: 'failed', code: result.code, message: result.message };
-      } catch (error) {
-        return { status: 'failed', code: 'native_error', message: errorMessage(error) };
-      }
+        }),
+      );
     },
 
     async listNativeAlarms() {
@@ -78,4 +133,5 @@ export function createNativeAlarmService(
       await native.openSettingsAsync();
     },
   };
+  return service;
 }

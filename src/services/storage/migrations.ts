@@ -51,6 +51,18 @@ export const migrations: readonly string[] = [
   CREATE UNIQUE INDEX alarm_occurrences_one_active_per_alarm
     ON alarm_occurrences (alarm_id)
     WHERE status IN ('scheduled', 'alarm_fired', 'mission_in_progress');`,
+
+  // 4: accountability modes. Existing alarms become Reward mode (the most
+  // permissive; mission optional for stopping). Occurrences copy the mode and
+  // record how the alarm was stopped and how we know it fired. Existing
+  // occurrences all came from "Simulate alarm now" (evidence 'app').
+  `ALTER TABLE alarms ADD COLUMN completion_mode TEXT NOT NULL DEFAULT 'reward';
+  ALTER TABLE alarms ADD COLUMN gentle_reminder_minutes INTEGER NOT NULL DEFAULT 10;
+  ALTER TABLE alarm_occurrences ADD COLUMN completion_mode TEXT NOT NULL DEFAULT 'reward';
+  ALTER TABLE alarm_occurrences ADD COLUMN gentle_reminder_minutes INTEGER NOT NULL DEFAULT 10;
+  ALTER TABLE alarm_occurrences ADD COLUMN fire_evidence TEXT NOT NULL DEFAULT 'app';
+  ALTER TABLE alarm_occurrences ADD COLUMN alarm_stopped_at INTEGER;
+  ALTER TABLE alarm_occurrences ADD COLUMN alarm_stop_reason TEXT;`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

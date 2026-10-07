@@ -8,9 +8,9 @@ import android.net.Uri
 import android.os.Build
 
 /**
- * Schedules one-time alarms with AlarmManager.setAlarmClock(): exact, allowed
- * in Doze, and shown to the user as an alarm by the system.
- * Milestone 1 only: no repeats, snooze or reboot rescheduling.
+ * Schedules alarms with AlarmManager.setAlarmClock(): exact, allowed in Doze,
+ * and shown to the user as an alarm by the system. Each call schedules one
+ * ring; weekly repeats are rescheduled by SavedAlarms after each fire.
  */
 object AlarmScheduler {
   const val ACTION_FIRE = "expo.modules.terbitalarms.ALARM_FIRE"
@@ -19,6 +19,9 @@ object AlarmScheduler {
   const val EXTRA_OCCURRENCE_ID = "occurrenceId"
   const val EXTRA_FIRE_AT = "fireAt"
   const val EXTRA_TITLE = "title"
+  const val EXTRA_KIND = "kind"
+  const val EXTRA_MISSION_REQUIRED = "missionRequired"
+  const val EXTRA_COMPLETION_MODE = "completionMode"
 
   fun canScheduleExact(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
@@ -33,12 +36,24 @@ object AlarmScheduler {
       .setAction(ACTION_FIRE)
       .setData(Uri.parse("terbitalarm://alarm/" + Uri.encode(alarmId)))
 
-  fun schedule(context: Context, alarmId: String, occurrenceId: String?, fireAt: Long, title: String) {
+  fun schedule(
+    context: Context,
+    alarmId: String,
+    occurrenceId: String?,
+    fireAt: Long,
+    title: String,
+    kind: String = "test",
+    missionRequired: Boolean = false,
+    completionMode: String = "reward",
+  ) {
     val intent = fireIntent(context, alarmId)
       .putExtra(EXTRA_ALARM_ID, alarmId)
       .putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
       .putExtra(EXTRA_FIRE_AT, fireAt)
       .putExtra(EXTRA_TITLE, title)
+      .putExtra(EXTRA_KIND, kind)
+      .putExtra(EXTRA_MISSION_REQUIRED, missionRequired)
+      .putExtra(EXTRA_COMPLETION_MODE, completionMode)
     val operation = PendingIntent.getBroadcast(
       context,
       requestCode(alarmId),

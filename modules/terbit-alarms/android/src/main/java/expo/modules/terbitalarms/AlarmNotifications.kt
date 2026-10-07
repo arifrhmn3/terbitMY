@@ -90,7 +90,13 @@ object AlarmNotifications {
     val notification = builder
       .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
       .setContentTitle(title)
-      .setContentText("Tap to open the alarm.")
+      .setContentText(
+        if (extras.getBooleanExtra(AlarmScheduler.EXTRA_MISSION_REQUIRED, false)) {
+          "Tap to start your Terbit MY mission."
+        } else {
+          "Tap to open the alarm."
+        },
+      )
       .setCategory(Notification.CATEGORY_ALARM)
       .setVisibility(Notification.VISIBILITY_PUBLIC)
       .setOngoing(true)

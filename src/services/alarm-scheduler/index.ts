@@ -10,18 +10,19 @@ let service: AlarmService | null = null;
 function createForPlatform(): AlarmService {
   switch (process.env.EXPO_OS) {
     case 'ios':
-      return createIosAlarmService(); // placeholder: AlarmKit not implemented
+      return createIosAlarmService(); // AlarmKit (iOS 26+)
     case 'android':
-      return createAndroidAlarmService(); // placeholder: AlarmManager not implemented
+      return createAndroidAlarmService(); // AlarmManager.setAlarmClock
     default:
       return createNotImplementedAlarmService(); // web preview never rings
   }
 }
 
 /**
- * Returns the alarm service for this platform. Native triggering is NOT
- * implemented on any platform yet; every implementation reports
- * `not-implemented` and never reports a fired alarm.
+ * Returns the alarm service for this platform: AlarmKit on iOS 26+,
+ * AlarmManager on Android (development/release builds with the native
+ * module), otherwise one that reports `not-implemented` and never claims an
+ * alarm was scheduled or fired (Expo Go, web, tests).
  */
 export function getAlarmService(): AlarmService {
   service ??= createForPlatform();

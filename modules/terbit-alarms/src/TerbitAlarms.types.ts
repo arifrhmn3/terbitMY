@@ -36,11 +36,28 @@ export type OneTimeAlarmOptions = {
   title: string;
 };
 
+/** A saved Terbit MY alarm. Native code repeats weekly alarms on its own. */
+export type SavedAlarmOptions = {
+  alarmId: string;
+  hour: number;
+  minute: number;
+  /** 0 = Sunday … 6 = Saturday. Empty = ring once, at `fireAt`. */
+  weekdays: number[];
+  /** The next time it should ring (ms since 1970). */
+  fireAt: number;
+  title: string;
+  /** True when the alarm has a mission (Android shows "Start mission"). */
+  missionRequired: boolean;
+  completionMode: 'reward' | 'challenge' | 'gentle';
+};
+
 export type NativeScheduleResult =
   | { ok: true; nativeId: string }
   | { ok: false; code: NativeAlarmErrorCode; message: string };
 
 export type NativeRecordPayload = {
+  /** 'test' (developer test alarm) or 'saved' (a saved Terbit MY alarm). Older records have none (= test). */
+  kind?: 'test' | 'saved';
   alarmId: string;
   occurrenceId: string | null;
   nativeId: string;
@@ -55,12 +72,21 @@ export type NativeRecordPayload = {
   firedAt: number | null;
   stoppedAt: number | null;
   cancelledAt: number | null;
+  /** Android: 'stop' (alarm controls) or 'mission' ("Start mission"). */
+  stopAction?: 'stop' | 'mission' | null;
+  /** iOS saved alarms: the schedule AlarmKit was given. */
+  hour?: number | null;
+  minute?: number | null;
+  weekdays?: number[] | null;
 };
 
 export type TerbitAlarmsNativeModule = {
   getStatusAsync(): Promise<NativeStatusPayload>;
   requestPermissionAsync(): Promise<NativeStatusPayload>;
+  /** Developer test: one alarm at a fixed time. */
   scheduleOneTimeAsync(options: OneTimeAlarmOptions): Promise<NativeScheduleResult>;
+  /** A saved alarm (one-off or weekly). Replaces any earlier native alarm for the same ID. */
+  scheduleAlarmAsync(options: SavedAlarmOptions): Promise<NativeScheduleResult>;
   /** Cancels every native alarm scheduled for `alarmId`. Returns how many were cancelled. */
   cancelAsync(alarmId: string): Promise<number>;
   /** The most recent native alarms this app scheduled, newest first. */

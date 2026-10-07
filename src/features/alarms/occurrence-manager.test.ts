@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import { createAlarmDraft, type Alarm } from './alarm';
 import { createMemoryAlarmRepository } from './alarm-repository';
 import { createAlarmStore } from './alarm-store';
+import { isRewardEligible, isStreakEligible } from './accountability';
 import { MISSED_AFTER_MS } from './occurrence';
 import { createOccurrenceManager, OccurrenceError } from './occurrence-manager';
 import { createMemoryOccurrenceRepository } from './occurrence-repository';
@@ -161,5 +162,56 @@ describe('occurrence manager', () => {
   it('reports unknown occurrences', async () => {
     const { manager } = setup();
     await expectCode(manager.startMission('nope'), 'not-found');
+  });
+});
+
+describe('genuine native alarms', () => {
+  const nativeEvent = (scheduledAt: number, extra = {}) => ({ alarmId: alarm.id, scheduledAt, evidence: 'system' as const, ...extra });
+
+  it('records a fired native alarm once, however many times it is reported', async () => {
+    const { manager, repository } = setup();
+    const first = await manager.recordNativeFire(alarm, nativeEvent(9_000, { firedAt: 9_050 }));
+    const again = await manager.recordNativeFire(alarm, nativeEvent(9_000, { firedAt: 9_050 }));
+
+    expect(again.id).toBe(first.id);
+    expect(first).toMatchObject({ source: 'native', fireEvidence: 'system', status: 'alarm_fired', startedAt: 9_050 });
+    expect(await repository.listRecent(10)).toHaveLength(1);
+  });
+
+  it('records a stop with the phone controls, then still accepts the mission', async () => {
+    const { manager } = setup();
+    const stopped = await manager.recordNativeFire(alarm, nativeEvent(9_000, { stoppedAt: 9_500, stopAction: 'stop' }));
+    expect(stopped).toMatchObject({ status: 'alarm_fired', alarmStopReason: 'system', alarmStoppedAt: 9_500 });
+
+    await manager.startMission(stopped.id);
+    const done = await manager.completeMission(stopped.id, playMathMission());
+    expect(done.status).toBe('completed');
+    expect(isRewardEligible(done)).toBe(true);
+  });
+
+  it('closes an older unfinished morning before recording the next one', async () => {
+    const { manager, clock } = setup();
+    const older = await manager.recordNativeFire(alarm, nativeEvent(9_000, { stoppedAt: 9_100, stopAction: 'stop' }));
+    clock.time = 20_000;
+    const newer = await manager.recordNativeFire(alarm, nativeEvent(19_000));
+
+    expect(newer.id).not.toBe(older.id);
+    expect((await manager.get(older.id))?.status).toBe('dismissed');
+    expect((await manager.listActive()).map((o) => o.id)).toEqual([newer.id]);
+  });
+
+  it('records an old alarm that nobody responded to as missed', async () => {
+    const { manager, clock } = setup();
+    clock.time = 9_000 + MISSED_AFTER_MS + 1;
+    const old = await manager.recordNativeFire(alarm, { alarmId: alarm.id, scheduledAt: 9_000, evidence: 'schedule' });
+    expect(old).toMatchObject({ status: 'missed', fireEvidence: 'schedule' });
+    expect(isStreakEligible(old)).toBe(false);
+  });
+
+  it('keeps each alarm event unique in the database', async () => {
+    const { manager, repository } = setup();
+    await manager.recordNativeFire(alarm, nativeEvent(9_000));
+    await Promise.all([manager.recordNativeFire(alarm, nativeEvent(9_000)), manager.recordNativeFire(alarm, nativeEvent(9_000))]);
+    expect(await repository.listRecent(10)).toHaveLength(1);
   });
 });

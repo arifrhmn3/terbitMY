@@ -8,15 +8,21 @@ struct NativeAlarmRecord: Codable {
   var occurrenceId: String?
   /// The AlarmKit alarm UUID.
   var nativeId: String
-  /// ms since 1970
+  /// ms since 1970 (one-off: when it rings; weekly: the first ring)
   var fireAt: Double
   var createdAt: Double
   var cancelledAt: Double?
+  /// "test" (developer test alarm) or "saved" (a saved Terbit MY alarm). Older records: nil = test.
+  var kind: String?
+  /// Saved alarms: the schedule given to AlarmKit. Empty weekdays = one-off.
+  var hour: Int?
+  var minute: Int?
+  var weekdays: [Int]?
 }
 
 enum NativeAlarmRecords {
   private static let key = "terbit.nativeAlarmRecords.v1"
-  private static let maxRecords = 20
+  private static let maxRecords = 60
 
   static func load() -> [NativeAlarmRecord] {
     guard let data = UserDefaults.standard.data(forKey: key) else { return [] }

@@ -4,9 +4,7 @@ _Last updated: 7 October 2026_
 
 ## Current phase
 
-**Phase 1 milestone reached: shared alarm flow + native alarm proof of concept, verified on a physical iPhone and Android phone.**
-
-The phones can now schedule and ring genuine system alarms: AlarmKit on iOS 26+, `AlarmManager.setAlarmClock` on Android. Your *saved* alarms don't ring natively yet, and a real alarm doesn't open the mission yet. Those are the remaining Phase 1 milestones (see "What's left in Phase 1"). Phase 2 has not started. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Phase 1: saved alarms, accountability modes and the native alarm → mission hand-off are built; waiting for physical-device testing.** The native alarm proof of concept is already verified on a physical iPhone and Android phone. Phase 2 has not started. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Phase 0: Foundation ✅
 
@@ -33,43 +31,46 @@ The phones can now schedule and ring genuine system alarms: AlarmKit on iOS 26+,
 | Item | Status |
 |---|---|
 | Development builds (`expo-dev-client`, `eas.json`); signed iOS build and Android APK installed on the owner's phones | ✅ Verified on device |
-| Alarm data model: time, repeat days, on/off, mission, snooze, main wake-up alarm | ✅ |
-| Alarm list + editor screens, saved in SQLite on the device | ✅ Tested by the owner (Expo Go and dev builds) |
+| Alarm data model: time, repeat days, on/off, mission, snooze preference, main wake-up alarm, **accountability mode** | ✅ |
+| Alarm list + editor screens, saved in SQLite on the device | ✅ Tested by the owner (mode selector: ⏳ new build) |
 | Maths mission: Easy/Medium/Hard, 3/5/10 questions, retry, result, practice screen | ✅ Tested by the owner |
 | `AlarmService` interface (shared TypeScript; Swift and Kotlin behind it) | ✅ |
-| Alarm occurrences and accountability outcomes (see below), duplicate protection | ✅ Unit-tested, including real SQLite |
-| Shared full-screen ringing screen, maths mission connected to occurrences, morning-complete confirmation | ✅ Built · ⏳ simulated flow not yet separately confirmed by the owner |
-| "Simulate alarm now" and "Recent mornings" history | ✅ Built (simulation is developer builds only) · ⏳ not yet separately confirmed by the owner |
-| **Native alarm proof of concept**: local Expo module `modules/terbit-alarms`. iOS: AlarmKit (iOS 26+), authorisation, one-time alarm, cancel, state. Android: `setAlarmClock`, permissions, receiver, alarm notification + basic lock-screen alarm screen. | ✅ **Physically verified on iPhone and Android:** scheduled, rang, stopped with the system controls |
-| Developer "Native alarm test" panel | ✅ Developer builds only |
+| Alarm occurrences, duplicate protection | ✅ Unit-tested, including real SQLite |
+| Native alarm proof of concept (one-time test alarm) | ✅ **Physically verified on iPhone and Android** |
+| **Saved alarms scheduled natively** (create/edit → schedule, disable/delete → cancel, weekday repeats; Android reschedules after restart / time change) | ✅ Built + unit-tested · ⏳ needs new builds + device test |
+| **Genuine alarm → occurrence → configured mission → Recent mornings** | ✅ Built + unit-tested · ⏳ needs new builds + device test |
+| **Accountability modes:** Reward / Challenge / Gentle, with `evaluateMorning`, `isRewardEligible`, `isStreakEligible` | ✅ Built + unit-tested · ⏳ device test |
+| Simulated flow ("Simulate alarm now"), developer "Native alarm test" | ✅ Developer builds only |
 
-Checks: `npm run check` passes (137 unit tests, including real SQLite queries), `npx expo-doctor` 21/21, and iOS, Android and web bundles export without errors.
+Checks: `npm run check` passes (192 unit tests, including real SQLite queries), `npx expo-doctor` 21/21, and iOS, Android and web bundles export without errors. Swift and Kotlin are compiled by EAS Build (there's no local Xcode or Android SDK).
 
 ### Accountability model (agreed product behaviour)
 
-The phone's own alarm controls can always stop an alarm. **Terbit MY doesn't try to disable or bypass them.** Instead, every alarm occurrence ends in an outcome, and **only a completed mission counts as a successful morning** for future streaks and XP:
+The phone's own alarm controls can always stop an alarm, and **Terbit MY never tries to disable or bypass them.** Stopping the alarm is recorded, but the morning stays open: the mission can still be completed until the deadline (one hour after the alarm, or one hour after the Gentle follow-up).
 
-| Outcome | Meaning | Successful morning? |
+| Mode | Behaviour | Reward / streak eligible when |
 |---|---|---|
-| Mission completed | The mission was finished | ✅ Yes |
-| Dismissed, no mission | Stopped (Emergency Dismiss in the app, or the phone's Stop) before the mission started | ❌ |
-| Mission abandoned | The mission was started but never finished (dismissed, or left until the alarm timed out) | ❌ |
-| Missed | Nobody responded within an hour | ❌ |
-| Turned off (no mission) | The alarm had no mission set | ❌ |
-| Cancelled | The alarm was deleted | Doesn't count |
+| Reward *(default; existing alarms migrated)* | Stop normally; the mission is optional | The mission is completed |
+| Challenge | Leads straight into the mission. Stopping early = incomplete Challenge morning | The mission is completed |
+| Gentle | Stop normally; follow-up after N minutes if the mission isn't done (shown in the app; no notification yet) | The mission is completed |
 
-Statuses stored per occurrence: `scheduled`, `alarm_fired`, `mission_in_progress`, `completed`, `dismissed`, `missed`, `cancelled`. Code: `morningOutcome()` / `isSuccessfulMorning()` in `src/features/alarms/occurrence.ts`.
+Outcomes kept separate:
+- **alarm outcome:** ringing, went off, stopped by phone, stopped for mission, dismissed in app, unanswered, cancelled;
+- **mission outcome:** not required, not started, in progress, completed, skipped, abandoned;
+- **mode**;
+- **reward / streak eligibility**.
 
-### What's left in Phase 1
-1. **Saved alarms ring natively.** Schedule the user's real (repeating) alarms through AlarmKit / AlarmManager instead of only the developer test alarm.
-2. **Alarm → mission hand-off.** When a native alarm fires and the app opens, create the occurrence and open the ringing screen and mission. Record a stop with the phone's controls as "dismissed".
-3. **Android reliability:** reschedule after a restart and after time-zone changes, and a foreground-service alarm sound.
-4. **Snooze** on both platforms.
-5. **iOS before 26:** decide on a notification fallback (it can't ring in silent mode) or require iOS 26.
+Rules live in `MODE_POLICIES` (`src/features/alarms/accountability.ts`), so beta behaviour can change without a database change. Phase 2 must use `isRewardEligible()` / `isStreakEligible()`.
+
+### Before Phase 1 can close
+1. Rebuild both phones and pass the physical tests for saved alarms and all three modes.
+2. Decide on the remaining items below: fix them now, or move them to a later phase.
 
 ### Known limitations (today)
-- The system Stop control on both platforms ends the alarm without a mission. This is by design, recorded as an outcome (above).
-- Only the developer test alarm rings natively. Saved alarms show "Alarms can't ring yet".
-- AlarmKit needs iOS 26+. Older iPhones get a clear "unsupported" message.
-- Android test alarms don't survive a phone restart yet. The alarm sound is an alarm-category notification, not yet a foreground service.
-- Stops made with the system controls aren't reported back to the app yet.
+- The system Stop control ends the alarm without the mission. This is by design and recorded.
+- **iOS:**
+  - AlarmKit doesn't report fires or stops to apps. Fires are worked out from the schedule when Terbit MY opens, and the user must open Terbit MY for the mission. Stops aren't known.
+  - There's no native alarm before iOS 26.
+- **Android:** the alarm sound is a notification sound, not yet a foreground service, and alarms aren't restored before the first unlock after a restart.
+- **Snooze:** not implemented.
+- **Gentle:** the follow-up reminder isn't delivered as a notification yet.

@@ -67,14 +67,17 @@ docs/
 ```ts
 // src/services/alarm-scheduler/types.ts (Phase 1)
 export interface AlarmService {
-  getCapabilities(): Promise<AlarmCapabilities>; // status: 'not-implemented' | 'needs-permission' | 'ready'
+  getCapabilities(): Promise<AlarmCapabilities>; // 'not-implemented' | 'needs-permission' | 'ready'
   requestPermission(): Promise<'granted' | 'denied' | 'not-implemented'>;
-  schedule(alarm: AlarmSpec): Promise<ScheduleResult>;
+  schedule(alarm: AlarmSpec): Promise<ScheduleResult>; // a saved alarm, repeats included
   cancel(alarmId: string): Promise<void>;
+  syncAll(alarms: AlarmSpec[]): Promise<void>; // make the native schedule match
+  getFireEvents(since: number, now: number): Promise<AlarmFiredEvent[]>; // genuine alarms that went off
+  // …plus developer-test helpers (scheduleOneTime, listNativeAlarms, …)
 }
 ```
 
-The iOS and Android modules will each implement this interface, in `ios-alarmkit.ts` and `android-alarm-manager.ts`; `index.ts` picks one by platform. Both are placeholders today that never claim an alarm was scheduled or fired, and the UI shows "Alarms can't ring yet". The full contract is in [NATIVE-ALARMS.md](NATIVE-ALARMS.md).
+`ios-alarmkit.ts` and `android-alarm-manager.ts` both use the shared `native-alarm-service.ts` over the local module `modules/terbit-alarms` (Swift / Kotlin). Where the module is missing (Expo Go, web, tests) they fall back to `not-implemented.ts`, which never claims an alarm was scheduled or fired. The full contract is in [NATIVE-ALARMS.md](NATIVE-ALARMS.md).
 
 ## Alarm data flow (Phase 1)
 
@@ -97,7 +100,15 @@ scheduled ─► alarm_fired ─► mission_in_progress ─► completed
 any active status ─► dismissed | missed | cancelled
 ```
 
-**Accountability:** the phone's own Stop control can always end an alarm, and Terbit MY never tries to block it. `morningOutcome()` turns each finished occurrence into one of: mission completed, dismissed without mission, mission abandoned, missed, completed without mission, or cancelled. `isSuccessfulMorning()` is true **only** for a completed mission, and Phase 2 streaks and XP must use it. A dismiss records why: `emergency_dismiss` (in the app) or `system_dismiss` (the phone's controls, once native code reports it).
+**Accountability** (`src/features/alarms/accountability.ts`). The phone's own Stop control can always end an alarm, and Terbit MY never tries to block it. Stopping the *alarm* (`alarmStoppedAt` / `alarmStopReason`) is separate from finishing the *morning*: the mission can still be completed until the completion deadline. Four ideas are kept apart:
+- **alarm outcome:** ringing / went off / stopped by the phone / stopped for the mission / dismissed in the app / unanswered / cancelled;
+- **mission outcome:** not required / not started / in progress / completed / skipped / abandoned;
+- **accountability mode:** the alarm's `completionMode` (Reward, Challenge or Gentle), copied onto each occurrence;
+- **eligibility:** `isRewardEligible()` and `isStreakEligible()`, derived by `evaluateMorning()` from `MODE_POLICIES`.
+
+Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy), with no database change. Phase 2 XP and streaks must use these functions, not raw statuses.
+
+**Native hand-off** (`alarm-handoff.ts`, `use-alarm-handoff.ts`). When the app opens or returns to the foreground: native fire events become occurrences (safe to repeat), fired one-off alarms are turned off, the native schedule is reconciled, and the newest open native morning opens the alarm screen. Android's "Start mission" opens `terbitmy://alarm-fired?…` straight into the mission.
 
 - `src/features/alarms/occurrence.ts`: pure state rules. Finished occurrences can never change.
 - `src/features/alarms/occurrence-manager.ts`: trigger, start mission, complete, dismiss, mark missed (active for over an hour), cancel (alarm deleted).
