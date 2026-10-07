@@ -2,6 +2,8 @@
 
 Each phase ends with a working app, passing checks, and a Git commit or pull request. Later phases are not started until the earlier one has been reviewed.
 
+**Development strategy (from 7 Oct 2026): iOS-first prototype.** Native alarms are already proven on a physical iPhone and Android phone. New features are built and tested on iOS first, with shared logic in platform-neutral TypeScript and native behaviour behind service interfaces (like `AlarmService`). Android stays supported and compatible: existing Android features aren't removed or broken, but new native features aren't duplicated in Kotlin until the behaviour is validated. **At the end of each phase**, run an Android compatibility/build check. A dedicated **Android feature-parity phase** follows the validated iOS prototype.
+
 | Phase | Scope | Needs from you |
 |---|---|---|
 | **0. Foundation** ✅ *(complete, verified on iPhone via Expo Go)* | Expo SDK 57 + TypeScript project, Expo Router native tabs (Today, Alarms, Circles, Progress, Settings), theme tokens with light/dark, shared UI components, lint/typecheck/test scripts, CI, planning docs | — |
@@ -10,4 +12,5 @@ Each phase ends with a working app, passing checks, and a Git commit or pull req
 | **3. More missions, settings & privacy** | Quiz packs; faith recitation & reflection (offline content); fitness missions with on-device pose detection + non-camera alternative; full settings, permission centre, accessibility options, notifications | Decide faith content & reviewers |
 | **4. Bedtime & restrictions** | Bedtime routine & reminders; iOS Screen Time (FamilyControls + extensions); Android UsageStats + bedtime screen; sleep analytics charts | **Request Family Controls (Distribution) entitlement** (start this during Phase 1, it can take weeks) |
 | **5. Circles** | Create/join via invite link or code, check-in feed, reactions, privacy controls, push notifications via Edge Function | — |
+| **A. Android feature parity** *(after the iOS prototype is validated)* | Native Android implementations of features built iOS-first (behind the same service interfaces), Android-specific UX checks, physical-device test pass | A physical Android phone |
 | **6. Polish & release** | Bahasa Melayu localisation, onboarding, analytics review, store listings, privacy labels, Play declarations (exact alarm, full-screen intent), TestFlight & Play internal testing | Store accounts, screenshots approval |

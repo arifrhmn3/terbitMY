@@ -62,9 +62,13 @@ Outcomes kept separate:
 
 Rules live in `MODE_POLICIES` (`src/features/alarms/accountability.ts`), so beta behaviour can change without a database change. Phase 2 must use `isRewardEligible()` / `isStreakEligible()`.
 
+### Development strategy: iOS-first prototype
+New features are built and tested on the physical iPhone first. Android stays supported: the Android code already written is kept, and shared logic stays platform-neutral. But new native features aren't duplicated in Kotlin until the behaviour is validated, and there's no Android build per feature. Android gets a compatibility/build check at the end of each phase, and a dedicated feature-parity phase after the iOS prototype. See docs/ROADMAP.md.
+
 ### Before Phase 1 can close
-1. Rebuild both phones and pass the physical tests for saved alarms and all three modes.
-2. Decide on the remaining items below: fix them now, or move them to a later phase.
+1. Rebuild **iOS** and pass the iPhone tests for saved alarms and all three modes.
+2. Decide on the remaining items below: fix now on iOS, or move to a later phase.
+3. **Android compatibility check (end of phase):** one Android development build to confirm the project still compiles, plus a quick smoke test of saved alarms. The Android alarm code for this phase is already written and unit-tested in shared code; its full device test belongs to the Android parity phase.
 
 ### Known limitations (today)
 - The system Stop control ends the alarm without the mission. This is by design and recorded.

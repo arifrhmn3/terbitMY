@@ -5,6 +5,7 @@
 2. **Native features sit behind TypeScript interfaces.** Screens never call Swift or Kotlin directly. They call a TypeScript service, such as `alarms.schedule(...)`, which picks the iOS or Android implementation.
 3. **Code is grouped by feature.** Each product area keeps its logic, state and UI together, so it can be built and tested on its own.
 4. **No secrets in the app.** The app only holds the Supabase *anon* key. Row Level Security protects all data, and privileged logic runs in Supabase Edge Functions.
+5. **iOS-first, Android-ready.** During the prototype, native features are built for iOS first. Shared code must not assume iOS: screens call services, and platform choices live only in `src/services/*` (`index.ts` picks the platform implementation) and `modules/*`. Android gets its own implementation later, behind the same interface. This applies to alarms, notifications, restrictions, sharing, subscriptions, camera and permissions.
 
 ## Layers
 
