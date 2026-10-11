@@ -8,7 +8,8 @@ Built with **Expo SDK 57**, **React Native 0.86**, **TypeScript** and **Expo Rou
 
 ```bash
 npm install
-npm start        # scan the QR code with your iPhone camera (Expo Go)
+npm start        # opens the Terbit MY development build (see docs/DEV-BUILD.md)
+npm run start:go # opens in Expo Go instead
 npm run web      # or preview in the browser
 npm run check    # lint + typecheck + tests
 ```
@@ -24,6 +25,7 @@ New to this? Start with **[docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)**.
 | [docs/FEASIBILITY.md](docs/FEASIBILITY.md) | What iOS and Android allow (alarms, Screen Time, Play policy) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Project structure and technical design |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Build phases and what is needed from you in each |
+| [docs/DEV-BUILD.md](docs/DEV-BUILD.md) | Moving from Expo Go to a development build |
 
 ## Project layout
 

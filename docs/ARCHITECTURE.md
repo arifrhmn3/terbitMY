@@ -5,6 +5,7 @@
 2. **Native features sit behind TypeScript interfaces.** Screens never call Swift or Kotlin directly. They call a TypeScript service, such as `alarms.schedule(...)`, which picks the iOS or Android implementation.
 3. **Code is grouped by feature.** Each product area keeps its logic, state and UI together, so it can be built and tested on its own.
 4. **No secrets in the app.** The app only holds the Supabase *anon* key. Row Level Security protects all data, and privileged logic runs in Supabase Edge Functions.
+5. **iOS-first, Android-ready.** During the prototype, native features are built for iOS first. Shared code must not assume iOS: screens call services, and platform choices live only in `src/services/*` (`index.ts` picks the platform implementation) and `modules/*`. Android gets its own implementation later, behind the same interface. This applies to alarms, notifications, restrictions, sharing, subscriptions, camera and permissions.
 
 ## Layers
 
@@ -65,17 +66,57 @@ docs/
 ## Example: a shared native interface
 
 ```ts
-// src/services/alarm-scheduler/index.ts (Phase 1)
-export interface AlarmScheduler {
-  getCapabilities(): Promise<{ ringsInSilentMode: boolean; needsPermission: boolean }>;
-  requestPermission(): Promise<'granted' | 'denied'>;
-  schedule(alarm: AlarmSpec): Promise<string>;
-  cancel(id: string): Promise<void>;
-  list(): Promise<ScheduledAlarm[]>;
+// src/services/alarm-scheduler/types.ts (Phase 1)
+export interface AlarmService {
+  getCapabilities(): Promise<AlarmCapabilities>; // 'not-implemented' | 'needs-permission' | 'ready'
+  requestPermission(): Promise<'granted' | 'denied' | 'not-implemented'>;
+  schedule(alarm: AlarmSpec): Promise<ScheduleResult>; // a saved alarm, repeats included
+  cancel(alarmId: string): Promise<void>;
+  syncAll(alarms: AlarmSpec[]): Promise<void>; // make the native schedule match
+  getFireEvents(since: number, now: number): Promise<AlarmFiredEvent[]>; // genuine alarms that went off
+  // …plus developer-test helpers (scheduleOneTime, listNativeAlarms, …)
 }
 ```
 
-The iOS and Android modules each implement this interface. The web/Expo Go build uses a mock version so the UI can still be previewed.
+`ios-alarmkit.ts` and `android-alarm-manager.ts` both use the shared `native-alarm-service.ts` over the local module `modules/terbit-alarms` (Swift / Kotlin). Where the module is missing (Expo Go, web, tests) they fall back to `not-implemented.ts`, which never claims an alarm was scheduled or fired. The full contract is in [NATIVE-ALARMS.md](NATIVE-ALARMS.md).
+
+## Alarm data flow (Phase 1)
+
+```
+Alarm screens ──► alarmStore (src/features/alarms/alarm-store.ts)
+                    ├─► AlarmRepository ─► SQLite `alarms` table (iOS/Android)
+                    │                     └► in-memory (web preview, tests)
+                    └─► AlarmService.schedule / cancel (src/services/alarm-scheduler)
+```
+
+Settings are always saved to the device first, then passed to `AlarmService`. The schema lives in `src/services/storage/migrations.ts`, which uses SQLite's `PRAGMA user_version` to track versions.
+
+## Alarm occurrences (Phase 1)
+
+Each time an alarm rings (or is simulated) creates an **occurrence**, stored separately from the alarm's settings in the `alarm_occurrences` table:
+
+```
+scheduled ─► alarm_fired ─► mission_in_progress ─► completed
+                 └─(no mission)──────────────────► completed
+any active status ─► dismissed | missed | cancelled
+```
+
+**Accountability** (`src/features/alarms/accountability.ts`). The phone's own Stop control can always end an alarm, and Terbit MY never tries to block it. Stopping the *alarm* (`alarmStoppedAt` / `alarmStopReason`) is separate from finishing the *morning*: the mission can still be completed until the completion deadline. Four ideas are kept apart:
+- **alarm outcome:** ringing / went off / stopped by the phone / stopped for the mission / dismissed in the app / unanswered / cancelled;
+- **mission outcome:** not required / not started / in progress / completed / skipped / abandoned;
+- **accountability mode:** the alarm's `completionMode` (Reward, Challenge or Gentle), copied onto each occurrence;
+- **eligibility:** `isRewardEligible()` and `isStreakEligible()`, derived by `evaluateMorning()` from `MODE_POLICIES`.
+
+Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy), with no database change. Phase 2 XP and streaks must use these functions, not raw statuses.
+
+**Entitlements** (`src/features/entitlements`, `src/services/entitlements`). Feature screens ask `isFeatureAvailable` / `useEntitlement().has(feature)` / `<FeatureGate>`, never "is premium". Which features are free, trial or premium is provisional policy in `policy.ts`. Each alarm's needs are derived from its settings (`alarm-features.ts`), and a locked mode falls back to Reward so alarms always ring. No billing yet; see [MONETISATION.md](MONETISATION.md).
+
+**Native hand-off** (`alarm-handoff.ts`, `use-alarm-handoff.ts`). When the app opens or returns to the foreground: native fire events become occurrences (safe to repeat), fired one-off alarms are turned off, the native schedule is reconciled, and the newest open native morning opens the alarm screen. Android's "Start mission" opens `terbitmy://alarm-fired?…` straight into the mission.
+
+- `src/features/alarms/occurrence.ts`: pure state rules. Finished occurrences can never change.
+- `src/features/alarms/occurrence-manager.ts`: trigger, start mission, complete, dismiss, mark missed (active for over an hour), cancel (alarm deleted).
+- Duplicate protection on two levels. The database has `UNIQUE (alarm_id, scheduled_at)`, plus a partial unique index allowing only one active occurrence per alarm. Every status change is a compare-and-set (`UPDATE … WHERE status = <expected>`), so an occurrence completes at most once. Future XP must be awarded per occurrence ID, which makes double rewards impossible.
+- `/alarm/[occurrenceId]` is the shared full-screen ringing screen. "Recent mornings" (`/alarms/history`) lists the latest 30 occurrences.
 
 ## Data model (first draft, Supabase)
 - `profiles`: id, display_name, timezone, rank, created_at

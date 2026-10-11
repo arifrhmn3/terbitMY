@@ -57,7 +57,7 @@ npm start
 
 Edits you save in VS Code show up on the phone automatically.
 
-> **Expo Go is only for Phase 0.** From Phase 1 the app has its own native code for alarms. Expo Go can't run that, so we will make a *development build* with EAS (see below).
+> **Expo Go is only for Phase 0.** From Phase 1 the app has its own native code for alarms. Expo Go can't run that, so we will make a *development build* with EAS. See [DEV-BUILD.md](DEV-BUILD.md).
 
 ## 4. Run the checks
 

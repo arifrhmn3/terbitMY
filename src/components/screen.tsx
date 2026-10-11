@@ -19,6 +19,8 @@ export function Screen({ children }: ScreenProps) {
     <ScrollView
       style={{ backgroundColor: theme.background }}
       contentInsetAdjustmentBehavior="automatic"
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}>
       <View style={styles.inner}>{children}</View>
     </ScrollView>

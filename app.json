@@ -10,7 +10,11 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.terbitmy.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAlarmKitUsageDescription": "Terbit MY uses alarms to wake you up at the times you set."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -38,11 +42,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "db6aa5b6-4442-4246-98d1-c1291806f69d"
+      }
     }
   }
 }
