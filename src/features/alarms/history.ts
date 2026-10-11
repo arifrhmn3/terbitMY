@@ -11,7 +11,7 @@ export type HistoryEntry = {
   mission: string;
   /** Plain-language outcome, e.g. "Mission completed", "Stopped with phone controls · Mission not done". */
   status: string;
-  /** Qualifies for a streak day under the alarm's mode (Phase 2 will use this). */
+  /** Qualifies for a streak day under the alarm’s mode (see features/progress). */
   successful: boolean;
   /** e.g. "Done at 06:32 · 1 wrong answer", or null. */
   completion: string | null;

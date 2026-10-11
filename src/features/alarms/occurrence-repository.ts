@@ -26,6 +26,8 @@ export interface OccurrenceRepository {
   listActive(): Promise<AlarmOccurrence[]>;
   /** Newest first. */
   listRecent(limit: number): Promise<AlarmOccurrence[]>;
+  /** Every occurrence due at or after `since`, oldest first (progression history). */
+  listSince(since: number): Promise<AlarmOccurrence[]>;
   /** Throws `DuplicateOccurrenceError` if the event already has an occurrence, or the alarm has an active one. */
   insert(occurrence: AlarmOccurrence): Promise<void>;
   /**
@@ -168,6 +170,14 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
       return rows.map(rowToOccurrence);
     },
 
+    async listSince(since) {
+      const rows = await db.getAllAsync<OccurrenceRow>(
+        'SELECT * FROM alarm_occurrences WHERE scheduled_at >= ? ORDER BY scheduled_at',
+        since,
+      );
+      return rows.map(rowToOccurrence);
+    },
+
     async insert(o) {
       const r = occurrenceToRow(o);
       try {
@@ -259,6 +269,13 @@ export function createMemoryOccurrenceRepository(): OccurrenceRepository {
         .map(rowToOccurrence)
         .sort((a, b) => b.scheduledAt - a.scheduledAt)
         .slice(0, limit);
+    },
+
+    async listSince(since) {
+      return rows
+        .map(rowToOccurrence)
+        .filter((o) => o.scheduledAt >= since)
+        .sort((a, b) => a.scheduledAt - b.scheduledAt);
     },
 
     async insert(o) {

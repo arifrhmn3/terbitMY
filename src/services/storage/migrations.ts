@@ -72,6 +72,27 @@ export const migrations: readonly string[] = [
     value TEXT NOT NULL,
     updated_at INTEGER NOT NULL
   );`,
+
+  // 6: progression (Phase 2A). An append-only XP ledger and unlocked
+  // achievements. Each award has a unique key (e.g. 'occ:<id>:mission'), so
+  // the same morning can never earn XP twice. Alarms and occurrences are
+  // untouched; streaks and summaries are derived from occurrences.
+  `CREATE TABLE IF NOT EXISTS xp_ledger (
+    award_key TEXT PRIMARY KEY NOT NULL,
+    occurrence_id TEXT,
+    category TEXT,
+    amount INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    earned_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS xp_ledger_earned_at ON xp_ledger (earned_at);
+  CREATE TABLE IF NOT EXISTS achievements (
+    id TEXT PRIMARY KEY NOT NULL,
+    unlocked_at INTEGER NOT NULL,
+    occurrence_id TEXT,
+    created_at INTEGER NOT NULL
+  );`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

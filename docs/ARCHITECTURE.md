@@ -118,6 +118,24 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - Duplicate protection on two levels. The database has `UNIQUE (alarm_id, scheduled_at)`, plus a partial unique index allowing only one active occurrence per alarm. Every status change is a compare-and-set (`UPDATE … WHERE status = <expected>`), so an occurrence completes at most once. Future XP must be awarded per occurrence ID, which makes double rewards impossible.
 - `/alarm/[occurrenceId]` is the shared full-screen ringing screen. "Recent mornings" (`/alarms/history`) lists the latest 30 occurrences.
 
+## Progression (Phase 2A, device-local)
+
+`src/features/progress/` turns the morning history into XP, streaks, ranks and achievements, entirely on the phone.
+
+```
+alarm_occurrences (Phase 1, unchanged) ──► progress engine (progress-engine.ts)
+                                              ├─ xpForMorning ─────────► xp_ledger     (unique award_key)
+                                              ├─ reachedAchievements ──► achievements  (unique id) + bonus XP
+                                              └─ summarise ────────────► Progress tab, "Morning complete"
+```
+
+- **Rules are pure functions** (`progression.ts`) built on `evaluateMorning()`: `rewardEligible` decides XP, `streakEligible` decides streak days. Each morning's `completionMode` is the mode it really rang with, already adjusted for the entitlement.
+- **All numbers live in `policy.ts`** (`PROGRESSION_POLICY`): XP per mission type, mode bonuses, mission → discipline (Education / Fitness / Faith), rank thresholds, the streak gap rule and achievement definitions. Beta changes go there, never into screens.
+- **Stored vs derived.** XP and achievements are stored, because a ledger keeps what was earned even if values change later. Streaks, ranks and totals are recalculated from occurrences and the ledger every time, so they can't drift out of sync.
+- **Idempotent.** Every award has a unique key (`occ:<id>:mission`, `occ:<id>:mode_bonus`, `ach:<id>`) enforced by the database (`INSERT OR IGNORE`). `progress.sync()` can run on every resume, screen open or mission completion without ever awarding twice. Achievement bonus XP is derived from all unlocked achievements, so it's never lost if a run stops halfway.
+- **Streak day rule.** Mornings are grouped by the local calendar day they were due (`scheduledAt`, device time zone). A day succeeds if **any** of its mornings succeeded (at most one streak day per day, however many alarms). It stays pending while a morning is open, fails if it had only failed mornings, and is neutral otherwise. Neutral days (cancelled alarms, a mission-free alarm turned off) and days without alarms neither extend nor break a streak. `streak.maxGapDays` can optionally expire a streak after a long gap (off by default).
+- **Developer reset** moves a "history start" setting forward and clears the ledger. Mornings stay in history but stop counting.
+
 ## Data model (first draft, Supabase)
 - `profiles`: id, display_name, timezone, rank, created_at
 - `alarms`: synced copy for backup; the device copy is authoritative
