@@ -143,11 +143,8 @@ alarm_occurrences (Phase 1, unchanged) ──► progress engine (progress-engin
 - **Streak day rule.** Main Wake-Up occurrences are grouped by the local calendar day they were due (`scheduledAt`, device time zone). A day succeeds if **any** of its mornings succeeded (at most one streak day per day, however many alarms). It stays pending while a morning is open, fails if it had only failed mornings, and is neutral otherwise. Neutral days (cancelled alarms, a mission-free alarm turned off) and days without alarms neither extend nor break a streak. `streak.maxGapDays` can optionally expire a streak after a long gap (off by default).
 - **Developer reset** moves a "history start" setting forward and clears the ledger. Mornings stay in history but stop counting.
 
-## Data model (first draft, Supabase)
-- `profiles`: id, display_name, timezone, rank, created_at
-- `alarms`: synced copy for backup; the device copy is authoritative
-- `mission_completions`: user_id, alarm_id, type, score, completed_at
-- `xp_events`: user_id, amount, reason, created_at (append-only; the total is derived from these)
-- `circles`, `circle_members`, `circle_checkins`: membership is checked with RLS
+## Accounts & cloud (Phase 2B)
 
-Every table has RLS enabled. A user can only read their own rows, plus check-ins from circles they belong to.
+Optional accounts (email one-time code) and a private Supabase **backup** of the phone's canonical records: alarms, occurrences, XP ledger and achievements. The phone stays the source of truth, and alarm-time features never touch the network. Full details, conflict policy and setup are in [CLOUD.md](CLOUD.md).
+
+Planned later, with RLS and explicit opt-in sharing: `circles`, `circle_members`, `circle_checkins`. Membership is checked with RLS. Nothing private (alarms, mission history, streaks, XP, faith settings) is visible to other users unless the user explicitly shares it.

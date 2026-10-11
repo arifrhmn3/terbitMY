@@ -105,6 +105,20 @@ export const migrations: readonly string[] = [
        WHEN alarm_id = 'dev-seed' THEN 1
        ELSE COALESCE((SELECT is_primary FROM alarms WHERE alarms.id = alarm_occurrences.alarm_id), 0)
      END;`,
+
+  // 8: cloud sync (Phase 2B). What has already been backed up, per account:
+  // a fingerprint of each record's content when it was last sent. A record
+  // is "pending" when it has no row here or its content changed since. Local
+  // records themselves are untouched and have no account attached, so signing
+  // out never deletes anything.
+  `CREATE TABLE IF NOT EXISTS sync_state (
+    user_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    synced_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, entity, entity_id)
+  );`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

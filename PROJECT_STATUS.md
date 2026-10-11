@@ -6,7 +6,7 @@ _Last updated: 11 October 2026_
 
 **Phase 1 (iOS prototype) is closed: complete, physically verified on iPhone (11 October 2026) and merged into `main`.** Android work is deferred to the dedicated Android parity phase (see "Android status" below). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
-**Phase 2A (local Progress Engine) is built and unit-tested on `phase-2/accounts-cloud-foundation`, waiting for an iPhone test.** No Supabase or accounts yet.
+**Phase 2A (local Progress Engine) is complete and verified on iPhone. Phase 2B (Accounts & Cloud Foundation) is built and unit-tested on `phase-2/accounts-cloud-foundation`; it waits for the Supabase project to be created (see docs/CLOUD.md → Supabase setup), then an iPhone test.**
 
 ## Phase 2A: local Progress Engine
 
@@ -118,3 +118,16 @@ These are the current working assumptions for beta. They're deliberately configu
 - **Android Gentle parity and final Android alarm parity are deferred** under the iOS-first strategy. Known Android gaps: no Gentle reminder notification; the alarm sound is a notification sound, not a foreground service; alarms aren't restored before the first unlock after a restart.
 - **Free/premium packaging is provisional** and may change during beta (see the table above).
 - **Development builds only:** on a development build, a fully closed app may show the Expo developer menu before Terbit MY loads. Release builds don't.
+
+## Phase 2B: Accounts & Cloud Foundation
+
+| Item | Status |
+|---|---|
+| Optional account; guest/local-only use unchanged; app runs local-only when no Supabase is configured | ✅ Unit-tested |
+| Email one-time code sign-in, session restored on restart, sign out (keeps local data) | ✅ Unit-tested against an in-memory cloud · ⏳ needs Supabase project + iPhone test |
+| Profile (display name, avatar URL, time zone), created at sign-up | ✅ Schema + app · ⏳ live test |
+| Supabase schema: profiles, alarms, alarm_occurrences, xp_ledger, achievements; RLS own-rows-only on every table; cascade delete | ✅ `supabase/migrations/…accounts_cloud_foundation.sql`; SQL checked by tests; manual RLS script |
+| Local-first backup sync: pending-by-fingerprint (migration 8 `sync_state`), retries with back-off, idempotent, newest-wins conflicts, alarm tombstones | ✅ Unit-tested (offline, retry, duplicates, conflicts, guest → account) |
+| Settings → Account screen: local / sign-in / email, display name, sync status, sign out, delete account; developer sync diagnostics | ✅ Built · ⏳ iPhone test |
+
+Not in 2B: restoring cloud data onto a phone (cross-device sync), Apple/Google sign-in, custom SMTP. See docs/CLOUD.md.

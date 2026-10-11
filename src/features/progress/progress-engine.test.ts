@@ -202,7 +202,7 @@ describe('progress engine on real SQLite', () => {
     ];
     for (const o of old) await insertOldRow(db, o);
 
-    expect(await migrate(db)).toBe(2);
+    expect(await migrate(db)).toBe(migrations.length - 5);
     expect(await db.getFirstAsync('PRAGMA user_version')).toEqual({ user_version: migrations.length });
     expect(await db.getAllAsync('SELECT id, label FROM alarms ORDER BY id')).toEqual([
       { id: 'evening', label: 'evening' },
