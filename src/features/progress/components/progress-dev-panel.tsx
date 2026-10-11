@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 
 import { ListRow } from '@/components/list-row';
@@ -8,14 +9,24 @@ import { occurrences } from '@/features/alarms/alarms';
 import { DuplicateOccurrenceError } from '@/features/alarms/occurrence-repository';
 
 import { exampleWeek } from '../example-mornings';
+import { diagnosticsText } from '../format';
 import { progress } from '../progress';
-import type { ProgressSummary } from '../progression';
+import type { ProgressSummary, XpEntry } from '../progression';
 
 /**
  * DEVELOPER TEST TOOL (development builds only). Inspects the local
  * progression state, resets it, or seeds a week of example mornings.
  */
 export function ProgressDevPanel({ summary, onChange }: { summary: ProgressSummary | null; onChange: () => void }) {
+  const [ledger, setLedger] = useState<XpEntry[]>([]);
+  useEffect(() => {
+    let current = true;
+    progress.ledger().then(({ xp }) => current && setLedger(xp)).catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [summary]);
+
   async function seed() {
     const week = exampleWeek(Date.now());
     // Make sure the example days count even after a reset.
@@ -49,13 +60,10 @@ export function ProgressDevPanel({ summary, onChange }: { summary: ProgressSumma
     ]);
   }
 
-  const unlocked = summary?.achievements.filter((a) => a.unlock).length ?? 0;
   return (
     <Section title="Progress (developer)" footer="Development builds only. Not shown in release builds.">
       <ThemedText type="small" themeColor="textSecondary" style={styles.text}>
-        {summary
-          ? `XP ${summary.totalXp} · achievements ${unlocked}/${summary.achievements.length} · streak ${summary.streak.current} (longest ${summary.streak.longest}) · last success ${summary.streak.lastSuccessfulDay ?? '—'} · ${summary.successfulMornings}/${summary.trackedMornings} mornings`
-          : 'Loading…'}
+        {summary ? diagnosticsText(summary, ledger) : 'Loading…'}
       </ThemedText>
       <ListRow icon={{ ios: 'calendar.badge.plus', android: 'calendar_add_on', web: 'calendar_add_on' }} title="Seed example week" onPress={seed} />
       <ListRow icon={{ ios: 'arrow.counterclockwise', android: 'restart_alt', web: 'restart_alt' }} title="Reset progress" onPress={reset} />

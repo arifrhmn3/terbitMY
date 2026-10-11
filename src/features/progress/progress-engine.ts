@@ -6,7 +6,6 @@ import { PROGRESSION_POLICY, type ProgressionPolicy } from './policy';
 import type { ProgressRepository } from './progress-repository';
 import {
   achievementXp,
-  dayResults,
   reachedAchievements,
   summarise,
   xpForMorning,
@@ -50,10 +49,10 @@ export function createProgressEngine(deps: {
   }
 
   async function run(): Promise<Awarded> {
-    const mornings = await loadHistory();
+    const occurrences = await loadHistory();
     const repo = await repository();
-    const xp = await repo.addXp(mornings.flatMap((o) => xpForMorning(o, policy)));
-    const achievements = await repo.unlock(reachedAchievements(mornings, dayResults(mornings, dayKey), policy));
+    const xp = await repo.addXp(occurrences.flatMap((o) => xpForMorning(o, policy)));
+    const achievements = await repo.unlock(reachedAchievements(occurrences, dayKey, policy));
     // From every unlocked achievement (not just new ones), so a bonus is never lost if a run stops halfway.
     const bonuses = (await repo.listUnlocked()).flatMap((u) => {
       const definition = policy.achievements.find((a) => a.id === u.id);
@@ -86,6 +85,11 @@ export function createProgressEngine(deps: {
         dayKey,
         now: now(),
       });
+    },
+    /** DEVELOPER DIAGNOSTICS: the whole XP ledger (newest first) and unlocked achievements. */
+    async ledger(): Promise<{ xp: XpEntry[]; unlocked: AchievementUnlock[] }> {
+      const repo = await repository();
+      return { xp: await repo.listXp(), unlocked: await repo.listUnlocked() };
     },
     /** XP earned by one morning (for its "Morning complete" screen). */
     async xpForOccurrence(occurrenceId: string): Promise<XpEntry[]> {

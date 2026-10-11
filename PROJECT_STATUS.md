@@ -17,7 +17,9 @@ _Last updated: 11 October 2026_
 | Education / Fitness / Faith XP and placeholder ranks (overall + per discipline) | ✅ Maths = Education; Fitness and Faith ready for later missions |
 | Achievements (first morning, 3- and 7-day streaks, 10 missions, first Challenge), data-driven | ✅ Unlock once, unit-tested |
 | Progress tab with real data; XP shown on "Morning complete" | ✅ Built · ⏳ iPhone test |
-| Developer panel: inspect, reset, seed an example week | ✅ Development builds only |
+| Developer panel: inspect, reset, seed an example week; XP accounting (total = disciplines + general/bonus) with every bonus line's source | ✅ Development builds only |
+| First iPhone test (11 Oct) | ✅ XP once per mission, Education XP, one streak day per day, Challenge bonus, persistence, seeding |
+| **Morning vs general accountability** (from the test): only the Main Wake-Up Alarm counts as a morning; other alarms earn XP and count in "All alarms". Each occurrence stores `isMainWakeUp` when it fires (migration 7) | ✅ Unit-tested · ⏳ iPhone retest |
 
 Provisional policy (all in `src/features/progress/policy.ts`): maths mission 10 XP; Challenge +5; Reward/Gentle +0; incomplete 0; 3-day streak +10; 7-day streak +25; overall ranks at 0/50/150/300/600/1000/2000 XP; discipline ranks at 0/30/100/250/500/1000 XP. See docs/ARCHITECTURE.md → Progression.
 

@@ -93,6 +93,18 @@ export const migrations: readonly string[] = [
     occurrence_id TEXT,
     created_at INTEGER NOT NULL
   );`,
+
+  // 7: morning accountability. Each occurrence records whether it was the
+  // Main Wake-Up Alarm when it fired; only those count as "mornings". Older
+  // rows didn't record it, so they're filled in ONCE from the alarm's main
+  // setting at upgrade time (deleted alarms: not main), then frozen. The
+  // developer seed's example mornings ('dev-seed', no alarm row) are mornings.
+  `ALTER TABLE alarm_occurrences ADD COLUMN is_main_wake_up INTEGER NOT NULL DEFAULT 0;
+  UPDATE alarm_occurrences
+     SET is_main_wake_up = CASE
+       WHEN alarm_id = 'dev-seed' THEN 1
+       ELSE COALESCE((SELECT is_primary FROM alarms WHERE alarms.id = alarm_occurrences.alarm_id), 0)
+     END;`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

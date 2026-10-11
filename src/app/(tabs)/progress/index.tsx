@@ -33,22 +33,40 @@ export default function ProgressScreen() {
     );
   }
 
-  const { streak, ranks, categoryXp } = summary;
+  const { morning, general, ranks, xp } = summary;
   return (
     <Screen>
       <Section
-        title="Streak"
-        footer="A day counts when at least one morning mission is completed. Days without an alarm don’t break your streak.">
+        title="Mornings"
+        footer="Only your Main Wake-Up Alarm counts as a morning. A day counts when its mission is completed; days without it don’t break your streak.">
         <ListRow
           icon={{ ios: 'flame.fill', android: 'local_fire_department', web: 'local_fire_department' }}
-          title="Current streak"
-          value={plural(streak.current, 'day')}
+          title="Morning streak"
+          value={plural(morning.streak.current, 'day')}
         />
-        <ListRow icon={{ ios: 'flame', android: 'whatshot', web: 'whatshot' }} title="Longest streak" value={plural(streak.longest, 'day')} />
+        <ListRow
+          icon={{ ios: 'flame', android: 'whatshot', web: 'whatshot' }}
+          title="Longest morning streak"
+          value={plural(morning.streak.longest, 'day')}
+        />
         <ListRow
           icon={{ ios: 'sunrise', android: 'wb_twilight', web: 'wb_twilight' }}
           title="Successful mornings"
-          value={`${summary.successfulMornings} of ${summary.trackedMornings}`}
+          subtitle={morning.scheduled === 0 ? 'Mark an alarm as your Main Wake-Up Alarm to track mornings.' : undefined}
+          value={`${morning.successful} of ${morning.scheduled}`}
+        />
+      </Section>
+
+      <Section title="All alarms" footer="Every alarm, morning or evening: each completed mission earns XP.">
+        <ListRow
+          icon={{ ios: 'checkmark.circle', android: 'task_alt', web: 'task_alt' }}
+          title="Missions completed"
+          value={String(general.missionsCompleted)}
+        />
+        <ListRow
+          icon={{ ios: 'alarm', android: 'alarm', web: 'alarm' }}
+          title="Alarms completed"
+          value={`${general.successful} of ${general.scheduled}`}
         />
       </Section>
 
@@ -56,16 +74,16 @@ export default function ProgressScreen() {
         <ListRow
           icon={{ ios: 'star.fill', android: 'star', web: 'star' }}
           title={`Total · ${ranks.overall.label}`}
-          subtitle={rankDetail(summary.totalXp, ranks.overall)}
-          value={`${summary.totalXp} XP`}
+          subtitle={rankDetail(xp.total, ranks.overall)}
+          value={`${xp.total} XP`}
         />
         {CATEGORIES.map((category) => (
           <ListRow
             key={category}
             icon={CATEGORY_ICON[category]}
             title={`${CATEGORY_LABEL[category]} · ${ranks[category].label}`}
-            subtitle={category === 'education' ? rankDetail(categoryXp[category], ranks[category]) : 'Missions coming in a later phase'}
-            value={`${categoryXp[category]} XP`}
+            subtitle={category === 'education' ? rankDetail(xp.byCategory[category], ranks[category]) : 'Missions coming in a later phase'}
+            value={`${xp.byCategory[category]} XP`}
           />
         ))}
       </Section>

@@ -46,6 +46,7 @@ export type OccurrenceRow = {
   source: string;
   status: string;
   alarm_label: string;
+  is_main_wake_up: number | null;
   mission: string;
   snooze_minutes: number | null;
   completion_mode: string;
@@ -72,6 +73,7 @@ export function occurrenceToRow(o: AlarmOccurrence): OccurrenceRow {
     source: o.source,
     status: o.status,
     alarm_label: o.alarmLabel,
+    is_main_wake_up: o.isMainWakeUp ? 1 : 0,
     mission: JSON.stringify(o.mission),
     snooze_minutes: o.snoozeMinutes,
     completion_mode: o.completionMode,
@@ -119,6 +121,7 @@ export function rowToOccurrence(row: OccurrenceRow): AlarmOccurrence {
     source: (row.source === 'native' ? 'native' : 'simulated') satisfies OccurrenceSource,
     status: parseStatus(row.status),
     alarmLabel: row.alarm_label,
+    isMainWakeUp: row.is_main_wake_up === 1,
     mission: parseMission(row.mission),
     snoozeMinutes: row.snooze_minutes,
     completionMode: parseCompletionMode(row.completion_mode),
@@ -183,16 +186,17 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
       try {
         await db.runAsync(
           `INSERT INTO alarm_occurrences
-            (id, alarm_id, scheduled_at, source, status, alarm_label, mission, snooze_minutes,
+            (id, alarm_id, scheduled_at, source, status, alarm_label, is_main_wake_up, mission, snooze_minutes,
              completion_mode, gentle_reminder_minutes, fire_evidence, started_at, alarm_stopped_at,
              alarm_stop_reason, mission_started_at, mission_completed_at, ended_at, result, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           r.id,
           r.alarm_id,
           r.scheduled_at,
           r.source,
           r.status,
           r.alarm_label,
+          r.is_main_wake_up,
           r.mission,
           r.snooze_minutes,
           r.completion_mode,

@@ -36,11 +36,13 @@ export function buildMorning(params: {
   mission?: AlarmMission;
   source?: OccurrenceSource;
   label?: string;
+  /** Was it the Main Wake-Up Alarm when it fired? Default true (a "morning"). */
+  mainWakeUp?: boolean;
 }): AlarmOccurrence {
   const { id, scheduledAt, outcome, mode = 'reward', source = 'simulated' } = params;
   const mission: AlarmMission = params.mission ?? { type: 'math', difficulty: 'easy', questionCount: 3 };
   const alarm: Alarm = {
-    ...createAlarmDraft({ completionMode: mode, mission, label: params.label ?? '' }),
+    ...createAlarmDraft({ completionMode: mode, mission, label: params.label ?? '', isPrimary: params.mainWakeUp ?? true }),
     id: params.alarmId ?? `alarm-${id}`,
     createdAt: scheduledAt,
     updatedAt: scheduledAt,

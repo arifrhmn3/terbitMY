@@ -55,7 +55,8 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
       </ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         {entry.source}
-        {good ? ' · Counts toward streak' : ''}
+        {entry.mainWakeUp ? ' · Main wake-up' : ''}
+        {good && entry.mainWakeUp ? ' · Counts toward morning streak' : ''}
       </ThemedText>
       {entry.completion && (
         <ThemedText type="small" themeColor="textSecondary">

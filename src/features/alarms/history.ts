@@ -15,6 +15,8 @@ export type HistoryEntry = {
   successful: boolean;
   /** e.g. "Done at 06:32 · 1 wrong answer", or null. */
   completion: string | null;
+  /** It was the Main Wake-Up Alarm when it fired (only these are "mornings"). */
+  mainWakeUp: boolean;
   /** How Terbit MY knows the alarm went off. */
   source: string;
 };
@@ -64,6 +66,7 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
     mission: `${describeMission(o.mission)} · ${MODE_POLICIES[o.completionMode].label} mode`,
     status: evaluation.summary,
     successful: evaluation.streakEligible,
+    mainWakeUp: o.isMainWakeUp,
     completion: details.length > 0 ? details.join(' · ') : null,
     source: SOURCE_TEXT[o.fireEvidence],
   };

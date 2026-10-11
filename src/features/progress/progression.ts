@@ -97,15 +97,29 @@ export type DayResult = {
 };
 
 /**
- * THE STREAK DAY RULE. Mornings are grouped by the local calendar day they
- * were due. A day is:
- * - a success if ANY of its mornings succeeded (so several alarms on one day
- *   add at most one streak day, and a missed backup alarm doesn't matter
- *   once another morning that day succeeded);
- * - otherwise pending while any of its mornings is still open;
- * - otherwise failed if any morning failed;
- * - otherwise neutral. Neutral days, and days with no alarm due, neither
- *   extend nor break a streak.
+ * "Mornings": occurrences of the Main Wake-Up Alarm, as recorded when each
+ * fired (`isMainWakeUp`). Evening or daytime alarms are never mornings: they
+ * earn XP and count in general accountability, but never touch morning
+ * counters or the morning streak.
+ */
+export function mainWakeUps(history: AlarmOccurrence[]): AlarmOccurrence[] {
+  return history.filter((o) => o.isMainWakeUp);
+}
+
+/** The morning streak's days: Main Wake-Up occurrences only, by local calendar day. */
+export function morningDays(history: AlarmOccurrence[], dayKey: DayKeyFn): DayResult[] {
+  return dayResults(mainWakeUps(history), dayKey);
+}
+
+/**
+ * THE STREAK DAY RULE. Occurrences are grouped by the local calendar day they
+ * were due (the morning streak passes Main Wake-Up occurrences only). A day is:
+ * - a success if ANY of them succeeded (so it adds at most one streak day,
+ *   even if the main alarm changed that day);
+ * - otherwise pending while any of them is still open;
+ * - otherwise failed if any failed;
+ * - otherwise neutral. Neutral days, and days with no main alarm due,
+ *   neither extend nor break a streak.
  */
 export function dayResults(history: AlarmOccurrence[], dayKey: DayKeyFn): DayResult[] {
   const byDay = new Map<DayKey, AlarmOccurrence[]>();
@@ -183,20 +197,18 @@ export function rankFor(xp: number, thresholds: readonly number[]): Rank {
 export type AchievementUnlock = {
   id: string;
   unlockedAt: number;
-  /** The morning that reached the threshold. */
+  /** The occurrence that reached the threshold. */
   occurrenceId: string | null;
 };
 
 /**
- * Every achievement the history has reached, with the morning that reached
- * it. Data-driven: add a definition to the policy to add an achievement.
+ * Every achievement the history has reached, with the occurrence that
+ * reached it. Data-driven: add a definition to the policy to add one.
+ * Morning metrics (successful mornings, streak days) use Main Wake-Up
+ * occurrences only; mission metrics use every alarm.
  */
-export function reachedAchievements(
-  history: AlarmOccurrence[],
-  days: DayResult[],
-  policy: ProgressionPolicy,
-): AchievementUnlock[] {
-  // The moment each metric reached each count, in order.
+export function reachedAchievements(history: AlarmOccurrence[], dayKey: DayKeyFn, policy: ProgressionPolicy): AchievementUnlock[] {
+  // The occurrences at which each metric reached 1, 2, 3, … in order.
   const reachedAt: Record<AchievementMetric, AlarmOccurrence[]> = {
     successful_mornings: [],
     missions_completed: [],
@@ -205,15 +217,14 @@ export function reachedAchievements(
   };
   const finished = history.filter((o) => evaluateMorning(o).finished).sort((a, b) => earnedAt(a) - earnedAt(b));
   for (const o of finished) {
-    const e = evaluateMorning(o);
-    if (e.rewardEligible) reachedAt.successful_mornings.push(o);
-    if (e.missionOutcome === 'completed') {
+    if (o.isMainWakeUp && morningVerdict(o) === 'success') reachedAt.successful_mornings.push(o);
+    if (evaluateMorning(o).missionOutcome === 'completed') {
       reachedAt.missions_completed.push(o);
       if (o.completionMode === 'challenge') reachedAt.challenge_completions.push(o);
     }
   }
   // Streak length n is first reached on the n-th entry here.
-  for (const { day, run } of walkStreak(days, policy.streak.maxGapDays).steps) {
+  for (const { day, run } of walkStreak(morningDays(history, dayKey), policy.streak.maxGapDays).steps) {
     if (run > reachedAt.streak_days.length && day.firstSuccess) reachedAt.streak_days.push(day.firstSuccess);
   }
 
@@ -227,19 +238,49 @@ export function reachedAchievements(
 
 export type RankTrack = 'overall' | Category;
 
+/** Success/failure counts. Pending, cancelled and neutral occurrences count on neither side. */
+export type Tally = { successful: number; scheduled: number };
+
+function tally(occurrences: AlarmOccurrence[]): Tally {
+  const verdicts = occurrences.map(morningVerdict);
+  return {
+    successful: verdicts.filter((v) => v === 'success').length,
+    scheduled: verdicts.filter((v) => v === 'success' || v === 'failed').length,
+  };
+}
+
+/**
+ * Four separate kinds of statistic:
+ * 1. morning accountability: Main Wake-Up occurrences only;
+ * 2. general accountability: every alarm (morning, evening, any time);
+ * 3. discipline XP (Education / Fitness / Faith);
+ * 4. total XP = discipline XP + general/bonus XP (achievement bonuses, which
+ *    belong to no discipline). `xp.total` always equals that sum.
+ */
 export type ProgressSummary = {
-  totalXp: number;
-  categoryXp: Record<Category, number>;
+  morning: Tally & { streak: StreakSummary };
+  general: Tally & { missionsCompleted: number; challengeCompletions: number };
+  xp: {
+    total: number;
+    byCategory: Record<Category, number>;
+    /** XP not tied to a discipline (achievement bonuses). */
+    general: number;
+  };
   ranks: Record<RankTrack, Rank>;
-  streak: StreakSummary;
-  /** Mornings that earned a reward. */
-  successfulMornings: number;
-  /** Finished mornings that counted either way (not cancelled, not neutral). */
-  trackedMornings: number;
   achievements: { definition: AchievementDefinition; unlock: AchievementUnlock | null }[];
   /** Newest first. */
   recentXp: XpEntry[];
 };
+
+export function xpTotals(ledger: XpEntry[]): ProgressSummary['xp'] {
+  const byCategory = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>;
+  let general = 0;
+  for (const entry of ledger) {
+    if (entry.category) byCategory[entry.category] += entry.amount;
+    else general += entry.amount;
+  }
+  return { total: CATEGORIES.reduce((sum, c) => sum + byCategory[c], general), byCategory, general };
+}
 
 export function summarise(params: {
   history: AlarmOccurrence[];
@@ -251,26 +292,26 @@ export function summarise(params: {
   recentLimit?: number;
 }): ProgressSummary {
   const { history, ledger, unlocked, policy, dayKey, now, recentLimit = 10 } = params;
-  const categoryXp = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>;
-  let totalXp = 0;
-  for (const entry of ledger) {
-    totalXp += entry.amount;
-    if (entry.category) categoryXp[entry.category] += entry.amount;
-  }
-  const verdicts = history.map(morningVerdict);
+  const xp = xpTotals(ledger);
+  const completed = history.filter((o) => evaluateMorning(o).missionOutcome === 'completed');
   return {
-    totalXp,
-    categoryXp,
+    morning: {
+      ...tally(mainWakeUps(history)),
+      streak: streaks(morningDays(history, dayKey), dayKey(now), policy),
+    },
+    general: {
+      ...tally(history),
+      missionsCompleted: completed.length,
+      challengeCompletions: completed.filter((o) => o.completionMode === 'challenge').length,
+    },
+    xp,
     ranks: {
-      overall: rankFor(totalXp, policy.overallRankThresholds),
-      ...(Object.fromEntries(CATEGORIES.map((c) => [c, rankFor(categoryXp[c], policy.categoryRankThresholds)])) as Record<
+      overall: rankFor(xp.total, policy.overallRankThresholds),
+      ...(Object.fromEntries(CATEGORIES.map((c) => [c, rankFor(xp.byCategory[c], policy.categoryRankThresholds)])) as Record<
         Category,
         Rank
       >),
     },
-    streak: streaks(dayResults(history, dayKey), dayKey(now), policy),
-    successfulMornings: history.filter((o) => evaluateMorning(o).rewardEligible).length,
-    trackedMornings: verdicts.filter((v) => v === 'success' || v === 'failed').length,
     achievements: policy.achievements.map((definition) => ({
       definition,
       unlock: unlocked.find((u) => u.id === definition.id) ?? null,

@@ -23,13 +23,13 @@ export type MissionType = Exclude<AlarmMission['type'], 'none'>;
 
 /** What an achievement measures. */
 export type AchievementMetric =
-  /** Mornings that earned a reward (mission completed). */
+  /** Main Wake-Up mornings that succeeded (other alarms never count as mornings). */
   | 'successful_mornings'
   /** Missions completed, in any mode. */
   | 'missions_completed'
   /** Missions completed in Challenge mode. */
   | 'challenge_completions'
-  /** Consecutive streak days reached (at any point). */
+  /** Consecutive morning-streak days reached at any point (Main Wake-Up Alarm only). */
   | 'streak_days';
 
 export type AchievementDefinition = {
@@ -76,7 +76,7 @@ export const PROGRESSION_POLICY: ProgressionPolicy = {
     {
       id: 'first_morning',
       title: 'First successful morning',
-      description: 'Complete your first morning mission.',
+      description: 'Complete the mission on your Main Wake-Up Alarm.',
       metric: 'successful_mornings',
       threshold: 1,
       bonusXp: 0,
@@ -84,7 +84,7 @@ export const PROGRESSION_POLICY: ProgressionPolicy = {
     {
       id: 'streak_3',
       title: '3-day streak',
-      description: 'Succeed on 3 mornings in a row.',
+      description: 'Complete your Main Wake-Up mission 3 days in a row.',
       metric: 'streak_days',
       threshold: 3,
       bonusXp: 10,
@@ -92,7 +92,7 @@ export const PROGRESSION_POLICY: ProgressionPolicy = {
     {
       id: 'streak_7',
       title: '7-day streak',
-      description: 'Succeed on 7 mornings in a row.',
+      description: 'Complete your Main Wake-Up mission 7 days in a row.',
       metric: 'streak_days',
       threshold: 7,
       bonusXp: 25,
@@ -100,7 +100,7 @@ export const PROGRESSION_POLICY: ProgressionPolicy = {
     {
       id: 'missions_10',
       title: '10 missions completed',
-      description: 'Complete 10 morning missions.',
+      description: 'Complete 10 missions on any alarms.',
       metric: 'missions_completed',
       threshold: 10,
       bonusXp: 0,
