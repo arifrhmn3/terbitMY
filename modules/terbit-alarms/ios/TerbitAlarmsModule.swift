@@ -24,6 +24,8 @@ struct SavedAlarmOptions: Record {
   @Field var completionMode: String = "reward"
   /// The one-tap button, e.g. "Stop & Open Terbit" / "Stop & Start Mission".
   @Field var actionLabel: String = "Stop & Open Terbit"
+  /// SF Symbol for that button.
+  @Field var actionIcon: String = "sunrise.fill"
 }
 
 struct ReminderOptions: Record {
@@ -280,7 +282,8 @@ public class TerbitAlarmsModule: Module {
         weekdays: weekdays,
         date: Date(timeIntervalSince1970: options.fireAt / 1000),
         title: options.title,
-        actionLabel: options.actionLabel
+        actionLabel: options.actionLabel,
+        actionIcon: options.actionIcon
       )
       records.append(NativeAlarmRecord(
         alarmId: options.alarmId,

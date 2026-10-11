@@ -56,6 +56,8 @@ export type SavedAlarmOptions = {
   completionMode: 'reward' | 'challenge' | 'gentle';
   /** Label for the one-tap "stop and open the mission" button. */
   actionLabel: string;
+  /** iOS: SF Symbol for that button. */
+  actionIcon?: string;
 };
 
 /** iOS: a tap on the AlarmKit buttons, recorded natively by an App Intent. */

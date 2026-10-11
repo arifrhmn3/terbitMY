@@ -89,6 +89,7 @@ export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backe
           missionRequired: spec.missionRequired,
           completionMode: spec.completionMode,
           actionLabel: spec.actionLabel,
+          actionIcon: spec.actionIcon,
         }),
       );
     },

@@ -43,6 +43,8 @@ export type ModePolicy = {
   missionFirst: boolean;
   /** The one-tap action on the system alarm (iOS AlarmKit button, Android alarm screen). */
   primaryActionLabel: string;
+  /** SF Symbol shown on the iOS alarm button. */
+  primaryActionIcon: string;
   /** Gentle: a follow-up reminder is due if the mission isn't done after the alarm stops. */
   followUp: boolean;
   reward: EligibilityRule;
@@ -56,6 +58,7 @@ export const MODE_POLICIES: Record<CompletionMode, ModePolicy> = {
       'Stop the alarm normally. Completing the mission (then or later that morning) earns the morning’s reward and streak.',
     missionFirst: false,
     primaryActionLabel: 'Stop & Open Terbit',
+    primaryActionIcon: 'sunrise.fill',
     followUp: false,
     reward: 'mission_completed',
     streak: 'mission_completed',
@@ -66,6 +69,7 @@ export const MODE_POLICIES: Record<CompletionMode, ModePolicy> = {
       'The alarm leads straight into the mission. The morning stays incomplete until the mission is done. The phone’s Stop button still works, but stopping early is recorded.',
     missionFirst: true,
     primaryActionLabel: 'Stop & Start Mission',
+    primaryActionIcon: 'play.fill',
     followUp: false,
     reward: 'mission_completed',
     streak: 'mission_completed',
@@ -76,6 +80,7 @@ export const MODE_POLICIES: Record<CompletionMode, ModePolicy> = {
       'Stop the alarm normally. If the mission isn’t done, Terbit MY reminds you after the delay you choose.',
     missionFirst: false,
     primaryActionLabel: 'Stop & Open Terbit',
+    primaryActionIcon: 'sunrise.fill',
     followUp: true,
     reward: 'mission_completed',
     streak: 'mission_completed',

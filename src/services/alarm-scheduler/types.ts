@@ -19,6 +19,8 @@ export type AlarmSpec = {
   completionMode: 'reward' | 'challenge' | 'gentle';
   /** The one-tap button on the system alarm, e.g. "Stop & Open Terbit". */
   actionLabel: string;
+  /** iOS: SF Symbol for that button. */
+  actionIcon: string;
   soundId: string;
 };
 

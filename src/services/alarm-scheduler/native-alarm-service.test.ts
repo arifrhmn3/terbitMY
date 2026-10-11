@@ -39,6 +39,7 @@ const spec: AlarmSpec = {
   nextFireAt: 1_000_000,
   completionMode: 'challenge',
   actionLabel: 'Stop & Start Mission',
+  actionIcon: 'play.fill',
   soundId: 'system-default',
 };
 
@@ -59,6 +60,7 @@ describe('native alarm service: saved alarms', () => {
       missionRequired: true,
       completionMode: 'challenge',
       actionLabel: 'Stop & Start Mission',
+      actionIcon: 'play.fill',
     });
   });
 

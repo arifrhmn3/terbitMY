@@ -189,7 +189,10 @@ describe('entitlement-adjusted scheduling', () => {
 
 describe('toAlarmSpec', () => {
   it('uses the mode’s one-tap action label', () => {
-    expect(toAlarmSpec(alarm({ completionMode: 'challenge' }), TUESDAY_7AM).actionLabel).toBe('Stop & Start Mission');
+    expect(toAlarmSpec(alarm({ completionMode: 'challenge' }), TUESDAY_7AM)).toMatchObject({
+      actionLabel: 'Stop & Start Mission',
+      actionIcon: 'play.fill',
+    });
     expect(toAlarmSpec(alarm({ completionMode: 'reward' }), TUESDAY_7AM).actionLabel).toBe('Stop & Open Terbit');
     expect(toAlarmSpec(alarm({ completionMode: 'gentle' }), TUESDAY_7AM).actionLabel).toBe('Stop & Open Terbit');
   });

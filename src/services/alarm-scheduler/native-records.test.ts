@@ -48,6 +48,7 @@ function spec(overrides: Partial<AlarmSpec> = {}): AlarmSpec {
     nextFireAt: at(7, 6, 30),
     completionMode: 'reward',
     actionLabel: 'Stop & Open Terbit',
+    actionIcon: 'sunrise.fill',
     soundId: 'system-default',
     ...overrides,
   };

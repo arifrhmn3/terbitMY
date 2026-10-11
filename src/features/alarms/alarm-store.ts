@@ -44,6 +44,7 @@ export function toAlarmSpec(alarm: Alarm, now: number): AlarmSpec {
     nextFireAt: next ? next.getTime() : now,
     completionMode: alarm.completionMode,
     actionLabel: MODE_POLICIES[alarm.completionMode].primaryActionLabel,
+    actionIcon: MODE_POLICIES[alarm.completionMode].primaryActionIcon,
     soundId: alarm.soundId,
   };
 }

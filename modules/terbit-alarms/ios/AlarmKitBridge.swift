@@ -28,7 +28,7 @@ enum AlarmKitBridge {
   }
 
   static func scheduleOneTime(alarmId: String, occurrenceId: String?, date: Date, title: String) async throws -> UUID {
-    try await schedule(alarmId: alarmId, occurrenceId: occurrenceId, title: title, schedule: .fixed(date), actionLabel: nil)
+    try await schedule(alarmId: alarmId, occurrenceId: occurrenceId, title: title, schedule: .fixed(date), actionLabel: nil, actionIcon: nil)
   }
 
   /// A saved alarm: weekly at hour:minute on `weekdays` (0 = Sunday), or once at `date` when `weekdays` is empty.
@@ -41,7 +41,8 @@ enum AlarmKitBridge {
     weekdays: [Int],
     date: Date,
     title: String,
-    actionLabel: String
+    actionLabel: String,
+    actionIcon: String
   ) async throws -> UUID {
     let schedule: Alarm.Schedule
     if weekdays.isEmpty {
@@ -55,7 +56,8 @@ enum AlarmKitBridge {
       occurrenceId: nil,
       title: title,
       schedule: schedule,
-      actionLabel: actionLabel.isEmpty ? "Stop & Open Terbit" : actionLabel
+      actionLabel: actionLabel.isEmpty ? "Stop & Open Terbit" : actionLabel,
+      actionIcon: actionIcon.isEmpty ? "sunrise.fill" : actionIcon
     )
   }
 
@@ -68,14 +70,15 @@ enum AlarmKitBridge {
     occurrenceId: String?,
     title: String,
     schedule: Alarm.Schedule,
-    actionLabel: String?
+    actionLabel: String?,
+    actionIcon: String?
   ) async throws -> UUID {
     let id = UUID()
     // Apple's own Stop control is always available; Terbit MY can't remove it
     // or force the mission first. The secondary button ("Stop & Open Terbit")
     // supplements it: it stops the alarm and opens the mission.
     let secondaryButton = actionLabel.map {
-      AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "sunrise.fill")
+      AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: actionIcon ?? "sunrise.fill")
     }
     let secondaryBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior? =
       actionLabel == nil ? nil : AlarmPresentation.Alert.SecondaryButtonBehavior.custom
