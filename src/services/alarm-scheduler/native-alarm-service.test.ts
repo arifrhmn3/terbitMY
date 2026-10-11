@@ -89,6 +89,26 @@ describe('native alarm service: saved alarms', () => {
     expect(events).toEqual([expect.objectContaining({ scheduledAt: dueToday, evidence: 'system', stopAction: 'mission' })]);
   });
 
+  it('passes on the native "alarm button tapped" event on iOS only, and unsubscribes', () => {
+    const remove = jest.fn();
+    let emit: () => void = () => {};
+    const addListener = jest.fn((_event: 'onAlarmAction', listener: () => void) => {
+      emit = listener;
+      return { remove };
+    });
+    const listener = jest.fn();
+
+    const unsubscribe = createNativeAlarmService(fakeModule({ addListener }), 'alarmkit').onAlarmAction(listener);
+    expect(addListener).toHaveBeenCalledWith('onAlarmAction', expect.any(Function));
+    emit();
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    expect(remove).toHaveBeenCalled();
+
+    createNativeAlarmService(fakeModule({ addListener }), 'alarm-manager').onAlarmAction(listener)();
+    expect(addListener).toHaveBeenCalledTimes(1);
+  });
+
   it('maps permission errors to permission-denied and other errors to failed', async () => {
     for (const code of ['not_authorized', 'exact_alarm_not_allowed'] as const) {
       const native = fakeModule({ scheduleAlarmAsync: async () => ({ ok: false, code, message: 'Turn it on' }) });

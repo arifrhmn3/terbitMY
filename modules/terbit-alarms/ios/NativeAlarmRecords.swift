@@ -53,15 +53,16 @@ enum NativeAlarmRecords {
 enum NativeAlarmActions {
   private static let key = "terbit.nativeAlarmActions.v1"
   private static let maxActions = 60
+  /// Posted once a tap is saved, so a running app can react at once instead of guessing when the intent finished.
+  static let recordedNotification = Notification.Name("TerbitAlarmActionRecorded")
 
   /// action: "mission" (Stop & Open Terbit / Stop & Start Mission) or "stop" (the system Stop button).
   static func record(alarmId: String, nativeId: String, action: String) {
     var actions = load()
-    actions.insert(
-      ["alarmId": alarmId, "nativeId": nativeId, "action": action, "at": NativeAlarmRecords.nowMs()],
-      at: 0
-    )
+    let entry: [String: Any] = ["alarmId": alarmId, "nativeId": nativeId, "action": action, "at": NativeAlarmRecords.nowMs()]
+    actions.insert(entry, at: 0)
     UserDefaults.standard.set(Array(actions.prefix(maxActions)), forKey: key)
+    NotificationCenter.default.post(name: recordedNotification, object: nil, userInfo: entry)
   }
 
   /// Newest first.

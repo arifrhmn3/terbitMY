@@ -30,6 +30,8 @@ export function createAlarmHandOff(deps: {
 }) {
   const { alarmStore, occurrences, service, reminders, beforeSync, now = Date.now } = deps;
   let running: Promise<AlarmOccurrence | null> | null = null;
+  let queued: Promise<AlarmOccurrence | null> | null = null;
+  const listeners = new Set<(occurrence: AlarmOccurrence | null) => void>();
 
   async function processFireEvents() {
     await beforeSync?.();
@@ -61,16 +63,37 @@ export function createAlarmHandOff(deps: {
     await alarmStore.syncNative();
     await syncReminders().catch(() => {});
     const open = (await occurrences.listActive()).filter((o) => o.source === 'native' && o.status !== 'scheduled');
-    return open.sort((a, b) => b.scheduledAt - a.scheduledAt)[0] ?? null;
+    const result = open.sort((a, b) => b.scheduledAt - a.scheduledAt)[0] ?? null;
+    for (const listener of listeners) listener(result);
+    return result;
   }
 
-  return {
-    /** Runs the hand-off once at a time; concurrent callers share the same run. */
-    sync(): Promise<AlarmOccurrence | null> {
-      running ??= run().finally(() => {
+  function sync(): Promise<AlarmOccurrence | null> {
+    if (!running) {
+      running = run().finally(() => {
         running = null;
       });
       return running;
+    }
+    // A call during a run may carry news that run already missed (e.g. an alarm
+    // button tap saved after it read the taps), so queue one more run after it.
+    // Every caller in the meantime shares that queued run.
+    queued ??= running
+      .catch(() => null)
+      .then(() => {
+        queued = null;
+        return sync();
+      });
+    return queued;
+  }
+
+  return {
+    /** Runs the hand-off one at a time; a call during a run gets a fresh run straight after it. */
+    sync,
+    /** Called after every run with the morning that needs attention. Returns an unsubscribe function. */
+    subscribe(listener: (occurrence: AlarmOccurrence | null) => void): () => void {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
     syncReminders,
   };
@@ -79,11 +102,13 @@ export function createAlarmHandOff(deps: {
 export type AlarmHandOff = ReturnType<typeof createAlarmHandOff>;
 
 /**
- * Show it if it hasn't been shown this session, or (Gentle mode) if its
+ * Show it if it hasn't been shown this session, if "Stop & Open Terbit" moved
+ * it into the mission after it was last shown, or (Gentle mode) if its
  * follow-up became due after it was last shown.
  */
 export function shouldPresent(occurrence: AlarmOccurrence, now: number, lastShown: number | undefined): boolean {
   if (lastShown === undefined) return true;
+  if (occurrence.status === 'mission_in_progress' && (occurrence.missionStartedAt ?? 0) > lastShown) return true;
   const followUp = evaluateMorning(occurrence).followUpAt;
   return followUp !== null && now >= followUp && lastShown < followUp;
 }

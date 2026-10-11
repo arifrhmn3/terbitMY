@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 7 October 2026_
+_Last updated: 11 October 2026_
 
 ## Current phase
 
@@ -40,7 +40,7 @@ _Last updated: 7 October 2026_
 | **Saved alarms scheduled natively** (create/edit → schedule, disable/delete → cancel, weekday repeats; Android reschedules after restart / time change) | ✅ Built + unit-tested · ⏳ needs new builds + device test |
 | **Genuine alarm → occurrence → configured mission → Recent mornings** | ✅ Built + unit-tested · ⏳ needs new builds + device test |
 | **Accountability modes per alarm:** Reward / Challenge / Gentle, with `evaluateMorning`, `isRewardEligible`, `isStreakEligible` | ✅ Built + unit-tested · ⏳ device test |
-| **One-tap "Stop & Open Terbit" / "Stop & Start Mission"** (iOS AlarmKit App Intents; Android alarm screen) | ✅ Built · First iPhone test (build 59f24b9): button not visible. Fix: switched to the iOS 26.1+ alert API, rescheduled alarms without the button, added on-device diagnostics. ⏳ New iOS build + retest |
+| **One-tap "Stop & Open Terbit" / "Stop & Start Mission"** (iOS AlarmKit App Intents; Android alarm screen) | ✅ **Button verified on iPhone** (11 Oct): the alarm fires and shows Apple's Stop plus the Terbit button. But tapping it didn't open straight into the mission: iOS can open the app before the tap is saved, and the app showed Today or the "Start mission" screen first. Fix: a native `onAlarmAction` event, a re-run of the hand-off when a tap arrives mid-run, a launch route that waits for the hand-off, and an alarm screen that refreshes after every run. ⏳ New iOS build + retest |
 | **Gentle reminders** (iOS local notification, 5/10/15 min) | ✅ Built · ⏳ iPhone test |
 | **Entitlement layer** (`isFeatureAvailable`, `useEntitlement`, `FeatureGate`; local mock only; provisional freemium policy) | ✅ Built + unit-tested. See docs/MONETISATION.md |
 | Alarm sound catalog (basic/premium) and share-card architecture | ✅ Prepared (no library, no sharing UI) |
@@ -87,5 +87,6 @@ New features are built and tested on the physical iPhone first. Android stays su
   - Some system dismiss paths may not run the intents.
   - There's no native alarm before iOS 26.
 - **Android:** the alarm sound is a notification sound, not yet a foreground service. Alarms aren't restored before the first unlock after a restart. No Gentle reminder notification yet (parity phase).
-- **Snooze:** not implemented.
+- **Snooze:** not implemented. To be decided later **per mode** (Reward, Gentle, Challenge): whether snooze is allowed, how many snoozes, how long, and whether Challenge has stricter rules.
+- **Apple's own controls:** the system Stop, the swipe-up dismiss and other lock-screen gestures can't be removed or overridden, and Terbit MY doesn't try. When they're used, the morning is recorded as stopped by the phone (the Stop button's intent), or inferred from the schedule when no intent runs. It never counts as a completed mission.
 - **Billing:** none. Entitlement is a local mock only.

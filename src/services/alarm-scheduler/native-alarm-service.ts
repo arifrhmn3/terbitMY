@@ -115,6 +115,12 @@ export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backe
       return alarmKitFireEvents(records, since, now, actions);
     },
 
+    onAlarmAction(listener) {
+      if (backend !== 'alarmkit' || !native.addListener) return () => {};
+      const subscription = native.addListener('onAlarmAction', () => listener());
+      return () => subscription.remove();
+    },
+
     getNativeAlarmStatus: status,
 
     async requestNativeAlarmPermission() {

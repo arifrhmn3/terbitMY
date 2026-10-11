@@ -123,6 +123,8 @@ export type TerbitAlarmsNativeModule = {
   resetAllAsync?(): Promise<number>;
   /** iOS only: recent taps on the AlarmKit buttons, newest first. */
   listActionsAsync?(): Promise<NativeAlarmAction[]>;
+  /** iOS: 'onAlarmAction' fires as soon as an App Intent has saved an AlarmKit button tap. */
+  addListener?(eventName: 'onAlarmAction', listener: (action: NativeAlarmAction) => void): { remove(): void };
   /** iOS only: local notification reminders (Gentle mode). */
   requestReminderPermissionAsync?(): Promise<'granted' | 'denied'>;
   scheduleReminderAsync?(options: { id: string; title: string; body: string; fireAt: number }): Promise<boolean>;

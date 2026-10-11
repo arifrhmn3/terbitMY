@@ -41,8 +41,32 @@ struct ReminderOptions: Record {
 /// Note: static helpers must be called as `TerbitAlarmsModule.x` inside
 /// `definition()`, which is an instance method.
 public class TerbitAlarmsModule: Module {
+  static let onAlarmAction = "onAlarmAction"
+
+  @objc func handleAlarmActionRecorded(_ notification: Notification) {
+    guard let action = notification.userInfo as? [String: Any] else { return }
+    sendEvent(TerbitAlarmsModule.onAlarmAction, action)
+  }
+
   public func definition() -> ModuleDefinition {
     Name("TerbitAlarms")
+
+    // An AlarmKit button tap was just saved by an App Intent. JavaScript re-runs the
+    // hand-off on this event, so it doesn't depend on when iOS ran the intent.
+    Events(TerbitAlarmsModule.onAlarmAction)
+
+    OnStartObserving(TerbitAlarmsModule.onAlarmAction) {
+      NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(self.handleAlarmActionRecorded),
+        name: NativeAlarmActions.recordedNotification,
+        object: nil
+      )
+    }
+
+    OnStopObserving(TerbitAlarmsModule.onAlarmAction) {
+      NotificationCenter.default.removeObserver(self, name: NativeAlarmActions.recordedNotification, object: nil)
+    }
 
     AsyncFunction("getStatusAsync") { () -> [String: Any] in
       TerbitAlarmsModule.status(permission: nil)

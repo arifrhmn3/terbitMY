@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Alert, AppState, BackHandler, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -53,13 +53,11 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
     let current = true;
     const refresh = () => occurrences.get(occurrenceId).then((o) => current && setOccurrence(o));
     refresh();
-    // Coming back from the alarm's "Stop & Open Terbit" may have moved this morning into its mission.
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setTimeout(refresh, 1500);
-    });
+    // A hand-off run (e.g. after the alarm's "Stop & Open Terbit") may have moved this morning into its mission.
+    const unsubscribe = handOff.subscribe(() => refresh());
     return () => {
       current = false;
-      subscription.remove();
+      unsubscribe();
     };
   }, [occurrenceId]);
 

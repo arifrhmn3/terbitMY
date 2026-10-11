@@ -142,6 +142,12 @@ export interface AlarmService {
   syncAll(alarms: AlarmSpec[]): Promise<void>;
   /** Saved alarms that went off at or after `since` (ms since 1970), oldest first. */
   getFireEvents(since: number, now: number): Promise<AlarmFiredEvent[]>;
+  /**
+   * iOS: calls `listener` as soon as a tap on an alarm button has been saved
+   * (so `getFireEvents` now includes it). Returns an unsubscribe function.
+   * Elsewhere it never calls back.
+   */
+  onAlarmAction(listener: () => void): () => void;
 
   // Native one-time alarms (milestone 1 proof of concept).
   getNativeAlarmStatus(): Promise<NativeAlarmStatus>;

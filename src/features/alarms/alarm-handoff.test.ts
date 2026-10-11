@@ -88,10 +88,46 @@ describe('saved alarm → genuine native alarm → mission', () => {
     expect((await ctx.occurrences.listActive()).map((o) => o.alarmId)).toEqual([once.id]);
   });
 
-  it('shares one run between concurrent callers', async () => {
+  it('runs one at a time: calls during a run share a single follow-up run', async () => {
     const ctx = setup();
-    await Promise.all([ctx.handOff.sync(), ctx.handOff.sync()]);
-    expect(ctx.service.getFireEvents).toHaveBeenCalledTimes(1);
+    await Promise.all([ctx.handOff.sync(), ctx.handOff.sync(), ctx.handOff.sync()]);
+    expect(ctx.service.getFireEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('doesn’t miss an alarm button tap saved while a run is already in progress', async () => {
+    const ctx = setup();
+    const { alarm } = await ctx.alarmStore.save(createAlarmDraft({ completionMode: 'reward' }));
+    ctx.clock.time = at(6, 31);
+    // iOS brings the app forward and the first run reads the schedule only…
+    jest
+      .mocked(ctx.service.getFireEvents)
+      .mockResolvedValueOnce([{ alarmId: alarm.id, scheduledAt: at(6, 30), firedAt: at(6, 30), evidence: 'schedule' }]);
+    const first = ctx.handOff.sync();
+    // …then the App Intent saves "Stop & Open Terbit" and the app checks again mid-run.
+    ctx.events.push({
+      alarmId: alarm.id,
+      scheduledAt: at(6, 30),
+      firedAt: at(6, 30),
+      evidence: 'system',
+      stoppedAt: at(6, 31),
+      stopAction: 'mission',
+    });
+    const second = ctx.handOff.sync();
+    expect(await first).toMatchObject({ status: 'alarm_fired' });
+    expect(await second).toMatchObject({ alarmId: alarm.id, status: 'mission_in_progress', alarmStopReason: 'mission' });
+  });
+
+  it('tells subscribers the result of every run', async () => {
+    const ctx = setup();
+    const { alarm } = await ctx.alarmStore.save(createAlarmDraft());
+    ctx.events.push({ alarmId: alarm.id, scheduledAt: at(6, 30), firedAt: at(6, 30), evidence: 'system' });
+    ctx.clock.time = at(6, 31);
+    const seen: (string | null)[] = [];
+    const unsubscribe = ctx.handOff.subscribe((o) => seen.push(o?.alarmId ?? null));
+    await ctx.handOff.sync();
+    unsubscribe();
+    await ctx.handOff.sync();
+    expect(seen).toEqual([alarm.id]);
   });
 });
 
@@ -111,6 +147,20 @@ describe('when to present the alarm screen', () => {
 
     const reward = { ...morning, completionMode: 'reward' as const };
     expect(shouldPresent(reward, at(6, 50), at(6, 32))).toBe(false);
+  });
+
+  it('presents again when "Stop & Open Terbit" moved the morning into its mission after it was shown', async () => {
+    const ctx = setup();
+    const { alarm } = await ctx.alarmStore.save(createAlarmDraft({ completionMode: 'reward' }));
+    ctx.events.push({ alarmId: alarm.id, scheduledAt: at(6, 30), firedAt: at(6, 30), evidence: 'schedule' });
+    ctx.clock.time = at(6, 31);
+    const ringing = (await ctx.handOff.sync())!;
+    expect(shouldPresent(ringing, at(6, 31), at(6, 31))).toBe(false);
+
+    ctx.clock.time = at(6, 32);
+    const inMission = await ctx.occurrences.startMission(ringing.id);
+    expect(shouldPresent(inMission, at(6, 32), at(6, 31))).toBe(true);
+    expect(shouldPresent(inMission, at(6, 33), at(6, 32))).toBe(false);
   });
 });
 

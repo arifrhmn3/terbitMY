@@ -40,6 +40,9 @@ export function createNotImplementedAlarmService(summary = DEFAULT_SUMMARY): Ala
     async getFireEvents() {
       return [];
     },
+    onAlarmAction() {
+      return () => {};
+    },
     async getNativeAlarmStatus() {
       return UNAVAILABLE;
     },
