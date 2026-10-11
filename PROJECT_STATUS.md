@@ -4,7 +4,7 @@ _Last updated: 11 October 2026_
 
 ## Current phase
 
-**Phase 1 (iOS prototype) is complete and physically verified on iPhone (11 October 2026).** Branch `phase-1/dev-build-setup`, waiting for review and merge. One item stays open under the iOS-first strategy: the end-of-phase Android EAS compile check (see "Android compatibility check" below). Phase 2 has not started. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Phase 1 (iOS prototype) is closed: complete, physically verified on iPhone (11 October 2026) and merged into `main`.** Android work is deferred to the dedicated Android parity phase (see "Android status" below). Phase 2 has not started. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Phase 0: Foundation ✅
 
@@ -50,9 +50,11 @@ _Last updated: 11 October 2026_
 
 Final checks (11 Oct): `npm run check` passes (lint, typecheck and 242 unit tests, including real SQLite migrations); `npx expo-doctor` passes 21/21; iOS, Android and web bundles export without errors. Swift and Kotlin are compiled only by EAS Build (there's no local Xcode or Android SDK).
 
-### Android compatibility check (iOS-first policy)
-- ✅ Shared TypeScript compiles, and the Android JavaScript bundle exports.
-- ⏳ **The Kotlin code has not been compiled since `59f24b9`.** The last Android build installed on the HONOR phone predates it. Confirming it compiles needs one Android EAS development build: `npx eas-cli@latest build --profile development --platform android`. A quick smoke test of saved alarms on that build is optional; full Android behaviour is tested in the parity phase.
+### Android status (deferred by decision, 11 Oct 2026)
+- ✅ **Basic native alarm functionality was physically proven on Android** earlier in Phase 1 (milestone 1, on the owner's HONOR phone).
+- ⚠️ **Later Android-native changes have not all been recompiled.** The Kotlin code changed in `fc8a5a6` and `59f24b9`, after the last Android build that was installed. Shared TypeScript still typechecks, and the Android JavaScript bundle exports.
+- ⏸️ **Deferred on purpose:** Android compatibility, native compilation (EAS Android builds), physical testing and full feature parity. The priority is speed in finishing the iOS prototype, so phases no longer end with an Android build check.
+- ➡️ All of this is handled in the **dedicated Android parity phase (A)**, after the iOS prototype is feature-complete. Expect some Kotlin compile fixes there.
 
 ### Accountability model (agreed product behaviour)
 
@@ -73,7 +75,7 @@ Outcomes kept separate:
 Rules live in `MODE_POLICIES` (`src/features/alarms/accountability.ts`), so beta behaviour can change without a database change. Phase 2 must use `isRewardEligible()` / `isStreakEligible()`.
 
 ### Development strategy: iOS-first prototype
-New features are built and tested on the physical iPhone first. Android stays supported: the Android code already written is kept, and shared logic stays platform-neutral. But new native features aren't duplicated in Kotlin until the behaviour is validated, and there's no Android build per feature. Android gets a compatibility/build check at the end of each phase, and a dedicated feature-parity phase after the iOS prototype. See docs/ROADMAP.md.
+New features are built and tested on the physical iPhone first. Android stays supported: the Android code already written is kept, and shared logic stays platform-neutral. But new native features aren't duplicated in Kotlin until the behaviour is validated, and there's no Android build per feature or per phase. Android compilation, testing and parity all happen in a dedicated Android parity phase once the iOS prototype is feature-complete (policy updated 11 Oct 2026). See docs/ROADMAP.md.
 
 ### Beta product assumptions (provisional, not permanent)
 These are the current working assumptions for beta. They're deliberately configurable, so changing them doesn't need a database or screen change.
