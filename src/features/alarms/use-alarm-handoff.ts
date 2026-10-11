@@ -1,12 +1,11 @@
 import { router, usePathname, useRootNavigationState } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { getAlarmService } from '@/services/alarm-scheduler';
 
-import { shouldPresent } from './alarm-handoff';
+import { createAlarmPresenter } from './alarm-presenter';
 import { handOff } from './alarms';
-import type { AlarmOccurrence } from './occurrence';
 
 /** Fallback only: the native 'onAlarmAction' event normally reports the tap first. */
 const RECHECK_AFTER_MS = 1200;
@@ -14,18 +13,17 @@ const RECHECK_AFTER_MS = 1200;
 /** How long the launch screen waits for the hand-off before showing Today anyway. */
 export const LAUNCH_WAIT_MS = 4000;
 
-/** When each occurrence was last shown this session, so closing the alarm screen doesn't reopen it straight away. */
-const presentedAt = new Map<string, number>();
+let currentPath = '/';
 
-export function markAlarmPresented(occurrenceId: string, at = Date.now()) {
-  presentedAt.set(occurrenceId, at);
-}
+/** The app's one alarm presenter (one per session). */
+export const alarmPresenter = createAlarmPresenter({
+  appState: () => AppState.currentState,
+  path: () => currentPath,
+  navigate: (occurrenceId) => router.push({ pathname: '/alarm/[occurrenceId]', params: { occurrenceId } }),
+});
 
-/** The morning to open now, if any (and remembers it as shown). */
-export function takeAlarmToPresent(occurrence: AlarmOccurrence | null, now = Date.now()): AlarmOccurrence | null {
-  if (!occurrence || !shouldPresent(occurrence, now, presentedAt.get(occurrence.id))) return null;
-  markAlarmPresented(occurrence.id, now);
-  return occurrence;
+export function markAlarmPresented(occurrenceId: string) {
+  alarmPresenter.markPresented(occurrenceId);
 }
 
 /**
@@ -37,29 +35,23 @@ export function takeAlarmToPresent(occurrence: AlarmOccurrence | null, now = Dat
  * Cold start is handled by the launch route (`src/app/index.tsx`), which waits
  * for the first hand-off before showing anything, so Today never flashes
  * first. This hook covers everything after that: resume from the background,
- * and an alarm button tap that iOS saves a moment after the app is already
- * in front.
+ * and an alarm button tap that iOS saves a moment before or after the app is
+ * in front. Every hand-off run offers its result to the presenter, which
+ * opens it once the app is active.
  */
 export function useAlarmHandOff() {
   const navigationReady = Boolean(useRootNavigationState()?.key);
   const pathname = usePathname();
-  const pathnameRef = useRef(pathname);
 
   useEffect(() => {
-    pathnameRef.current = pathname;
+    currentPath = pathname;
+    alarmPresenter.flush();
   }, [pathname]);
 
   useEffect(() => {
     if (!navigationReady) return;
-    // Every hand-off run (from here, the launch route or a screen) can open the mission.
-    const unsubscribeRuns = handOff.subscribe((occurrence) => {
-      // The launch route is still deciding, or an alarm screen is already open
-      // (it refreshes itself after every hand-off run).
-      const path = pathnameRef.current;
-      if (path === '/' || path.startsWith('/alarm')) return;
-      const next = takeAlarmToPresent(occurrence);
-      if (next) router.push({ pathname: '/alarm/[occurrenceId]', params: { occurrenceId: next.id } });
-    });
+
+    const unsubscribeRuns = handOff.subscribe(alarmPresenter.offer);
 
     function check() {
       handOff.sync().catch(() => null);
@@ -75,7 +67,11 @@ export function useAlarmHandOff() {
     // Subscribe before the first check, so a tap saved in between isn't missed.
     const unsubscribeAction = getAlarmService().onAlarmAction(check);
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') checkSoon();
+      if (state !== 'active') return;
+      // A run that finished while iOS was still bringing the app forward is opened now…
+      alarmPresenter.flush();
+      // …and a fresh run picks up anything saved since.
+      checkSoon();
     });
     checkSoon();
     return () => {

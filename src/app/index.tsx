@@ -2,8 +2,9 @@ import { Redirect, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
+import { launchRoute } from '@/features/alarms/alarm-presenter';
 import { handOff } from '@/features/alarms/alarms';
-import { LAUNCH_WAIT_MS, takeAlarmToPresent } from '@/features/alarms/use-alarm-handoff';
+import { alarmPresenter, LAUNCH_WAIT_MS } from '@/features/alarms/use-alarm-handoff';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -30,8 +31,7 @@ export default function Index() {
       .catch(() => null)
       .then((occurrence) => {
         if (decided) return;
-        const next = takeAlarmToPresent(occurrence);
-        decide(next ? { pathname: '/alarm/[occurrenceId]', params: { occurrenceId: next.id } } : '/today');
+        decide(launchRoute(alarmPresenter.takeForLaunch(occurrence)));
       });
     return () => clearTimeout(timer);
   }, []);

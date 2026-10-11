@@ -32,7 +32,8 @@ The mode belongs to **each alarm**, so different alarms can use different modes.
   - On launch, the hand-off reads the record, creates the morning (with 'system' evidence) and goes straight into the mission.
   - **Timing:** iOS can bring the app forward before the intent has saved the tap. So the intent's save posts a native `onAlarmAction` event, and JS re-runs the hand-off on it (with a 1.2 s re-check as a fallback). A `handOff.sync()` called while a run is in progress queues one fresh run instead of reusing the stale result.
   - **Cold start:** the launch route (`src/app/index.tsx`) waits for the first hand-off (up to 4 s) and opens the alarm screen directly, so Today doesn't appear first.
-  - **App already open / resumed:** `useAlarmHandOff` reacts to every hand-off run (`handOff.subscribe`) and pushes the alarm screen. An alarm screen that is already open refreshes itself after each run, moving from "Start mission" to the mission when the tap arrives.
+  - **App already open / resumed:** every hand-off run (`handOff.subscribe`) is offered to the alarm presenter (`src/features/alarms/alarm-presenter.ts`). The presenter opens the alarm screen **only once the app is `active`**: a run can finish while iOS is still bringing the app forward, so the morning is kept and opened on the `active` transition. Each morning opens at most once per tap, however many signals arrive. An alarm screen that is already open refreshes itself after each run, moving from "Start mission" to the mission when the tap arrives.
+  - "Already on the alarm screen" means `/alarm/…` or `/alarm-fired`. The Alarms tab (`/alarms`) doesn't count; a prefix check on `/alarm` once made the hand-off skip it.
   - The Stop button's intent (`TerbitStopIntent`, background) records a system stop.
   - AlarmKit has no route-into-a-screen API, so this record-then-reconcile hand-off is the supported pattern. iOS may also show other system dismiss controls that don't run Terbit MY's intents.
 - **iOS presentation API:** iOS 26.1+ uses `AlarmPresentation.Alert(title:secondaryButton:secondaryButtonBehavior:)`. The system draws Stop, often as a slider; "Prefer Single Touch Actions" in Accessibility makes it a button. iOS 26.0 falls back to the older `stopButton:` initializer, which Apple deprecated in 26.1 ("stopButton … will no longer be used").
@@ -73,7 +74,7 @@ App opens / returns to foreground → handOff.sync()                  src/featur
 | `modules/terbit-alarms/src/` | TypeScript types. `requireOptionalNativeModule` makes it null in Expo Go and on web. |
 | `src/services/alarm-scheduler/native-alarm-service.ts`, `native-records.ts` | Shared mapping of the module onto `AlarmService`, fire-event and reconcile logic |
 | `src/features/alarms/accountability.ts` | Modes, outcomes, eligibility |
-| `src/features/alarms/alarm-handoff.ts`, `use-alarm-handoff.ts`, `src/app/alarm-fired.tsx` | Fired alarm → occurrence → mission screen |
+| `src/features/alarms/alarm-handoff.ts`, `alarm-presenter.ts`, `use-alarm-handoff.ts`, `src/app/index.tsx`, `src/app/alarm-fired.tsx` | Fired alarm → occurrence → mission screen |
 | `app.json` → `ios.infoPlist.NSAlarmKitUsageDescription` | Required by AlarmKit |
 
 ## Known limitations
