@@ -4,7 +4,7 @@ Saved Terbit MY alarms are scheduled as genuine system alarms: AlarmKit on iOS 2
 
 > **Status:**
 > - **Milestone 1** (one-time native test alarm): physically verified on an iPhone and an Android phone.
-> - **Saved alarms + hand-off + accountability modes**: built and unit-tested. ⏳ Needs new development builds and a physical-device test.
+> - **Saved alarms + hand-off + accountability modes** (Phase 1): ✅ physically verified on iPhone (11 Oct 2026). The alarm button opens the configured mission whether Terbit MY was closed or in the background. Android: built and unit-tested; device test in the Android parity phase. Accepted iOS limitations: see PROJECT_STATUS.md.
 
 ## Platform limitation: the system Stop control can't be prevented
 
