@@ -12,6 +12,7 @@ import {
   type OccurrenceSource,
   type TransitionResult,
 } from '@/features/alarms/occurrence';
+import type { MissionResult } from '@/features/missions/types';
 
 export type MorningOutcome = 'completed' | 'missed' | 'dismissed' | 'cancelled' | 'open' | 'turned_off';
 
@@ -62,7 +63,19 @@ export function buildMorning(params: {
       return step(dismissOccurrence(fired, scheduledAt + 2 * MINUTE));
     case 'completed': {
       const started = step(startMission(fired, scheduledAt + MINUTE));
-      const result = { difficulty: 'easy' as const, questionCount: 3, attempts: 3, wrongAttempts: 0, accuracy: 1, durationMs: 90_000 };
+      const result: MissionResult =
+        mission.type === 'quiz'
+          ? {
+              type: 'quiz',
+              category: mission.category,
+              difficulty: mission.difficulty,
+              questionCount: mission.questionCount,
+              correctCount: mission.questionCount - 1,
+              accuracy: (mission.questionCount - 1) / mission.questionCount,
+              durationMs: 90_000,
+              answers: [],
+            }
+          : { difficulty: 'easy', questionCount: 3, attempts: 3, wrongAttempts: 0, accuracy: 1, durationMs: 90_000 };
       return step(completeMission(started, result, scheduledAt + 4 * MINUTE));
     }
   }

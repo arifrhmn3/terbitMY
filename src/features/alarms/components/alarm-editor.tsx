@@ -25,8 +25,14 @@ import {
   type CompletionMode,
 } from '@/features/alarms/alarm';
 import { alarmStore, occurrences } from '@/features/alarms/alarms';
-import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
-import { MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
+import { QUIZ_CATEGORIES, QUIZ_CATEGORY_LABEL, QUIZ_CATEGORY_SHORT } from '@/features/missions/quiz/types';
+import {
+  DIFFICULTY_LABEL,
+  MISSION_DIFFICULTIES,
+  MISSION_QUESTION_COUNTS,
+  type MissionDifficulty,
+  type MissionQuestionCount,
+} from '@/features/missions/types';
 import { useTheme } from '@/hooks/use-theme';
 import { getAlarmService } from '@/services/alarm-scheduler';
 import { getReminderService } from '@/services/notifications';
@@ -41,22 +47,32 @@ type AlarmEditorProps = {
   alarmId?: string;
 };
 
-const missionOptions = [
+const missionOptions: { value: AlarmMission['type']; label: string }[] = [
   { value: 'math', label: 'Maths' },
+  { value: 'quiz', label: 'Quiz' },
   { value: 'none', label: 'None' },
-] as const;
-
-const difficultyOptions: { value: MathDifficulty; label: string }[] = [
-  { value: 'easy', label: 'Easy' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'hard', label: 'Hard' },
 ];
 
-const countOptions = MATH_QUESTION_COUNTS.map((count) => ({ value: count, label: `${count} questions` }));
+const topicOptions = QUIZ_CATEGORIES.map((category) => ({ value: category, label: QUIZ_CATEGORY_SHORT[category] }));
+const difficultyOptions = MISSION_DIFFICULTIES.map((difficulty) => ({ value: difficulty, label: DIFFICULTY_LABEL[difficulty] }));
+const countOptions = MISSION_QUESTION_COUNTS.map((count) => ({ value: count, label: `${count} questions` }));
 const gentleOptions = GENTLE_REMINDER_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 const snoozeOptions = SNOOZE_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 
-const defaultMathMission: AlarmMission = { type: 'math', difficulty: 'easy', questionCount: 3 };
+/** Switching mission type keeps the difficulty and question count already chosen. */
+function missionOfType(type: AlarmMission['type'], current: AlarmMission): AlarmMission {
+  const difficulty: MissionDifficulty = current.type === 'none' ? 'easy' : current.difficulty;
+  const questionCount: MissionQuestionCount = current.type === 'none' ? 3 : current.questionCount;
+  if (type === 'math') return { type: 'math', difficulty, questionCount };
+  if (type === 'quiz') return { type: 'quiz', category: current.type === 'quiz' ? current.category : 'general', difficulty, questionCount };
+  return { type: 'none' };
+}
+
+const MISSION_FOOTER: Record<AlarmMission['type'], string> = {
+  math: 'Solve these to turn the alarm off. A wrong answer means you try that question again.',
+  quiz: 'Answer each question to turn the alarm off. You see the right answer after each one; every completed quiz earns Education XP.',
+  none: 'Without a mission, the alarm can be turned off straight away.',
+};
 
 export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   const theme = useTheme();
@@ -181,19 +197,21 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
         />
       </Section>
 
-      <Section
-        title="Wake-up mission"
-        footer={
-          mission.type === 'math'
-            ? 'Solve these to turn the alarm off. A wrong answer means you try that question again.'
-            : 'Without a mission, the alarm can be turned off straight away.'
-        }>
+      <Section title="Wake-up mission" footer={MISSION_FOOTER[mission.type]}>
         <ChoiceRow
           options={missionOptions}
           value={mission.type}
-          onChange={(type) => update({ mission: type === 'none' ? { type: 'none' } : defaultMathMission })}
+          onChange={(type) => update({ mission: missionOfType(type, mission) })}
         />
-        {mission.type === 'math' && (
+        {mission.type === 'quiz' && (
+          <ChoiceRow
+            title={`Topic: ${QUIZ_CATEGORY_LABEL[mission.category]}`}
+            options={topicOptions}
+            value={mission.category}
+            onChange={(category) => update({ mission: { ...mission, category } })}
+          />
+        )}
+        {mission.type !== 'none' && (
           <ChoiceRow
             title="Difficulty"
             options={difficultyOptions}
@@ -201,22 +219,27 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(difficulty) => update({ mission: { ...mission, difficulty } })}
           />
         )}
-        {mission.type === 'math' && (
-          <ChoiceRow<MathQuestionCount>
+        {mission.type !== 'none' && (
+          <ChoiceRow<MissionQuestionCount>
             title="Questions"
             options={countOptions}
             value={mission.questionCount}
             onChange={(questionCount) => update({ mission: { ...mission, questionCount } })}
           />
         )}
-        {mission.type === 'math' && (
+        {mission.type !== 'none' && (
           <ListRow
             icon={{ ios: 'play.circle', android: 'play_circle', web: 'play_circle' }}
             title="Try this mission"
-            subtitle="Practice only. No alarm will ring."
+            subtitle="Practice only. No alarm rings and no XP is earned."
             href={{
               pathname: '/alarms/practice',
-              params: { difficulty: mission.difficulty, count: String(mission.questionCount) },
+              params: {
+                mission: mission.type,
+                category: mission.type === 'quiz' ? mission.category : undefined,
+                difficulty: mission.difficulty,
+                count: String(mission.questionCount),
+              },
             }}
           />
         )}

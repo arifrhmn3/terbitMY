@@ -15,6 +15,8 @@ import {
   type Weekday,
 } from './alarm';
 import { MATH_DIFFICULTIES, MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
+import { QUIZ_CATEGORIES } from '@/features/missions/quiz/types';
+import { MISSION_DIFFICULTIES, MISSION_QUESTION_COUNTS } from '@/features/missions/types';
 
 /** Saves and loads alarm settings. It never schedules or rings an alarm. */
 export interface AlarmRepository {
@@ -71,6 +73,14 @@ export function parseMission(json: string): AlarmMission {
       value?.type === 'math' &&
       MATH_DIFFICULTIES.includes(value.difficulty as never) &&
       MATH_QUESTION_COUNTS.includes(value.questionCount as never)
+    ) {
+      return value as AlarmMission;
+    }
+    if (
+      value?.type === 'quiz' &&
+      QUIZ_CATEGORIES.includes(value.category as never) &&
+      MISSION_DIFFICULTIES.includes(value.difficulty as never) &&
+      MISSION_QUESTION_COUNTS.includes(value.questionCount as never)
     ) {
       return value as AlarmMission;
     }

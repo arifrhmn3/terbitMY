@@ -1,4 +1,4 @@
-import type { MathMissionResult } from '@/features/missions/math/session';
+import type { MissionResult } from '@/features/missions/types';
 
 import type { Alarm, AlarmMission, CompletionMode } from './alarm';
 
@@ -43,7 +43,7 @@ export type FireEvidence = 'app' | 'system' | 'schedule';
 export type AlarmStopReason = 'system' | 'mission' | 'dismiss' | 'turn_off';
 
 export type OccurrenceResult =
-  | { kind: 'mission_completed'; mission: MathMissionResult }
+  | { kind: 'mission_completed'; mission: MissionResult }
   | { kind: 'no_mission' }
   /** Given up inside Terbit MY (Emergency Dismiss / skip mission). */
   | { kind: 'emergency_dismiss' }
@@ -192,7 +192,7 @@ export function startMission(occurrence: AlarmOccurrence, now: number): Transiti
 
 export function completeMission(
   occurrence: AlarmOccurrence,
-  mission: MathMissionResult,
+  mission: MissionResult,
   now: number,
 ): TransitionResult {
   return move(

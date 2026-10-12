@@ -1,4 +1,6 @@
 import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
+import { QUIZ_CATEGORY_LABEL, type QuizCategory } from '@/features/missions/quiz/types';
+import { DIFFICULTY_LABEL, type MissionDifficulty, type MissionQuestionCount } from '@/features/missions/types';
 
 /** Same numbering as `Date.getDay()`: 0 is Sunday, 6 is Saturday. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -16,9 +18,14 @@ export const WEEKDAY_SHORT: Record<Weekday, string> = {
   6: 'Sat',
 };
 
+/**
+ * The mission that turns the alarm off. Stored as JSON (alarms.mission and
+ * each occurrence's copy), so adding a mission type needs no schema change.
+ */
 export type AlarmMission =
   | { type: 'none' }
-  | { type: 'math'; difficulty: MathDifficulty; questionCount: MathQuestionCount };
+  | { type: 'math'; difficulty: MathDifficulty; questionCount: MathQuestionCount }
+  | { type: 'quiz'; category: QuizCategory; difficulty: MissionDifficulty; questionCount: MissionQuestionCount };
 
 export type SnoozeMinutes = 5 | 10 | 15;
 export const SNOOZE_MINUTES: readonly SnoozeMinutes[] = [5, 10, 15];
@@ -129,8 +136,9 @@ export function describeRepeat(weekdays: readonly Weekday[]): string {
 
 export function describeMission(mission: AlarmMission): string {
   if (mission.type === 'none') return 'No mission';
-  const level = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }[mission.difficulty];
-  return `Maths · ${level} · ${mission.questionCount} questions`;
+  const level = DIFFICULTY_LABEL[mission.difficulty];
+  const topic = mission.type === 'quiz' ? QUIZ_CATEGORY_LABEL[mission.category] : 'Maths';
+  return `${topic} · ${level} · ${mission.questionCount} questions`;
 }
 
 export const COMPLETION_MODE_LABEL: Record<CompletionMode, string> = {

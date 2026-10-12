@@ -14,11 +14,13 @@ import { handOff, occurrences } from '@/features/alarms/alarms';
 import { followUpAt, isActive, type AlarmOccurrence } from '@/features/alarms/occurrence';
 import { OccurrenceError } from '@/features/alarms/occurrence-manager';
 import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
-import type { MathMissionResult } from '@/features/missions/math/session';
+import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
+import { isQuizResult, type MissionResult } from '@/features/missions/types';
 import { useTheme } from '@/hooks/use-theme';
-import { CATEGORY_LABEL } from '@/features/progress/policy';
+import { xpEntryTitle } from '@/features/progress/format';
+import { CATEGORY_LABEL, PROGRESSION_POLICY } from '@/features/progress/policy';
 import { progress } from '@/features/progress/progress';
-import type { XpEntry } from '@/features/progress/progression';
+import type { AchievementUnlock, XpEntry } from '@/features/progress/progression';
 import { getReminderService } from '@/services/notifications';
 
 function useNow(intervalMs = 1000) {
@@ -271,22 +273,30 @@ function Ringing(props: {
 
 function Mission(props: {
   occurrence: AlarmOccurrence;
-  onComplete: (result: MathMissionResult) => void;
+  onComplete: (result: MissionResult) => void;
   onDismiss: () => void;
 }) {
   const { occurrence, onComplete, onDismiss } = props;
   const now = useNow();
-  if (occurrence.mission.type !== 'math') return null;
+  const mission = occurrence.mission;
+  if (mission.type === 'none') return null;
 
   return (
     <>
       <ThemedText type="headline" style={styles.center}>
         {clock(now)} · {occurrence.alarmLabel || 'Alarm'}
       </ThemedText>
-      <MathMissionView
-        config={{ difficulty: occurrence.mission.difficulty, questionCount: occurrence.mission.questionCount }}
-        onComplete={onComplete}
-      />
+      {mission.type === 'math' ? (
+        <MathMissionView
+          config={{ difficulty: mission.difficulty, questionCount: mission.questionCount }}
+          onComplete={onComplete}
+        />
+      ) : (
+        <QuizMissionView
+          config={{ category: mission.category, difficulty: mission.difficulty, questionCount: mission.questionCount }}
+          onComplete={onComplete}
+        />
+      )}
       <DismissLink
         label={occurrence.completionMode === 'challenge' ? 'Give up (Challenge incomplete)' : 'Skip mission (no reward)'}
         onPress={onDismiss}
@@ -300,45 +310,85 @@ function MorningComplete({ occurrence }: { occurrence: AlarmOccurrence }) {
   const finishedAt = occurrence.endedAt;
   const tookMs = finishedAt !== null && occurrence.startedAt !== null ? finishedAt - occurrence.startedAt : null;
   const eligible = evaluateMorning(occurrence).rewardEligible;
-  const [earned, setEarned] = useState<XpEntry[] | null>(null);
+  const [awards, setAwards] = useState<{ xp: XpEntry[]; achievements: AchievementUnlock[] } | null>(null);
 
   // Awards this morning's XP (idempotent: reopening this screen never awards it twice).
   useEffect(() => {
     if (!eligible) return;
     let current = true;
     progress
-      .xpForOccurrence(occurrence.id)
-      .then((entries) => current && setEarned(entries))
+      .awardsForOccurrence(occurrence.id)
+      .then((a) => current && setAwards(a))
       .catch(() => {});
     return () => {
       current = false;
     };
   }, [eligible, occurrence.id]);
 
-  let rewardLine = 'This morning doesn’t qualify for rewards (no mission was set).';
-  if (eligible) {
-    const total = earned?.reduce((sum, e) => sum + e.amount, 0) ?? 0;
-    const category = earned?.find((e) => e.category)?.category;
-    rewardLine =
-      earned === null
-        ? 'Counting your XP…'
-        : `+${total} XP${category ? ` · ${CATEGORY_LABEL[category]}` : ''}. This morning counts toward your streak.`;
-  }
-
   return (
     <>
       <ThemedView type="backgroundElement" style={styles.card}>
         <ThemedText type="title">Morning complete</ThemedText>
         {finishedAt !== null && <ThemedText>You were up at {clock(new Date(finishedAt))}.</ThemedText>}
-        {result && <MathResultSummary result={result} />}
+        {result && !isQuizResult(result) && <MathResultSummary result={result} />}
         {tookMs !== null && (
           <ThemedText themeColor="textSecondary">From alarm to done: {formatDuration(tookMs)}</ThemedText>
         )}
-        <ThemedText type={eligible ? 'smallBold' : 'small'} themeColor={eligible ? 'tint' : 'textSecondary'} style={styles.center}>
-          {rewardLine}
-        </ThemedText>
+        {eligible ? (
+          <RewardLines awards={awards} mainWakeUp={occurrence.isMainWakeUp} />
+        ) : (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+            This morning doesn’t qualify for rewards (no mission was set).
+          </ThemedText>
+        )}
       </ThemedView>
+      {result && isQuizResult(result) && (
+        <ThemedView type="backgroundElement" style={styles.card}>
+          <QuizResultSummary result={result} />
+        </ThemedView>
+      )}
       <Button title="Done" onPress={close} />
+    </>
+  );
+}
+
+/** XP earned (mission, difficulty, Challenge bonus), achievements unlocked, and what it counts toward. */
+function RewardLines({
+  awards,
+  mainWakeUp,
+}: {
+  awards: { xp: XpEntry[]; achievements: AchievementUnlock[] } | null;
+  mainWakeUp: boolean;
+}) {
+  if (!awards) {
+    return (
+      <ThemedText type="small" themeColor="textSecondary">
+        Counting your XP…
+      </ThemedText>
+    );
+  }
+  const total = awards.xp.reduce((sum, e) => sum + e.amount, 0);
+  const category = awards.xp.find((e) => e.category)?.category;
+  return (
+    <>
+      <ThemedText type="smallBold" themeColor="tint" style={styles.center}>
+        +{total} XP{category ? ` · ${CATEGORY_LABEL[category]}` : ''}
+      </ThemedText>
+      {awards.xp.map((e) => (
+        <ThemedText key={e.key} type="small" themeColor="textSecondary">
+          {xpEntryTitle(e, PROGRESSION_POLICY)}: +{e.amount} XP
+        </ThemedText>
+      ))}
+      {awards.achievements.map((u) => (
+        <ThemedText key={u.id} type="smallBold">
+          🏅 Achievement unlocked: {PROGRESSION_POLICY.achievements.find((a) => a.id === u.id)?.title ?? u.id}
+        </ThemedText>
+      ))}
+      <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+        {mainWakeUp
+          ? 'Your Main Wake-Up Alarm: this counts toward your morning streak.'
+          : 'Counts toward All alarms (only your Main Wake-Up Alarm counts toward the morning streak).'}
+      </ThemedText>
     </>
   );
 }

@@ -118,6 +118,15 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - Duplicate protection on two levels. The database has `UNIQUE (alarm_id, scheduled_at)`, plus a partial unique index allowing only one active occurrence per alarm. Every status change is a compare-and-set (`UPDATE … WHERE status = <expected>`), so an occurrence completes at most once. Future XP must be awarded per occurrence ID, which makes double rewards impossible.
 - `/alarm/[occurrenceId]` is the shared full-screen ringing screen. "Recent mornings" (`/alarms/history`) lists the latest 30 occurrences.
 
+## Missions (Phase 1 maths, Phase 3A quizzes)
+
+`src/features/missions/` holds each mission's pure session logic and its screen. An alarm stores its mission as JSON (`AlarmMission`: `none`, `math`, or `quiz` with `category`, `difficulty` and `questionCount`), so new mission types need no schema change. A finished mission produces one `MissionResult` (Maths result, or a quiz result with `type: 'quiz'`). It goes through the same `completeMission` → accountability → progression path, so XP, the Challenge bonus, Main Wake-Up rules and backup all work unchanged.
+
+- **Quiz content:** curated packs bundled with the app (`quiz/packs/*.ts`), always offline, never generated at runtime. The engine asks a `QuestionSource` for a topic and difficulty, so downloaded, topic or age-adapted packs can be added later as another source. Question IDs are permanent (`gk-e-002`); history refers to them.
+- **Selection:** a seeded shuffle, preferring questions not in the "recently asked" list (300 IDs, stored in `app_settings`). When a pool runs short, the questions asked longest ago come back first.
+- **Flow:** one question at a time. Choose, see right or wrong with a short explanation, then go to the next. The quiz completes after the last question whatever the score; the score is shown and kept for review.
+- **XP:** in `PROGRESSION_POLICY`. Every quiz topic counts as Education; base XP per mission type, plus `difficultyBonusXp`, plus the existing `modeBonusXp`.
+
 ## Progression (Phase 2A, device-local)
 
 `src/features/progress/` turns the morning history into XP, streaks, ranks and achievements, entirely on the phone.

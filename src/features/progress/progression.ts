@@ -45,7 +45,7 @@ export function xpForMorning(o: AlarmOccurrence, policy: ProgressionPolicy): XpE
   const category = policy.missionCategory[o.mission.type];
   const at = earnedAt(o);
   const entries: XpEntry[] = [];
-  const base = policy.missionXp[o.mission.type];
+  const base = policy.missionXp[o.mission.type] + policy.difficultyBonusXp[o.mission.difficulty];
   if (base > 0) {
     entries.push({ key: `occ:${o.id}:mission`, occurrenceId: o.id, category, amount: base, reason: 'mission_completed', earnedAt: at });
   }

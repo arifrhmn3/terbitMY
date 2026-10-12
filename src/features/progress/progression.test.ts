@@ -68,8 +68,8 @@ describe('XP for one morning', () => {
   it('uses the policy, so beta can change values and categories without code changes', () => {
     const policy: ProgressionPolicy = {
       ...PROGRESSION_POLICY,
-      missionCategory: { math: 'fitness' },
-      missionXp: { math: 7 },
+      missionCategory: { math: 'fitness', quiz: 'fitness' },
+      missionXp: { math: 7, quiz: 7 },
       modeBonusXp: { reward: 1, gentle: 0, challenge: 0 },
     };
     const xp = xpForMorning(morning(1, 'completed'), policy);

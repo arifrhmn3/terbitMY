@@ -91,6 +91,21 @@ export function createProgressEngine(deps: {
       const repo = await repository();
       return { xp: await repo.listXp(), unlocked: await repo.listUnlocked() };
     },
+    /**
+     * Everything one occurrence earned, for its result screen: its XP lines
+     * (mission, mode bonus) and the achievements it unlocked (with their
+     * bonus XP). Runs the engine first, so it's also how the award happens.
+     */
+    async awardsForOccurrence(occurrenceId: string): Promise<{ xp: XpEntry[]; achievements: AchievementUnlock[] }> {
+      await sync();
+      const repo = await repository();
+      const achievements = (await repo.listUnlocked()).filter((u) => u.occurrenceId === occurrenceId);
+      const keys = new Set(achievements.map((u) => `ach:${u.id}`));
+      const xp = (await repo.listXp()).filter(
+        (e) => (e.occurrenceId === occurrenceId && e.reason !== 'achievement') || keys.has(e.key),
+      );
+      return { xp, achievements };
+    },
     /** XP earned by one morning (for its "Morning complete" screen). */
     async xpForOccurrence(occurrenceId: string): Promise<XpEntry[]> {
       await sync();
