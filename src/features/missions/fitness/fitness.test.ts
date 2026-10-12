@@ -6,7 +6,7 @@ import { toHistoryEntry } from '@/features/alarms/history';
 import { buildMorning } from '@/features/progress/example-mornings';
 
 import { MISSION_DIFFICULTIES, isFitnessResult, isMathResult, isQuizResult } from '../types';
-import { EXERCISES, FITNESS_COUNTDOWN_MS, FITNESS_TARGETS, fitnessTarget, formatTarget } from './exercises';
+import { EXERCISES, FITNESS_CATALOGUES, FITNESS_COUNTDOWN_MS, FITNESS_TARGETS, fitnessTarget, formatTarget } from './exercises';
 import {
   countdownLeft,
   createFitnessSession,
@@ -21,7 +21,7 @@ import {
   tickFitness,
   type FitnessSession,
 } from './session';
-import { FITNESS_EXERCISES } from './types';
+import { FITNESS_EXERCISES, MOBILITY_PROFILES } from './types';
 
 const T0 = 1_000_000;
 const ACTIVE = T0 + FITNESS_COUNTDOWN_MS;
@@ -34,14 +34,21 @@ function tapReps(s: FitnessSession, count: number, from: number, gapMs: number) 
 }
 
 describe('exercise catalogue and targets', () => {
-  it('has the five exercises: three rep-based, two timed', () => {
-    expect(FITNESS_EXERCISES).toEqual(['pushups', 'squats', 'jumping_jacks', 'stretch', 'walk_in_place']);
-    expect(FITNESS_EXERCISES.filter((e) => EXERCISES[e].kind === 'reps')).toEqual(['pushups', 'squats', 'jumping_jacks']);
-    expect(FITNESS_EXERCISES.filter((e) => EXERCISES[e].kind === 'timed')).toEqual(['stretch', 'walk_in_place']);
+  it('the Standard catalogue has the five exercises: three rep-based, two timed', () => {
+    const standard = FITNESS_CATALOGUES.standard;
+    expect(standard).toEqual(['pushups', 'squats', 'jumping_jacks', 'stretch', 'walk_in_place']);
+    expect(standard.filter((e) => EXERCISES[e].kind === 'reps')).toEqual(['pushups', 'squats', 'jumping_jacks']);
+    expect(standard.filter((e) => EXERCISES[e].kind === 'timed')).toEqual(['stretch', 'walk_in_place']);
+  });
+
+  it('every activity belongs to exactly one Mobility Profile catalogue', () => {
+    const all = MOBILITY_PROFILES.flatMap((p) => FITNESS_CATALOGUES[p]);
+    expect([...all].sort()).toEqual([...FITNESS_EXERCISES].sort());
+    for (const p of MOBILITY_PROFILES) for (const e of FITNESS_CATALOGUES[p]) expect(EXERCISES[e].profile).toBe(p);
   });
 
   it('maps difficulty to the prototype targets, rising with difficulty', () => {
-    expect(FITNESS_TARGETS).toEqual({
+    expect(FITNESS_TARGETS).toMatchObject({
       pushups: { easy: 5, medium: 10, hard: 20 },
       squats: { easy: 10, medium: 20, hard: 30 },
       jumping_jacks: { easy: 15, medium: 30, hard: 50 },
@@ -58,9 +65,6 @@ describe('exercise catalogue and targets', () => {
     expect(formatTarget('stretch', 'easy')).toBe('30 sec');
   });
 
-  it('every exercise is ready for an accessible alternative (reduced mobility)', () => {
-    for (const e of FITNESS_EXERCISES) expect(EXERCISES[e].reducedMobilityAlternative).toBeTruthy();
-  });
 });
 
 describe('rep-based missions', () => {
@@ -101,7 +105,6 @@ describe('rep-based missions', () => {
         achieved: target,
         durationMs: target * 1000,
         verification: 'self_reported',
-        adaptation: 'standard',
       });
       // Extra taps after completion change nothing.
       expect(recordRep(done, ACTIVE + target * 1000 + 5000).outcome).toBe('not_active');

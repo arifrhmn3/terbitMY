@@ -24,7 +24,7 @@ export function RingingStatus() {
 
   return (
     <Notice
-      title={capabilities.status === 'not-implemented' ? 'Alarms can’t ring here' : 'Permission needed'}
+      title={capabilities.status === 'not-implemented' ? 'Alarms can’t ring here' : 'Alarm access needed'}
       description={capabilities.summary}
     />
   );

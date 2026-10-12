@@ -1,44 +1,75 @@
 import type { MissionDifficulty } from '../types';
 
-export type FitnessExercise = 'pushups' | 'squats' | 'jumping_jacks' | 'stretch' | 'walk_in_place';
+/**
+ * The user's Mobility Profile (Settings → Accessibility; later also asked
+ * during onboarding). Each profile has its own catalogue of activities.
+ */
+export type MobilityProfile = 'standard' | 'reduced_mobility' | 'non_physical';
 
-export const FITNESS_EXERCISES: readonly FitnessExercise[] = ['pushups', 'squats', 'jumping_jacks', 'stretch', 'walk_in_place'];
+export const MOBILITY_PROFILES: readonly MobilityProfile[] = ['standard', 'reduced_mobility', 'non_physical'];
 
-/** Rep-based (count each repetition) or timed (keep going until the timer ends). */
-export type FitnessKind = 'reps' | 'timed';
+/** Standard catalogue. */
+export type StandardExercise = 'pushups' | 'squats' | 'jumping_jacks' | 'stretch' | 'walk_in_place';
+/** Reduced-mobility catalogue. */
+export type ReducedMobilityExercise = 'wall_push' | 'chair_sit_to_stand' | 'step_out' | 'seated_stretch' | 'seated_marching';
+/** Non-physical catalogue: neutral accountability activities, not exercise. */
+export type NonPhysicalActivity = 'controlled_breathing' | 'number_focus' | 'hold_release' | 'grounding';
+
+/** Every Fitness-mission activity, from any catalogue (what an alarm and a result store). */
+export type FitnessExercise = StandardExercise | ReducedMobilityExercise | NonPhysicalActivity;
+
+export const FITNESS_EXERCISES: readonly FitnessExercise[] = [
+  'pushups',
+  'squats',
+  'jumping_jacks',
+  'stretch',
+  'walk_in_place',
+  'wall_push',
+  'chair_sit_to_stand',
+  'step_out',
+  'seated_stretch',
+  'seated_marching',
+  'controlled_breathing',
+  'number_focus',
+  'hold_release',
+  'grounding',
+];
 
 /**
- * How the mission is adapted for the person doing it. Only 'standard' exists
- * in Phase 3B. Planned additions (accessibility, Phase 3D):
- * 'reduced_mobility' (e.g. wall push-ups, chair squats, seated stretch) and
- * 'non_physical' (swap for an Education mission). Stored with the mission,
- * so adding them needs no data change.
+ * How progress is counted:
+ * - reps: one deliberate tap per repetition;
+ * - timed: keep going until the timer ends (optionally with guided cues);
+ * - holds: press and hold, then release (each long-enough hold counts);
+ * - sequence: tap the numbers in order (each completed round counts).
  */
-export type FitnessAdaptation = 'standard';
+export type FitnessKind = 'reps' | 'timed' | 'holds' | 'sequence';
 
 /**
- * How the result is known. Phase 3B is self-reported only (no camera); a
- * later camera/pose-detection mode would record 'verified'.
+ * How the result is known. Movement is self-reported (no camera); a later
+ * camera/pose-detection mode would record 'verified'. The number-focus task
+ * checks each tap: 'task_checked'.
  */
-export type FitnessVerification = 'self_reported';
+export type FitnessVerification = 'self_reported' | 'task_checked';
 
 export type FitnessMissionConfig = {
   exercise: FitnessExercise;
   difficulty: MissionDifficulty;
-  adaptation?: FitnessAdaptation;
+  /** "Get ready" countdown in ms (accessibility pacing). Default: FITNESS_COUNTDOWN_MS. */
+  countdownMs?: number;
 };
 
 export type FitnessMissionResult = {
   type: 'fitness';
+  /** The activity actually done (its catalogue tells the Mobility Profile). */
   exercise: FitnessExercise;
   difficulty: MissionDifficulty;
   kind: FitnessKind;
-  /** Reps, or seconds for timed exercises. */
+  /** Reps, seconds, holds or rounds, depending on `kind`. */
   target: number;
-  /** Reps counted, or seconds completed. */
   achieved: number;
   /** From Start (after the countdown) to done, in ms. */
   durationMs: number;
   verification: FitnessVerification;
-  adaptation: FitnessAdaptation;
+  /** Only on results saved before Phase 3D (always 'standard'). */
+  adaptation?: 'standard';
 };

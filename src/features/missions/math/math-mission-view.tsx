@@ -4,6 +4,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { Button } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { DisplayTextMaxScale } from '@/constants/text-scale';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -59,7 +60,7 @@ export function MathMissionView({ config, onComplete }: MathMissionViewProps) {
         Question {session.currentIndex + 1} of {session.questions.length}
       </ThemedText>
       <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText style={styles.prompt} accessibilityLabel={`What is ${question.prompt}?`}>
+        <ThemedText style={styles.prompt} maxFontSizeMultiplier={DisplayTextMaxScale} accessibilityLabel={`What is ${question.prompt}?`}>
           {question.prompt} = ?
         </ThemedText>
         <TextInput

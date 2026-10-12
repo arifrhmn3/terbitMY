@@ -163,7 +163,7 @@ Branch `phase-3/fitness-missions`. ✅ **Complete and verified on iPhone (12 Oct
 | Marked self-reported everywhere (editor, mission, result, history); no camera or pose detection | ✅ |
 | Fitness XP via central policy: 10 + difficulty bonus + existing Challenge bonus; awarded once; Fitness rank; "First Fitness mission" achievement | ✅ Unit-tested |
 | Main Wake-Up rule unchanged: non-main fitness alarms earn XP and count in All alarms only | ✅ Unit-tested |
-| Accessibility-ready model: `adaptation` field + reduced-mobility alternative per exercise (built in 3D) | ✅ Data model only |
+| Accessibility groundwork (replaced in 3D by Mobility Profile catalogues) | ✅ |
 | Practice for every mission from the Alarms tab; development builds can launch any type/exercise/difficulty directly | ✅ |
 
 No database migration (missions are stored as JSON). Maths and Quiz unchanged.
@@ -191,6 +191,24 @@ Branch `phase-3/faith-missions`. ✅ **Built and verified on iPhone (12 Oct 2026
 | Developer tools (practice screen): tradition, test date, theme, duration (incl. 15 s test), force offline, force fallback music, prepare now | ✅ Developer-only |
 
 **Changes needing action:** new native packages `expo-audio`, `expo-file-system`, `expo-asset` → **new iOS development build required**. SQLite migration 9 (`faith_content_cache`, automatic). Supabase: run `supabase/migrations/20261012120000_faith_preference_and_reflection_music.sql` and upload the three placeholder tracks (see docs/REFLECTION-MUSIC.md). Android: no work done (deferred).
+
+## Phase 3D: Settings, Permissions & Accessibility
+
+Branch `phase-3/settings-permissions-accessibility`. ✅ **Built and verified on iPhone (12 Oct 2026)**: Settings index, Permissions (real status, Open iPhone Settings), Gentle follow-ups automatic for Gentle only, Mobility Profile catalogues with equal XP, Extended pacing, Reduce Motion and Larger Text followed as iPhone preferences (not permissions), persistence, alarms unchanged. UX map: [docs/UX-INVENTORY.md](docs/UX-INVENTORY.md).
+
+| Item | Status |
+|---|---|
+| Settings index: Account · Alarms & missions (Faith) · Notifications · Accessibility · Privacy & data · Developer (dev builds only) · About; current value under each row; placeholder pages removed | ✅ Unit-tested (routes exist, no duplicates, dev hidden) |
+| Permissions: alarms + notifications status as reported (unknown never shown as allowed), Allow (only if never asked), Open iPhone Settings; audio needs none; microphone/camera not used and never requested | ✅ Unit-tested |
+| Reminders: alarm-critical explained; Gentle follow-ups are part of Gentle mode (no switch; Reward and Challenge never send one); planned optional notifications listed, not switchable | ✅ Unit-tested |
+| Mobility Profile (Standard / Reduced mobility / Non-physical), a personal setting (onboarding-ready). Each profile has its own Fitness catalogue; Non-physical: controlled breathing, number focus, hold and release, grounding (not exercise). Same XP at the same difficulty | ✅ Unit-tested |
+| Mission pacing Normal / Extended (Fitness “get ready” 3 s → 10 s; targets unchanged) | ✅ Unit-tested |
+| Reduce Motion: fade transitions; large text: stacked rows, list choices, capped display numbers | ✅ Built |
+| Your data (privacy) screen; Developer tools consolidated | ✅ Built |
+
+**Changes needing action:** a small native addition (reading the notification permission, `getReminderPermissionAsync` in the TerbitAlarms module) → **new iOS development build required** (until then the Permissions screen says notifications “can’t check on this version”). No new packages, no migration, no Supabase change. Android: no work done (deferred).
+
+**Open product decision (not changed in 3D):** fully non-physical activities currently earn **Fitness XP** (and count toward the Fitness rank), so accessibility choices aren’t penalised. Whether they should be named or counted differently (e.g. a neutral “Wellbeing” discipline) is a later product/UX decision.
 
 ## Beta requirements (must be done before public beta)
 

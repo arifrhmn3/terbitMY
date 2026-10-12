@@ -126,19 +126,28 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - **Selection:** a seeded shuffle, preferring questions not in the "recently asked" list (300 IDs, stored in `app_settings`). When a pool runs short, the questions asked longest ago come back first.
 - **Flow:** one question at a time. Choose, see right or wrong with a short explanation, then go to the next. The quiz completes after the last question whatever the score; the score is shown and kept for review.
 - **XP:** in `PROGRESSION_POLICY`. Every quiz topic counts as Education; base XP per mission type, plus `difficultyBonusXp`, plus the existing `modeBonusXp`.
-- **Fitness (Phase 3B):** `{ type: 'fitness', exercise, difficulty, adaptation? }`. It uses two reusable building blocks, rep-based (push-ups, squats, jumping jacks) and timed (stretch, walk in place), in `fitness/session.ts`. They are pure functions of timestamps, so backgrounding or a slow screen can't distort time.
+- **Fitness (Phase 3B, catalogues in 3D):** `{ type: 'fitness', exercise, difficulty }` (`adaptation` only on alarms saved before 3D). It uses four reusable building blocks in `fitness/session.ts`: reps, timed (with optional guided cues), holds, and number sequence. They are pure functions of timestamps, so backgrounding or a slow screen can't distort time.
   - Reps need one deliberate tap each; taps faster than `minRepIntervalMs` are ignored.
-  - Timers run from the end of a 3-second countdown and can be paused.
+  - Timers run from the end of a “get ready” countdown (3 s; 10 s with Extended pacing) and can be paused.
   - Results are marked `self_reported`; there's no camera yet.
   - Targets and anti-tap limits live in `fitness/exercises.ts`.
   - XP counts toward Fitness.
-  - `adaptation` and `reducedMobilityAlternative` reserve space for the accessibility options (Phase 3D).
+  - Accessibility (Phase 3D): a user-level **Mobility Profile** (Standard / Reduced mobility / Non-physical) and `missionPacing` in `features/accessibility`. Each profile has its own catalogue (`FITNESS_CATALOGUES` in `exercises.ts`); screens show only the current catalogue. An alarm saved under another profile runs the activity in the same place in the current catalogue (`activityForProfile`, internal only; `missionForProfile`, `fitnessConfigFor`, `ProfileFitnessMission`). Non-physical activities are never called exercise; number focus is `task_checked`. XP never depends on the profile.
 - **Faith (Phase 3C):** `src/features/faith/`. Separate missions, each Faith XP once per occurrence: `{ type: recitation, tradition }`, `{ type: reflection, difficulty }` (difficulty = length), and `{ type: recitation_reflection, tradition, difficulty }` (Recitation then Reflection, one occurrence; `combined.ts`). `completeMission` only accepts a result of the alarm’s own mission type. Later Reflections on the same day are alternates (`reflection/sessions.ts`). Details: [FAITH-CONTENT.md](FAITH-CONTENT.md), [REFLECTION-MUSIC.md](REFLECTION-MUSIC.md).
   - Faith settings (primary preference, explore other traditions, display) in `app_settings`; private (`privacy.ts`); backed up to the private profile by the sync engine’s `profile` entity.
   - Daily schedules (`schedule.ts`): explicit entries + rotations, stored as layers so a newer schedule never changes past/today/tomorrow.
   - Recitation text via `FaithContentProvider` (`recitation/content.ts`), cached exactly in `faith_content_cache` (migration 9, checksum). `RecitationLibrary.forMission` never touches the network (cache → local fallback); `prepare` prefetches; `open` serves the Recitation archive (`recitation/archive.ts`; Recitation only).
   - Reflection music via `ReflectionMusicProvider` (bundled/cached → download → stream → fallback), files in `src/services/file-cache`, playback in `src/services/audio` (expo-audio: silent-mode playback, exclusive audio focus, no background audio).
   - `createFaithServices` wires it all; `faith.ts` / `faith.web.ts` pass the platform pieces; `useFaithPrefetch` (root layout) keeps today and tomorrow on the phone.
+
+## Settings, permissions and accessibility (Phase 3D)
+
+- **Settings index** (`features/settings/settings-index.ts`): groups → one sub-screen per page under `src/app/(tabs)/settings/`. Each setting lives on one screen only. Developer tools are a single development-build-only screen.
+- **Preferences** (`features/settings/preference-store.ts`): small typed groups in `app_settings` (`accessibility.settings`), normalised on read, phone-only (never synced). Faith keeps its own store.
+- **Notifications** (`features/notifications/notification-catalogue.ts`): alarm-critical (AlarmKit, not a preference) vs mission reminders (Gentle follow-ups: part of Gentle mode, automatic, no switch; Reward and Challenge never send them) vs optional engagement (planned; they become preferences when built).
+- **Permissions** (`services/permissions` reads/requests; `features/permissions` maps to plain statuses). Reading never asks; asking only on tap, and only if never asked. Unknown is shown as unknown, never as allowed. Microphone and camera have no request path. iPhone Settings opens with `Linking.openSettings()`.
+- **Motion and text** (`services/accessibility`, `features/accessibility/system-preferences.ts`, `hooks/use-large-text`, `constants/text-scale`): iPhone preferences, not permissions. Read only, shown as "Follows iPhone setting" (plus the value when the iPhone reports one), with the iPhone Settings path as help; Terbit never opens Settings for them (no supported link). Reduce Motion → fade transitions; large text → stacked rows and list-style choices; display numbers capped at 1.5×.
+- UX map and known issues: [UX-INVENTORY.md](UX-INVENTORY.md).
 
 ## Progression (Phase 2A, device-local)
 

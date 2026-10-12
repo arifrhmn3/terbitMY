@@ -10,6 +10,8 @@ import {
   formatAlarmTime,
   type Alarm,
 } from '@/features/alarms/alarm';
+import { missionForProfile } from '@/features/accessibility/accessibility-settings';
+import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { useTheme } from '@/hooks/use-theme';
 
 type AlarmRowProps = {
@@ -20,11 +22,12 @@ type AlarmRowProps = {
 /** One saved alarm in the list. Tap to edit; the switch turns it on or off. */
 export function AlarmRow({ alarm, onToggle }: AlarmRowProps) {
   const theme = useTheme();
+  const { value: access } = useAccessibilitySettings();
   const time = formatAlarmTime(alarm);
   const details = [
     alarm.label,
     describeRepeat(alarm.weekdays),
-    describeMission(alarm.mission),
+    describeMission(missionForProfile(alarm.mission, access.mobilityProfile)),
     alarm.mission.type !== 'none' ? COMPLETION_MODE_LABEL[alarm.completionMode] : null,
   ]
     .filter(Boolean)

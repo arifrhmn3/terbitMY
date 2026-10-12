@@ -4,7 +4,6 @@ import { ComingSoon } from '@/components/coming-soon';
 import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
-import { ProgressDevPanel } from '@/features/progress/components/progress-dev-panel';
 import { plural, rankDetail, xpEntryDetail, xpEntryTitle } from '@/features/progress/format';
 import { CATEGORIES, CATEGORY_LABEL, PROGRESSION_POLICY, type Category } from '@/features/progress/policy';
 import { useProgressSummary } from '@/features/progress/use-progress';
@@ -17,7 +16,7 @@ const CATEGORY_ICON: Record<Category, SymbolViewProps['name']> = {
 
 /** Streaks, XP, ranks and achievements, worked out on this phone from your mornings. */
 export default function ProgressScreen() {
-  const { summary, error, refresh } = useProgressSummary();
+  const { summary, error } = useProgressSummary();
 
   if (!summary) {
     return (
@@ -133,8 +132,6 @@ export default function ProgressScreen() {
         <ListRow icon={{ ios: 'sunrise', android: 'wb_twilight', web: 'wb_twilight' }} title="Average wake-up" value="—" />
       </Section>
       <ComingSoon phase={4} description="Sleep and bedtime insights arrive with the bedtime routine." />
-
-      {__DEV__ && <ProgressDevPanel summary={summary} onChange={refresh} />}
     </Screen>
   );
 }

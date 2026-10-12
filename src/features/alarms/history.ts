@@ -2,7 +2,7 @@ import { evaluateMorning, MODE_POLICIES } from './accountability';
 import { describeMission, formatAlarmTime } from './alarm';
 import type { AlarmOccurrence } from './occurrence';
 import { REFLECTION_THEME_LABEL } from '@/features/faith/reflection/types';
-import { EXERCISES, formatSeconds } from '@/features/missions/fitness/exercises';
+import { EXERCISES, formatAmount, formatSeconds } from '@/features/missions/fitness/exercises';
 import {
   isCombinedFaithResult,
   isFitnessResult,
@@ -64,8 +64,8 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
       if (isQuizResult(result)) {
         done += ` · ${result.correctCount}/${result.questionCount} correct`;
       } else if (isFitnessResult(result)) {
-        const amount = result.kind === 'reps' ? `${result.achieved} reps` : formatSeconds(result.achieved);
-        done += ` · ${EXERCISES[result.exercise].label} ${amount} (self-reported)`;
+        const how = result.verification === 'task_checked' ? 'checked' : 'self-reported';
+        done += ` · ${EXERCISES[result.exercise].label} ${formatAmount(result.exercise, result.achieved)} (${how})`;
       } else if (isRecitationResult(result)) {
         done += ` · ${result.reference} (self-reported)`;
       } else if (isReflectionResult(result)) {

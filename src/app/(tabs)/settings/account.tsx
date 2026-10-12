@@ -9,7 +9,6 @@ import { Section } from '@/components/section';
 import { Spacing } from '@/constants/theme';
 import { account, useAccount, useSyncStatus } from '@/features/account/account';
 import { SignInForm } from '@/features/account/components/sign-in-form';
-import { SyncDevPanel } from '@/features/account/components/sync-dev-panel';
 import { syncStatusLabel } from '@/features/sync/status-label';
 import { syncEngine } from '@/features/sync/sync';
 import { useTheme } from '@/hooks/use-theme';
@@ -98,8 +97,6 @@ export default function AccountScreen() {
           </Section>
         </>
       )}
-
-      {__DEV__ && status !== 'unavailable' && <SyncDevPanel />}
     </Screen>
   );
 }

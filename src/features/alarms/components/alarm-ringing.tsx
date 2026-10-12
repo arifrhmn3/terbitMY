@@ -7,6 +7,7 @@ import { Button } from '@/components/button';
 import { Notice } from '@/components/notice';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { DisplayTextMaxScale } from '@/constants/text-scale';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { evaluateMorning, MODE_POLICIES } from '@/features/alarms/accountability';
 import { describeMission, formatAlarmTime } from '@/features/alarms/alarm';
@@ -16,7 +17,10 @@ import { OccurrenceError } from '@/features/alarms/occurrence-manager';
 import { CombinedFaithMissionView, CombinedFaithResultSummary } from '@/features/faith/combined-mission-view';
 import { RecitationMissionView, RecitationResultSummary } from '@/features/faith/recitation/recitation-view';
 import { ReflectionMissionView, ReflectionResultSummary } from '@/features/faith/reflection/reflection-mission-view';
-import { FitnessMissionView, FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
+import { missionForProfile } from '@/features/accessibility/accessibility-settings';
+import { ProfileFitnessMission } from '@/features/accessibility/profile-fitness-mission';
+import { useAccessibilitySettings } from '@/features/settings/use-preferences';
+import { FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
 import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
 import {
@@ -213,6 +217,7 @@ function Ringing(props: {
 }) {
   const { occurrence, busy, onStart, onDismiss } = props;
   const now = useNow();
+  const { value: access } = useAccessibilitySettings();
   const hasMission = occurrence.mission.type !== 'none';
   const mode = occurrence.completionMode;
   const scheduled = clock(new Date(occurrence.scheduledAt));
@@ -233,12 +238,12 @@ function Ringing(props: {
   return (
     <>
       <View style={styles.hero}>
-        <ThemedText style={styles.clock} accessibilityRole="header">
+        <ThemedText style={styles.clock} maxFontSizeMultiplier={DisplayTextMaxScale} accessibilityRole="header">
           {clock(now)}
         </ThemedText>
         <ThemedText type="headline">{occurrence.alarmLabel || 'Alarm'}</ThemedText>
         <ThemedText themeColor="textSecondary">{alarmLine}</ThemedText>
-        <ThemedText themeColor="textSecondary">{describeMission(occurrence.mission)}</ThemedText>
+        <ThemedText themeColor="textSecondary">{describeMission(missionForProfile(occurrence.mission, access.mobilityProfile))}</ThemedText>
       </View>
 
       {hasMission && (
@@ -311,10 +316,7 @@ function Mission(props: {
         />
       )}
       {mission.type === 'fitness' && (
-        <FitnessMissionView
-          config={{ exercise: mission.exercise, difficulty: mission.difficulty, adaptation: mission.adaptation }}
-          onComplete={onComplete}
-        />
+        <ProfileFitnessMission config={{ exercise: mission.exercise, difficulty: mission.difficulty }} onComplete={onComplete} />
       )}
       {mission.type === 'recitation' && <RecitationMissionView config={{ tradition: mission.tradition }} onComplete={onComplete} />}
       {mission.type === 'reflection' && <ReflectionMissionView config={{ difficulty: mission.difficulty }} onComplete={onComplete} />}

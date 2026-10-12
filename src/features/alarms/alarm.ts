@@ -1,7 +1,7 @@
 import { FAITH_POLICY } from '@/features/faith/policy';
 import { TRADITION_LABEL, type FaithTradition } from '@/features/faith/types';
 import { EXERCISES, formatSeconds, formatTarget } from '@/features/missions/fitness/exercises';
-import type { FitnessAdaptation, FitnessExercise } from '@/features/missions/fitness/types';
+import type { FitnessExercise } from '@/features/missions/fitness/types';
 import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
 import { QUIZ_CATEGORY_LABEL, type QuizCategory } from '@/features/missions/quiz/types';
 import { DIFFICULTY_LABEL, type MissionDifficulty, type MissionQuestionCount } from '@/features/missions/types';
@@ -30,7 +30,8 @@ export type AlarmMission =
   | { type: 'none' }
   | { type: 'math'; difficulty: MathDifficulty; questionCount: MathQuestionCount }
   | { type: 'quiz'; category: QuizCategory; difficulty: MissionDifficulty; questionCount: MissionQuestionCount }
-  | { type: 'fitness'; exercise: FitnessExercise; difficulty: MissionDifficulty; adaptation?: FitnessAdaptation }
+  /** Fitness: an activity from the user's Mobility Profile catalogue (`adaptation` only on alarms saved before Phase 3D). */
+  | { type: 'fitness'; exercise: FitnessExercise; difficulty: MissionDifficulty; adaptation?: 'standard' }
   /** Faith: today's Daily Recitation for the tradition (chosen by Terbit's schedule, not stored here). */
   | { type: 'recitation'; tradition: FaithTradition }
   /** Faith: today's guided Reflection / Meditation; difficulty is the session length. */

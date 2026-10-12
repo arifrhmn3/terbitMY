@@ -12,6 +12,8 @@ import { SwitchRow } from '@/components/switch-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
+import { ProfileFitnessMission } from '@/features/accessibility/profile-fitness-mission';
+import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { FaithDevPanel } from '@/features/faith/components/faith-dev-panel';
 import { primaryTradition } from '@/features/faith/faith-settings';
 import { CombinedFaithMissionView, CombinedFaithResultSummary } from '@/features/faith/combined-mission-view';
@@ -20,8 +22,8 @@ import { ReflectionMissionView, ReflectionResultSummary } from '@/features/faith
 import { REFLECTION_THEME_LABEL, REFLECTION_THEMES, type ReflectionTheme } from '@/features/faith/reflection/types';
 import { FAITH_TRADITIONS, isTradition, TRADITION_LABEL, type FaithTradition } from '@/features/faith/types';
 import { useFaithDev, useFaithSettings } from '@/features/faith/use-faith';
-import { FitnessMissionView, FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
-import { EXERCISES } from '@/features/missions/fitness/exercises';
+import { FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
+import { activityForProfile, catalogueFor, EXERCISES } from '@/features/missions/fitness/exercises';
 import { FITNESS_EXERCISES, type FitnessExercise } from '@/features/missions/fitness/types';
 import { MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
@@ -65,9 +67,12 @@ export default function PracticeMissionScreen() {
   const faithSettings = useFaithSettings();
   const dev = useFaithDev();
   const [kind, setKind] = useState<PracticeKind>(PRACTICE_KINDS.find((k) => k === params.mission) ?? 'math');
-  const [exercise, setExercise] = useState<FitnessExercise>(
-    FITNESS_EXERCISES.find((e) => e === params.exercise) ?? 'squats',
+  const [chosenExercise, setExercise] = useState<FitnessExercise>(
+    FITNESS_EXERCISES.find((e) => e === params.exercise) ?? 'pushups',
   );
+  // Fitness practice uses the user's Mobility Profile catalogue.
+  const { value: access } = useAccessibilitySettings();
+  const exercise = activityForProfile(chosenExercise, access.mobilityProfile);
   const [category, setCategory] = useState<QuizCategory>(QUIZ_CATEGORIES.find((c) => c === params.category) ?? 'general');
   const [tradition, setTradition] = useState<FaithTradition>(
     isTradition(params.tradition) ? params.tradition : (primaryTradition(faithSettings) ?? 'islam'),
@@ -126,7 +131,7 @@ export default function PracticeMissionScreen() {
           )}
           {kind === 'fitness' && (
             <ChoiceRow
-              options={FITNESS_EXERCISES.map((e) => ({ value: e, label: EXERCISES[e].short }))}
+              options={catalogueFor(access.mobilityProfile).map((e) => ({ value: e, label: EXERCISES[e].short }))}
               value={exercise}
               onChange={(next) => {
                 setExercise(next);
@@ -224,7 +229,7 @@ export default function PracticeMissionScreen() {
           onComplete={setResult}
         />
       ) : kind === 'fitness' ? (
-        <FitnessMissionView key={round} config={{ exercise, difficulty }} onComplete={setResult} />
+        <ProfileFitnessMission key={round} config={{ exercise, difficulty }} onComplete={setResult} />
       ) : kind === 'quiz' ? (
         <QuizMissionView
           key={round}
