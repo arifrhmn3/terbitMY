@@ -35,3 +35,8 @@ export const handOff = createAlarmHandOff({
 export function useAlarms() {
   return useAlarmStore(alarmStore);
 }
+
+/** Every saved alarm, read straight from SQLite (for cloud backup; doesn't touch the screens' state). */
+export async function listSavedAlarms() {
+  return createSqliteAlarmRepository(await getDatabase()).list();
+}

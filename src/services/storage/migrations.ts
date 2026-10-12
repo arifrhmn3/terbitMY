@@ -72,6 +72,53 @@ export const migrations: readonly string[] = [
     value TEXT NOT NULL,
     updated_at INTEGER NOT NULL
   );`,
+
+  // 6: progression (Phase 2A). An append-only XP ledger and unlocked
+  // achievements. Each award has a unique key (e.g. 'occ:<id>:mission'), so
+  // the same morning can never earn XP twice. Alarms and occurrences are
+  // untouched; streaks and summaries are derived from occurrences.
+  `CREATE TABLE IF NOT EXISTS xp_ledger (
+    award_key TEXT PRIMARY KEY NOT NULL,
+    occurrence_id TEXT,
+    category TEXT,
+    amount INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    earned_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS xp_ledger_earned_at ON xp_ledger (earned_at);
+  CREATE TABLE IF NOT EXISTS achievements (
+    id TEXT PRIMARY KEY NOT NULL,
+    unlocked_at INTEGER NOT NULL,
+    occurrence_id TEXT,
+    created_at INTEGER NOT NULL
+  );`,
+
+  // 7: morning accountability. Each occurrence records whether it was the
+  // Main Wake-Up Alarm when it fired; only those count as "mornings". Older
+  // rows didn't record it, so they're filled in ONCE from the alarm's main
+  // setting at upgrade time (deleted alarms: not main), then frozen. The
+  // developer seed's example mornings ('dev-seed', no alarm row) are mornings.
+  `ALTER TABLE alarm_occurrences ADD COLUMN is_main_wake_up INTEGER NOT NULL DEFAULT 0;
+  UPDATE alarm_occurrences
+     SET is_main_wake_up = CASE
+       WHEN alarm_id = 'dev-seed' THEN 1
+       ELSE COALESCE((SELECT is_primary FROM alarms WHERE alarms.id = alarm_occurrences.alarm_id), 0)
+     END;`,
+
+  // 8: cloud sync (Phase 2B). What has already been backed up, per account:
+  // a fingerprint of each record's content when it was last sent. A record
+  // is "pending" when it has no row here or its content changed since. Local
+  // records themselves are untouched and have no account attached, so signing
+  // out never deletes anything.
+  `CREATE TABLE IF NOT EXISTS sync_state (
+    user_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    synced_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, entity, entity_id)
+  );`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

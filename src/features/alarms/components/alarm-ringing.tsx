@@ -16,6 +16,9 @@ import { OccurrenceError } from '@/features/alarms/occurrence-manager';
 import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import type { MathMissionResult } from '@/features/missions/math/session';
 import { useTheme } from '@/hooks/use-theme';
+import { CATEGORY_LABEL } from '@/features/progress/policy';
+import { progress } from '@/features/progress/progress';
+import type { XpEntry } from '@/features/progress/progression';
 import { getReminderService } from '@/services/notifications';
 
 function useNow(intervalMs = 1000) {
@@ -296,6 +299,31 @@ function MorningComplete({ occurrence }: { occurrence: AlarmOccurrence }) {
   const result = occurrence.result?.kind === 'mission_completed' ? occurrence.result.mission : null;
   const finishedAt = occurrence.endedAt;
   const tookMs = finishedAt !== null && occurrence.startedAt !== null ? finishedAt - occurrence.startedAt : null;
+  const eligible = evaluateMorning(occurrence).rewardEligible;
+  const [earned, setEarned] = useState<XpEntry[] | null>(null);
+
+  // Awards this morning's XP (idempotent: reopening this screen never awards it twice).
+  useEffect(() => {
+    if (!eligible) return;
+    let current = true;
+    progress
+      .xpForOccurrence(occurrence.id)
+      .then((entries) => current && setEarned(entries))
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [eligible, occurrence.id]);
+
+  let rewardLine = 'This morning doesn’t qualify for rewards (no mission was set).';
+  if (eligible) {
+    const total = earned?.reduce((sum, e) => sum + e.amount, 0) ?? 0;
+    const category = earned?.find((e) => e.category)?.category;
+    rewardLine =
+      earned === null
+        ? 'Counting your XP…'
+        : `+${total} XP${category ? ` · ${CATEGORY_LABEL[category]}` : ''}. This morning counts toward your streak.`;
+  }
 
   return (
     <>
@@ -306,10 +334,8 @@ function MorningComplete({ occurrence }: { occurrence: AlarmOccurrence }) {
         {tookMs !== null && (
           <ThemedText themeColor="textSecondary">From alarm to done: {formatDuration(tookMs)}</ThemedText>
         )}
-        <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-          {evaluateMorning(occurrence).rewardEligible
-            ? 'This morning qualifies for rewards and streaks (coming in Phase 2).'
-            : 'This morning doesn’t qualify for rewards (no mission was set).'}
+        <ThemedText type={eligible ? 'smallBold' : 'small'} themeColor={eligible ? 'tint' : 'textSecondary'} style={styles.center}>
+          {rewardLine}
         </ThemedText>
       </ThemedView>
       <Button title="Done" onPress={close} />

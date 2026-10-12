@@ -27,7 +27,7 @@ export default function RecentMorningsScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Recent mornings', headerLargeTitleEnabled: false }} />
-      <Section footer="Saved on this phone only. Only a completed mission counts toward a streak (Phase 2).">
+      <Section footer="Saved on this phone only. Only a completed mission earns XP and counts toward your streak (see Progress).">
         {entries === null && <Message text="Loading…" />}
         {entries?.length === 0 && <Message text="No mornings yet. Simulate an alarm from an alarm’s settings to try it." />}
         {entries?.map((entry) => <HistoryRow key={entry.id} entry={entry} />)}
@@ -55,7 +55,8 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
       </ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         {entry.source}
-        {good ? ' · Counts toward streak' : ''}
+        {entry.mainWakeUp ? ' · Main wake-up' : ''}
+        {good && entry.mainWakeUp ? ' · Counts toward morning streak' : ''}
       </ThemedText>
       {entry.completion && (
         <ThemedText type="small" themeColor="textSecondary">

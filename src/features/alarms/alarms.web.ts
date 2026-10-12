@@ -31,3 +31,8 @@ export const handOff = createAlarmHandOff({
 export function useAlarms() {
   return useAlarmStore(alarmStore);
 }
+
+/** Every saved alarm (for cloud backup). */
+export async function listSavedAlarms() {
+  return repository.list();
+}

@@ -62,6 +62,13 @@ export type AlarmOccurrence = {
   status: OccurrenceStatus;
   /** Copied from the alarm when the occurrence is created. */
   alarmLabel: string;
+  /**
+   * Whether this was the user's Main Wake-Up Alarm when it fired. Copied from
+   * the alarm at that moment and never re-read, so changing the main alarm
+   * later doesn't rewrite history. Only these occurrences are "mornings"
+   * (morning counters and the morning streak).
+   */
+  isMainWakeUp: boolean;
   mission: AlarmMission;
   snoozeMinutes: number | null;
   completionMode: CompletionMode;
@@ -112,6 +119,7 @@ export function createOccurrence(params: {
     fireEvidence: params.fireEvidence ?? (source === 'simulated' ? 'app' : 'system'),
     status: 'scheduled',
     alarmLabel: alarm.label,
+    isMainWakeUp: alarm.isPrimary,
     mission: alarm.mission,
     snoozeMinutes: alarm.snooze.enabled ? alarm.snooze.minutes : null,
     completionMode: alarm.completionMode,

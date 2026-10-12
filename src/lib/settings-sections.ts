@@ -1,6 +1,7 @@
 import type { SymbolViewProps } from 'expo-symbols';
 
-export type SettingsSectionId = 'notifications' | 'privacy' | 'accessibility' | 'account';
+/** Placeholder sections for later phases. Account has its own screen (settings/account.tsx). */
+export type SettingsSectionId = 'notifications' | 'privacy' | 'accessibility';
 
 export type SettingsSection = {
   id: SettingsSectionId;
@@ -12,18 +13,6 @@ export type SettingsSection = {
 };
 
 export const settingsSections: SettingsSection[] = [
-  {
-    id: 'account',
-    title: 'Account',
-    summary: 'Sign in, sync and data export',
-    icon: { ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' },
-    phase: 2,
-    plannedItems: [
-      'Sign in with Apple, Google or email',
-      'Sync progress across devices',
-      'Export or delete your data',
-    ],
-  },
   {
     id: 'notifications',
     title: 'Notifications',

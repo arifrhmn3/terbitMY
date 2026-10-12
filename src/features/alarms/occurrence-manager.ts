@@ -185,6 +185,18 @@ export function createOccurrenceManager(
       await expireStale();
       return (await getRepository()).listRecent(limit);
     },
+    /** Every morning due since `since`, oldest first, after closing any past their deadline. */
+    async listSince(since: number) {
+      await expireStale();
+      return (await getRepository()).listSince(since);
+    },
+    /**
+     * DEVELOPER TOOL ONLY: stores a ready-made past morning (seed data for
+     * the progression panel). Throws `DuplicateOccurrenceError` if it exists.
+     */
+    async insertForTesting(occurrence: AlarmOccurrence) {
+      await (await getRepository()).insert(occurrence);
+    },
   };
 }
 
