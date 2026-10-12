@@ -1,122 +1,118 @@
 # Reflection / Meditation music
 
-Design for the background music used by the Reflection / Meditation mission (Phase 3C). Recorded 12 Oct 2026, before Phase 3C starts. Nothing here is built yet.
+The background music for the Reflection / Meditation mission. Designed on 12 Oct 2026 and **built in Phase 3C**, using development placeholder tracks only. Content rules for Faith missions are in [FAITH-CONTENT.md](FAITH-CONTENT.md).
 
 ## Product requirement
 
 - Every Reflection / Meditation session plays a deep-relaxation background track.
-- There is **one canonical daily track**. All users on the same calendar day get the same track, and it changes every day so each day's session feels distinct.
-- The track is **universal** and not tied to religion. Recitation stays faith-specific.
-- Music plays continuously under all guided prompts. It never restarts between prompts.
+- There is **one canonical daily track**. Everyone on the same calendar day gets the same track, and it changes every day so each day's session feels distinct.
+- The track is **universal**, not tied to any religion. Recitation stays faith-specific.
+- The music plays continuously under all guided prompts and never restarts between them.
 - A daily session has a daily theme, guided prompts, today's track, a session duration, and earns **Faith XP** when completed.
 - **The mission must never depend on live internet.**
 
 ## Architecture
 
 ```
-calendar date ─► Terbit daily track ID ─► ReflectionMusicProvider ─► local asset (cached or bundled) ─► player
-2026-10-12        reflection-track-004      resolves + caches           file:///…/reflection-track-004.m4a
+calendar date ─► Daily Reflection (theme, prompt set, track ID) ─► ReflectionMusicProvider ─► playable source ─► player
+2026-10-12        gratitude · gratitude-1 · reflection-001          resolves + caches          file:///…/reflection-001.wav
 ```
 
-Terbit owns the schedule (date → track ID). The provider only turns a track ID into something playable. The provider can be replaced later without changing the schedule, the mission screen, or the session logic. Provider "random track" endpoints are never used.
+Terbit owns the schedule (date → track ID). The provider only turns a track ID into something playable, so it can be replaced later without changing the schedule, the mission screen or the session logic. A provider's "random track" endpoint is never used.
+
+| Piece | File |
+|---|---|
+| Daily schedule (theme, prompts, track) | `src/features/faith/reflection/schedule.ts` (layered history, see below) |
+| Provider + resolution order | `src/features/faith/reflection/music/provider.ts` |
+| Catalogue + licence metadata | `src/features/faith/reflection/music/catalogue.ts`, `music/types.ts` |
+| Remote location | `music/config.ts`: default `<Supabase URL>/storage/v1/object/public/reflection-music`, or `EXPO_PUBLIC_REFLECTION_MUSIC_BASE_URL` |
+| Saved files | `src/services/file-cache` (the app's cache folder; download to a temporary name, then rename) |
+| Player | `src/services/audio/meditation-player.ts` (`expo-audio`) |
+| Session screen | `src/features/faith/reflection/reflection-mission-view.tsx` |
 
 ### Daily schedule
 
-- The **calendar date** is the phone's local date, the same `dayKey` the Progress Engine uses. So "same day, same track" holds within a time zone, and users in other time zones get the track for their own date.
-- The schedule is **published data, not a formula**: a versioned list of `date → trackId` entries, bundled with the app and later updatable from Supabase. Adding tracks to the catalogue never changes a past day's track.
-- For dates past the end of the published schedule, a fixed fallback rotation applies (days since an anchor date, modulo a **frozen** list of track IDs for that schedule version). It's deterministic, so every phone agrees offline.
-- Planned location: `src/features/missions/reflection/music/schedule.ts`. It's pure and unit-tested.
+- The **calendar date** is the phone's local date, the same one the Progress Engine uses. "Same day, same track" holds within a time zone; users elsewhere get the track for their own date.
+- A published schedule is data: explicit `date → value` entries plus rotation segments over frozen lists. It's deterministic, so every phone agrees offline.
+- **Newer schedules are added as layers that only apply after tomorrow.** A past day's track, and today's and tomorrow's, can never change, even when a newer schedule is bundled or downloaded later. Adding tracks to the catalogue never changes history.
 
-### `ReflectionMusicProvider`
+### Resolution order (`ReflectionMusicProvider.resolve`)
 
-```ts
-type ReflectionMusicProvider = {
-  /** Track metadata (title, duration, licence flags). Never shown in full to users. */
-  metadata(trackId: TrackId): Promise<ReflectionTrack | null>;
-  /** Best playable URI right now. Never throws, and never waits on the network
-   *  longer than a short timeout: it falls back instead. */
-  resolve(trackId: TrackId, opts: { online: boolean }): Promise<ResolvedTrack>;
-  /** Download + cache, only if the track's licence allows local caching. */
-  prefetch(trackId: TrackId): Promise<'cached' | 'not_permitted' | 'failed'>;
-  isAvailableOffline(trackId: TrackId): Promise<boolean>;
-};
+1. The track is **bundled** (and its licence allows bundling) or **already cached**: play it from the phone.
+2. Network allowed, and the licence permits caching: **download, cache, play** (with a timeout).
+3. Network allowed, archive only, and the licence permits streaming: **stream** it.
+4. Otherwise: the **bundled fallback** track (recorded as `musicSource: 'fallback'`).
 
-type ResolvedTrack = {
-  uri: string;
-  trackId: TrackId;            // the track actually played (may be the fallback)
-  source: 'bundled' | 'cache' | 'stream' | 'fallback';
-  requestedTrackId: TrackId;
-};
-```
+**Alarm missions resolve with no network at all.** They play today's track if it's on the phone, else the fallback, so they never wait. The licence flags on each track decide steps 2 and 3, so a future provider that forbids caching streams automatically, with no UI change.
 
-Resolution order:
+### Today and later sessions
 
-1. The requested track is **bundled** or **already cached**: play it.
-2. **Online**, and the licence allows caching: download, cache, play.
-3. **Online**, and the licence allows streaming but not caching: stream it. This is for archive days only, never today.
-4. Otherwise: the **bundled fallback** track. The session records `source: 'fallback'`.
+There's **no Reflection archive**: past days' sessions are never listed or browsable. Reflection can be used several times a day:
+- The first session of the day plays today's track.
+- A later session that day is a fresh session drawn from earlier days' Reflections, usually with a different track. See [FAITH-CONTENT.md](FAITH-CONTENT.md#several-reflection-sessions-in-one-day).
 
-The licence flags on each track decide steps 2 and 3. A future provider that forbids caching therefore streams automatically, with no UI change.
-
-### Today vs archive
-
-| | Today | Previous days (archive) |
+| | Today's track | A later session's track |
 |---|---|---|
-| Fetching | Prefetched ahead of time (app open, alarm saved, the night before) when caching is permitted | Fetched on demand |
-| No internet | Cached copy, else the bundled fallback. The session always runs | Cached copy if any, else a "needs internet" note with an offer to use the fallback |
-| Caching after fetch | If permitted | Only if permitted. Streaming otherwise |
+| Fetching | Prefetched ahead of time (today and tomorrow): at start-up, when the app comes to the front, and when alarms or Faith settings change | Already on the phone if it was prefetched on an earlier day, otherwise fetched when played (practice only) |
+| No internet | Cached copy, else the bundled fallback. The session always runs | Cached copy, else the bundled fallback |
+| After fetching | Cached, if the licence permits | Cached, if the licence permits |
 
-The cache is bounded (for example, today, tomorrow and a few recent days) and pruned. Cached files live in the app's cache directory, and losing them is harmless.
+The provider still supports an `archive` purpose (it streams when caching isn't permitted), but no screen uses it now.
 
-### Playback
+Cached files live in the app's cache folder; if iOS clears them, nothing breaks. With only three small placeholder tracks the cache isn't pruned yet. Add pruning (keep today, tomorrow and recent days) together with the production catalogue.
 
-- **One player is owned by the session**, not by the prompt components, so moving between prompts never restarts the music.
-- The track loops if it's shorter than the session, with a gentle fade-in and fade-out.
-- The audio API is chosen at build time from the Expo SDK 57 docs (likely `expo-audio`; verify before use). Open decisions: whether music plays when the silent switch is on, and whether it mixes with other audio.
-- No background audio. The session pauses with the app, like the fitness timer.
+### Playback on iOS (`expo-audio`)
+
+- **Plays even when the silent switch is on** (`playsInSilentMode: true`). The user deliberately started an audio-guided session.
+- **Takes audio focus** (`interruptionMode: 'doNotMix'`). Spotify, Apple Music and other audio pause instead of mixing. When the session ends, Terbit releases audio (`setIsAudioActiveAsync(false)`) so other apps can carry on.
+- **One player per session**, owned by the session screen, looping. Prompt changes never touch it. It fades in at the start and fades out at the end.
+- **No background audio** (`shouldPlayInBackground: false`; the config plugin has `enableBackgroundPlayback: false`). Leaving the app pauses both the session and the music; the user taps Resume.
+- **No microphone:** the config plugin sets `microphonePermission: false` and `recordAudioAndroid: false`.
+- This needed a native package (`expo-audio`, plus `expo-file-system` and `expo-asset`), so **a new iOS development build is required**. No Android work was done; Android follows in the parity phase.
 
 ### Track metadata (licensing)
 
-```ts
-type ReflectionTrack = {
-  id: TrackId;                     // internal Terbit ID, e.g. 'reflection-track-004'
-  title: string;
-  durationSec: number;
-  provider: string;                // 'terbit-bundled' | 'terbit-storage' | future provider
-  externalAssetId: string | null;
-  licence: {
-    type: string;                  // e.g. 'dev-placeholder', 'stock-commercial', 'commissioned', 'terbit-owned'
-    referenceUrl: string | null;
-    attributionRequired: boolean;
-    attributionText: string | null;
-    commercialAppUse: boolean;
-    localCachingPermitted: boolean;
-    offlineBundlingPermitted: boolean;
-    streamingPermitted: boolean;
-    acquiredOn: string | null;     // YYYY-MM-DD
-    notes: string;
-  };
-  approval: 'dev_placeholder' | 'production_approved';
-};
-```
+Each track (`ReflectionTrack`) stores:
+- its internal Terbit ID, title and duration;
+- its provider/source and external asset ID;
+- **licence:** type, reference URL, whether attribution is required (and the attribution text), commercial app use, local caching, offline bundling, streaming, date acquired, and notes;
+- approval: `dev_placeholder` or `production_approved`;
+- provenance notes.
 
-The normal UI shows only the title, plus attribution where a licence requires it. Full licensing details appear only in developer diagnostics.
+The normal UI shows only the title (with "(development placeholder)" while placeholders are in use). Licensing details are never shown to users.
 
-## Development placeholders
+## Development placeholders (in use now)
 
-Keep this as small as possible, just enough to prove daily selection, continuous playback, caching, fallback and archive behaviour:
+| ID | Title | Where | Length |
+|---|---|---|---|
+| `reflection-fallback` | Soft Horizon | Bundled in the app (`assets/audio/reflection-fallback.wav`) | 32 s loop |
+| `reflection-001` | Still Water | Supabase Storage bucket `reflection-music` | 48 s loop |
+| `reflection-002` | Morning Mist | same | 48 s loop |
+| `reflection-003` | Quiet Field | same | 48 s loop |
 
-- **1 bundled fallback track** (short seamless loop).
-- **2–3 "remote" tracks** in a Terbit-controlled location (planned: a Supabase Storage bucket on the existing project), used to test download, cache, offline and archive behaviour.
+All four were **generated by Terbit** with `scripts/generate-placeholder-music.mjs`: soft synthesised sine pads, no samples and no third-party music. Every one is marked `approval: 'dev_placeholder'`, `licence.type: 'dev-placeholder'` and `commercialAppUse: false`. **They're never production-approved.** `unapprovedTracks()` (tested) lists every track not marked `production_approved`, and it must return nothing before beta.
 
-To keep the rights unambiguous, placeholders will be **generated by us** (a simple synthesised ambient pad or soft noise), not taken from the internet. Every placeholder is marked `approval: 'dev_placeholder'` and `licence.type: 'dev-placeholder'`.
+### One-time setup: upload the placeholder tracks
 
-**Placeholders are never production-approved.** A catalogue check (unit test and release gate) lists every track not marked `production_approved`. Before beta it must find none.
+Without this step, sessions still work but always play the bundled fallback.
+
+1. In Supabase, open the **SQL Editor**. Run `supabase/migrations/20261012120000_faith_preference_and_reflection_music.sql`. It creates the public, read-only `reflection-music` bucket, and adds the private `faith_preference` profile column.
+2. Go to **Storage → reflection-music → Upload files**. Upload the three files from `supabase/storage/reflection-music/` (`reflection-001.wav`, `reflection-002.wav`, `reflection-003.wav`).
 
 ## Licensing rules
 
 - Don't scrape, download or redistribute music from Spotify, Apple Music, YouTube or any consumer streaming service.
-- Don't assume online "royalty-free" music may be redistributed or cached inside a commercial app. Every track needs a licence that covers Terbit MY's actual usage model.
+- Don't assume online "royalty-free" music may be redistributed or cached inside a commercial app. Every track needs a licence covering Terbit MY's actual usage.
+
+## Long-term direction (deferred to beta / polish)
+
+The current preferred direction:
+- generate original instrumental relaxation tracks with an AI music generator whose terms grant appropriate commercial rights;
+- keep the catalogue metadata (the source of truth) in GitHub;
+- host the production audio in object storage or a CDN, possibly Supabase Storage;
+- keep generation, licensing and provenance records for every track.
+
+Nothing about this is built yet. The provider and catalogue structure already support it.
 
 ## Beta requirement: Production Reflection Music Catalogue and Licensing Approval
 
@@ -125,6 +121,6 @@ Before public beta or any public distribution, choose one of these:
 - **A.** A stock-music provider whose licence explicitly permits commercial mobile-app use, playback, and the intended caching and download behaviour.
 - **B.** A custom or commercial licence from a music provider for Terbit MY.
 - **C.** Original music commissioned for Terbit MY, with written commercial rights covering worldwide mobile-app use, streaming and playback, local caching, redistribution as part of the app experience, and use after the commissioning agreement ends.
-- **D.** Original music owned by Terbit.
+- **D.** Original music owned by Terbit. This includes AI-generated tracks only where the generator's terms give Terbit those rights; record this in each track's provenance.
 
-Every production track must have a confirmed licence recorded in its metadata, with `approval: 'production_approved'`. The development placeholders must be replaced or removed.
+Every production track needs a confirmed licence recorded in its metadata, with `approval: 'production_approved'`. The development placeholders must be replaced or removed.

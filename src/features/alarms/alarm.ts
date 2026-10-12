@@ -1,4 +1,6 @@
-import { EXERCISES, formatTarget } from '@/features/missions/fitness/exercises';
+import { FAITH_POLICY } from '@/features/faith/policy';
+import { TRADITION_LABEL, type FaithTradition } from '@/features/faith/types';
+import { EXERCISES, formatSeconds, formatTarget } from '@/features/missions/fitness/exercises';
 import type { FitnessAdaptation, FitnessExercise } from '@/features/missions/fitness/types';
 import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
 import { QUIZ_CATEGORY_LABEL, type QuizCategory } from '@/features/missions/quiz/types';
@@ -28,7 +30,18 @@ export type AlarmMission =
   | { type: 'none' }
   | { type: 'math'; difficulty: MathDifficulty; questionCount: MathQuestionCount }
   | { type: 'quiz'; category: QuizCategory; difficulty: MissionDifficulty; questionCount: MissionQuestionCount }
-  | { type: 'fitness'; exercise: FitnessExercise; difficulty: MissionDifficulty; adaptation?: FitnessAdaptation };
+  | { type: 'fitness'; exercise: FitnessExercise; difficulty: MissionDifficulty; adaptation?: FitnessAdaptation }
+  /** Faith: today's Daily Recitation for the tradition (chosen by Terbit's schedule, not stored here). */
+  | { type: 'recitation'; tradition: FaithTradition }
+  /** Faith: today's guided Reflection / Meditation; difficulty is the session length. */
+  | { type: 'reflection'; difficulty: MissionDifficulty }
+  /** Faith: today's Recitation, then a Reflection (difficulty is its length). One occurrence, one reward. */
+  | { type: 'recitation_reflection'; tradition: FaithTradition; difficulty: MissionDifficulty };
+
+/** Missions with a difficulty setting (every type except Recitation, whose length comes from the daily passage). */
+export function missionDifficulty(mission: AlarmMission): MissionDifficulty | null {
+  return mission.type === 'none' || mission.type === 'recitation' ? null : mission.difficulty;
+}
 
 export type SnoozeMinutes = 5 | 10 | 15;
 export const SNOOZE_MINUTES: readonly SnoozeMinutes[] = [5, 10, 15];
@@ -139,6 +152,13 @@ export function describeRepeat(weekdays: readonly Weekday[]): string {
 
 export function describeMission(mission: AlarmMission): string {
   if (mission.type === 'none') return 'No mission';
+  if (mission.type === 'recitation') return `Recitation · ${TRADITION_LABEL[mission.tradition]} · Daily passage`;
+  if (mission.type === 'reflection') {
+    return `Reflection · ${DIFFICULTY_LABEL[mission.difficulty]} · ${formatSeconds(FAITH_POLICY.reflection.durationSec[mission.difficulty])}`;
+  }
+  if (mission.type === 'recitation_reflection') {
+    return `Recitation + Reflection · ${TRADITION_LABEL[mission.tradition]} · ${formatSeconds(FAITH_POLICY.reflection.durationSec[mission.difficulty])}`;
+  }
   const level = DIFFICULTY_LABEL[mission.difficulty];
   if (mission.type === 'fitness') {
     return `${EXERCISES[mission.exercise].label} · ${level} · ${formatTarget(mission.exercise, mission.difficulty)}`;

@@ -90,7 +90,7 @@ export type AlarmOccurrence = {
 /** Active occurrences are closed this long after the alarm was due (Gentle mode allows longer). */
 export const MISSED_AFTER_MS = 60 * 60 * 1000;
 
-export type TransitionError = 'already-finished' | 'invalid-transition' | 'mission-required' | 'no-mission';
+export type TransitionError = 'already-finished' | 'invalid-transition' | 'mission-required' | 'no-mission' | 'wrong-mission';
 
 export type TransitionResult = { ok: true; occurrence: AlarmOccurrence } | { ok: false; error: TransitionError };
 
@@ -195,6 +195,10 @@ export function completeMission(
   mission: MissionResult,
   now: number,
 ): TransitionResult {
+  // Only the alarm's own mission completes it (a Recitation alone never completes
+  // Recitation + Reflection). Maths results predate the `type` field.
+  const resultType = (mission as { type?: string }).type ?? 'math';
+  if (resultType !== occurrence.mission.type) return { ok: false, error: 'wrong-mission' };
   return move(
     occurrence,
     ['mission_in_progress'],

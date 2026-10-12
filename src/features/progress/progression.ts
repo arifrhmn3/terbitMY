@@ -1,4 +1,5 @@
 import { evaluateMorning } from '@/features/alarms/accountability';
+import { missionDifficulty } from '@/features/alarms/alarm';
 import type { AlarmOccurrence } from '@/features/alarms/occurrence';
 
 import { daysBetween, type DayKey, type DayKeyFn } from './day';
@@ -45,7 +46,8 @@ export function xpForMorning(o: AlarmOccurrence, policy: ProgressionPolicy): XpE
   const category = policy.missionCategory[o.mission.type];
   const at = earnedAt(o);
   const entries: XpEntry[] = [];
-  const base = policy.missionXp[o.mission.type] + policy.difficultyBonusXp[o.mission.difficulty];
+  const difficulty = missionDifficulty(o.mission);
+  const base = policy.missionXp[o.mission.type] + (difficulty ? policy.difficultyBonusXp[difficulty] : 0);
   if (base > 0) {
     entries.push({ key: `occ:${o.id}:mission`, occurrenceId: o.id, category, amount: base, reason: 'mission_completed', earnedAt: at });
   }

@@ -25,6 +25,8 @@ export type CloudProfile = {
   displayName: string | null;
   avatarUrl: string | null;
   timezone: string | null;
+  /** PRIVATE (owner-only). Never shown to other users or used in social features. */
+  faithPreference: string | null;
 };
 
 /** Row shapes sent to the cloud (snake_case, as in the Supabase tables). */

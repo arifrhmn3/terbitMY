@@ -118,7 +118,7 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - Duplicate protection on two levels. The database has `UNIQUE (alarm_id, scheduled_at)`, plus a partial unique index allowing only one active occurrence per alarm. Every status change is a compare-and-set (`UPDATE … WHERE status = <expected>`), so an occurrence completes at most once. Future XP must be awarded per occurrence ID, which makes double rewards impossible.
 - `/alarm/[occurrenceId]` is the shared full-screen ringing screen. "Recent mornings" (`/alarms/history`) lists the latest 30 occurrences.
 
-## Missions (Phase 1 maths, 3A quizzes, 3B fitness)
+## Missions (Phase 1 maths, 3A quizzes, 3B fitness, 3C faith)
 
 `src/features/missions/` holds each mission's pure session logic and its screen. An alarm stores its mission as JSON (`AlarmMission`: `none`, `math`, or `quiz` with `category`, `difficulty` and `questionCount`), so new mission types need no schema change. A finished mission produces one `MissionResult` (Maths result, or a quiz result with `type: 'quiz'`). It goes through the same `completeMission` → accountability → progression path, so XP, the Challenge bonus, Main Wake-Up rules and backup all work unchanged.
 
@@ -133,6 +133,12 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
   - Targets and anti-tap limits live in `fitness/exercises.ts`.
   - XP counts toward Fitness.
   - `adaptation` and `reducedMobilityAlternative` reserve space for the accessibility options (Phase 3D).
+- **Faith (Phase 3C):** `src/features/faith/`. Separate missions, each Faith XP once per occurrence: `{ type: recitation, tradition }`, `{ type: reflection, difficulty }` (difficulty = length), and `{ type: recitation_reflection, tradition, difficulty }` (Recitation then Reflection, one occurrence; `combined.ts`). `completeMission` only accepts a result of the alarm’s own mission type. Later Reflections on the same day are alternates (`reflection/sessions.ts`). Details: [FAITH-CONTENT.md](FAITH-CONTENT.md), [REFLECTION-MUSIC.md](REFLECTION-MUSIC.md).
+  - Faith settings (primary preference, explore other traditions, display) in `app_settings`; private (`privacy.ts`); backed up to the private profile by the sync engine’s `profile` entity.
+  - Daily schedules (`schedule.ts`): explicit entries + rotations, stored as layers so a newer schedule never changes past/today/tomorrow.
+  - Recitation text via `FaithContentProvider` (`recitation/content.ts`), cached exactly in `faith_content_cache` (migration 9, checksum). `RecitationLibrary.forMission` never touches the network (cache → local fallback); `prepare` prefetches; `open` serves the Recitation archive (`recitation/archive.ts`; Recitation only).
+  - Reflection music via `ReflectionMusicProvider` (bundled/cached → download → stream → fallback), files in `src/services/file-cache`, playback in `src/services/audio` (expo-audio: silent-mode playback, exclusive audio focus, no background audio).
+  - `createFaithServices` wires it all; `faith.ts` / `faith.web.ts` pass the platform pieces; `useFaithPrefetch` (root layout) keeps today and tomorrow on the phone.
 
 ## Progression (Phase 2A, device-local)
 

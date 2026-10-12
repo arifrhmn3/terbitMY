@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-export type SyncEntity = 'alarm' | 'occurrence' | 'xp' | 'achievement';
+export type SyncEntity = 'alarm' | 'occurrence' | 'xp' | 'achievement' | 'profile';
 
 /**
  * What has already been backed up for each account: entity ID → content

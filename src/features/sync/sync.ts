@@ -1,6 +1,7 @@
 import { AppState } from 'react-native';
 
 import { alarmStore, handOff, listSavedAlarms, occurrences } from '@/features/alarms/alarms';
+import { faith } from '@/features/faith/faith';
 import { progress } from '@/features/progress/progress';
 import { getCloud } from '@/services/cloud';
 import { getDatabase } from '@/services/storage/database';
@@ -17,6 +18,8 @@ export const syncEngine = createSyncEngine({
     occurrences: () => occurrences.listSince(0),
     xp: async () => (await progress.ledger()).xp,
     achievements: async () => (await progress.ledger()).unlocked,
+    // Private: backed up to the user's own profile only (see features/faith/privacy.ts).
+    privateProfile: async () => ({ faithPreference: (await faith.settings.get()).primary }),
   },
   store: cloud?.store ?? null,
   state: {
@@ -70,6 +73,7 @@ export function startCloudSync() {
   });
   alarmStore.subscribe(() => requestSync());
   progress.subscribe(() => requestSync());
+  faith.settings.subscribe(() => requestSync());
   // Alarm hand-off runs record fired, stopped and dismissed mornings.
   handOff.subscribe(() => requestSync());
   requestSync(0);

@@ -101,6 +101,7 @@ Settings → Account → Delete account calls it, signs out, and **keeps the pho
    2. Restart `npm start`.
 6. *(Before beta)* **Email delivery:** Supabase's built-in email sends only a few messages per hour, which is fine for testing. Set up custom SMTP (Authentication → Emails → SMTP Settings) before inviting testers.
 7. *(Optional)* **Check the security rules:** run `supabase/tests/rls_check.sql` after two test accounts exist.
+8. **Phase 3C (Faith):** SQL Editor → run `supabase/migrations/20261012120000_faith_preference_and_reflection_music.sql` (adds the PRIVATE `profiles.faith_preference` column and the public, read-only `reflection-music` Storage bucket). Then Storage → `reflection-music` → upload the three files in `supabase/storage/reflection-music/` (development placeholder music).
 
 For EAS cloud builds, add the same two variables as EAS environment variables (`EXPO_PUBLIC_…`). `.env.local` stays on your computer.
 

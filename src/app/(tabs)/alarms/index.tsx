@@ -64,8 +64,9 @@ export default function AlarmsScreen() {
         />
         <ListRow
           icon={{ ios: 'book', android: 'menu_book', web: 'menu_book' }}
-          title="Recitation & reflection"
-          subtitle="Coming later: read or recite a passage, then reflect"
+          title="Faith"
+          subtitle="Today’s Recitation and Reflection / Meditation, and the archive"
+          href="/alarms/faith"
         />
       </Section>
 
@@ -75,7 +76,7 @@ export default function AlarmsScreen() {
 
       <ComingSoon
         phase={1}
-        description="Snooze, more alarm sounds and more missions are still to come."
+        description="Snooze and more alarm sounds are still to come."
       />
     </Screen>
   );

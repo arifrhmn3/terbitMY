@@ -119,6 +119,17 @@ export const migrations: readonly string[] = [
     synced_at INTEGER NOT NULL,
     PRIMARY KEY (user_id, entity, entity_id)
   );`,
+  // 9: faith content cache (Phase 3C). Recitation passages fetched ahead of
+  // time (today, tomorrow) or opened from the archive, stored exactly as the
+  // source provided them, with a checksum so altered text is never shown.
+  `CREATE TABLE IF NOT EXISTS faith_content_cache (
+    provider TEXT NOT NULL,
+    content_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    checksum TEXT NOT NULL,
+    cached_at INTEGER NOT NULL,
+    PRIMARY KEY (provider, content_id)
+  );`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

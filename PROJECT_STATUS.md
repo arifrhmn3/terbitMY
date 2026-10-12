@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 11 October 2026_
+_Last updated: 12 October 2026_
 
 ## Current phase
 
@@ -168,6 +168,32 @@ Branch `phase-3/fitness-missions`. ✅ **Complete and verified on iPhone (12 Oct
 
 No database migration (missions are stored as JSON). Maths and Quiz unchanged.
 
+## Phase 3C: Faith Missions
+
+Branch `phase-3/faith-missions`. ✅ **Built and verified on iPhone (12 Oct 2026)**: Recitation, Reflection and Recitation + Reflection alarms, XP once, Recitation-only archive, same-day Reflection rotation, silent-switch playback and audio focus, offline/fallback, persistence, and Recitation paging with the current-page progress bar. Design and rules: [docs/FAITH-CONTENT.md](docs/FAITH-CONTENT.md), [docs/REFLECTION-MUSIC.md](docs/REFLECTION-MUSIC.md).
+
+| Item | Status |
+|---|---|
+| Faith preference (6 choices) in Settings → Faith; works for guests; private (never social/public/analytics); synced to the private profile only when signed in | ✅ Unit-tested · Supabase column needs the new SQL (below) |
+| “Explore other faith traditions” (default OFF), separate from the primary preference | ✅ Unit-tested |
+| Faith missions in the alarm editor (Faith → Recitation / Reflection / Both); default follows the preference | ✅ Built |
+| Recitation + Reflection: one occurrence, Recitation then Reflection, one Faith reward; a single stage can’t complete it | ✅ Unit-tested |
+| Several Reflections a day: first is today’s session, later ones are fresh alternates from earlier days (no repeat in a row, no Reflection history) | ✅ Unit-tested |
+| Daily Recitation: one per tradition per local date, Terbit-owned layered schedule (history never changes), future dates refused | ✅ Unit-tested |
+| `FaithContentProvider` abstraction; text stored/shown exactly (checksum-protected cache); review states draft → approved | ✅ Unit-tested · **development fixtures only (placeholder text, not scripture)** |
+| Recitation flow: Begin → pages with progress → confirm (self-reported, no microphone); transliteration/translation display settings, translation always one tap away | ✅ Unit-tested |
+| Offline first: today’s and tomorrow’s passage prefetched; alarm missions never wait on the network; local fallback passage | ✅ Unit-tested |
+| Recitation archive (last 30 days, Recitation only): needs internet the first time, then saved | ✅ Unit-tested |
+| Reflection / Meditation for everyone: daily theme + prompts + track, settle → prompts → closing intention, Easy 45 s / Medium 2 min / Hard 4 min (central policy), pause/resume | ✅ Unit-tested |
+| `ReflectionMusicProvider`: bundled/cached → download → stream (archive purpose, unused by screens) → bundled fallback; licence metadata; placeholders never production-approved | ✅ Unit-tested |
+| iOS audio: plays in silent mode, pauses other apps’ audio, continuous under prompts, no background audio, no microphone | ✅ Built · needs iPhone test |
+| Faith XP for both (once, Faith Rank, Total XP, restart-safe), Challenge bonus, Main Wake-Up rule, “First Faith mission” | ✅ Unit-tested |
+| Developer tools (practice screen): tradition, test date, theme, duration (incl. 15 s test), force offline, force fallback music, prepare now | ✅ Developer-only |
+
+**Changes needing action:** new native packages `expo-audio`, `expo-file-system`, `expo-asset` → **new iOS development build required**. SQLite migration 9 (`faith_content_cache`, automatic). Supabase: run `supabase/migrations/20261012120000_faith_preference_and_reflection_music.sql` and upload the three placeholder tracks (see docs/REFLECTION-MUSIC.md). Android: no work done (deferred).
+
 ## Beta requirements (must be done before public beta)
+
+- **Faith Content Sources and Review Approval.** Choose trusted sources per tradition (with licences covering display, caching and offline fallback) and qualified reviewers; ship only `approved` content; remove all development fixtures. See [docs/FAITH-CONTENT.md](docs/FAITH-CONTENT.md).
 
 - **Production Reflection Music Catalogue and Licensing Approval.** Every production Reflection / Meditation track needs a confirmed licence permitting Terbit MY’s actual usage (commercial app use, playback, caching/offline as used). Development placeholder tracks are never production-approved. Options A–D and the design: [docs/REFLECTION-MUSIC.md](docs/REFLECTION-MUSIC.md).
