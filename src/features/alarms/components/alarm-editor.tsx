@@ -25,6 +25,8 @@ import {
   type CompletionMode,
 } from '@/features/alarms/alarm';
 import { alarmStore, occurrences } from '@/features/alarms/alarms';
+import { EXERCISES, formatTarget } from '@/features/missions/fitness/exercises';
+import { FITNESS_EXERCISES } from '@/features/missions/fitness/types';
 import { QUIZ_CATEGORIES, QUIZ_CATEGORY_LABEL, QUIZ_CATEGORY_SHORT } from '@/features/missions/quiz/types';
 import {
   DIFFICULTY_LABEL,
@@ -50,6 +52,7 @@ type AlarmEditorProps = {
 const missionOptions: { value: AlarmMission['type']; label: string }[] = [
   { value: 'math', label: 'Maths' },
   { value: 'quiz', label: 'Quiz' },
+  { value: 'fitness', label: 'Fitness' },
   { value: 'none', label: 'None' },
 ];
 
@@ -59,18 +62,23 @@ const countOptions = MISSION_QUESTION_COUNTS.map((count) => ({ value: count, lab
 const gentleOptions = GENTLE_REMINDER_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 const snoozeOptions = SNOOZE_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 
-/** Switching mission type keeps the difficulty and question count already chosen. */
+const exerciseOptions = FITNESS_EXERCISES.map((exercise) => ({ value: exercise, label: EXERCISES[exercise].short }));
+
+/** Switching mission type keeps the difficulty (and question count) already chosen. */
 function missionOfType(type: AlarmMission['type'], current: AlarmMission): AlarmMission {
   const difficulty: MissionDifficulty = current.type === 'none' ? 'easy' : current.difficulty;
-  const questionCount: MissionQuestionCount = current.type === 'none' ? 3 : current.questionCount;
+  const questionCount: MissionQuestionCount = current.type === 'math' || current.type === 'quiz' ? current.questionCount : 3;
   if (type === 'math') return { type: 'math', difficulty, questionCount };
   if (type === 'quiz') return { type: 'quiz', category: current.type === 'quiz' ? current.category : 'general', difficulty, questionCount };
+  if (type === 'fitness') return { type: 'fitness', exercise: current.type === 'fitness' ? current.exercise : 'squats', difficulty };
   return { type: 'none' };
 }
 
 const MISSION_FOOTER: Record<AlarmMission['type'], string> = {
   math: 'Solve these to turn the alarm off. A wrong answer means you try that question again.',
   quiz: 'Answer each question to turn the alarm off. You see the right answer after each one; every completed quiz earns Education XP.',
+  fitness:
+    'Do the exercise to turn the alarm off and earn Fitness XP. Reps and time are self-reported for now (no camera). Go at your own pace and stop if anything hurts.',
   none: 'Without a mission, the alarm can be turned off straight away.',
 };
 
@@ -211,6 +219,14 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(category) => update({ mission: { ...mission, category } })}
           />
         )}
+        {mission.type === 'fitness' && (
+          <ChoiceRow
+            title={`Exercise: ${EXERCISES[mission.exercise].label} · ${formatTarget(mission.exercise, mission.difficulty)}`}
+            options={exerciseOptions}
+            value={mission.exercise}
+            onChange={(exercise) => update({ mission: { ...mission, exercise } })}
+          />
+        )}
         {mission.type !== 'none' && (
           <ChoiceRow
             title="Difficulty"
@@ -219,7 +235,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(difficulty) => update({ mission: { ...mission, difficulty } })}
           />
         )}
-        {mission.type !== 'none' && (
+        {(mission.type === 'math' || mission.type === 'quiz') && (
           <ChoiceRow<MissionQuestionCount>
             title="Questions"
             options={countOptions}
@@ -237,8 +253,9 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
               params: {
                 mission: mission.type,
                 category: mission.type === 'quiz' ? mission.category : undefined,
+                exercise: mission.type === 'fitness' ? mission.exercise : undefined,
                 difficulty: mission.difficulty,
-                count: String(mission.questionCount),
+                count: mission.type === 'fitness' ? undefined : String(mission.questionCount),
               },
             }}
           />

@@ -118,7 +118,7 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - Duplicate protection on two levels. The database has `UNIQUE (alarm_id, scheduled_at)`, plus a partial unique index allowing only one active occurrence per alarm. Every status change is a compare-and-set (`UPDATE … WHERE status = <expected>`), so an occurrence completes at most once. Future XP must be awarded per occurrence ID, which makes double rewards impossible.
 - `/alarm/[occurrenceId]` is the shared full-screen ringing screen. "Recent mornings" (`/alarms/history`) lists the latest 30 occurrences.
 
-## Missions (Phase 1 maths, Phase 3A quizzes)
+## Missions (Phase 1 maths, 3A quizzes, 3B fitness)
 
 `src/features/missions/` holds each mission's pure session logic and its screen. An alarm stores its mission as JSON (`AlarmMission`: `none`, `math`, or `quiz` with `category`, `difficulty` and `questionCount`), so new mission types need no schema change. A finished mission produces one `MissionResult` (Maths result, or a quiz result with `type: 'quiz'`). It goes through the same `completeMission` → accountability → progression path, so XP, the Challenge bonus, Main Wake-Up rules and backup all work unchanged.
 
@@ -126,6 +126,13 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - **Selection:** a seeded shuffle, preferring questions not in the "recently asked" list (300 IDs, stored in `app_settings`). When a pool runs short, the questions asked longest ago come back first.
 - **Flow:** one question at a time. Choose, see right or wrong with a short explanation, then go to the next. The quiz completes after the last question whatever the score; the score is shown and kept for review.
 - **XP:** in `PROGRESSION_POLICY`. Every quiz topic counts as Education; base XP per mission type, plus `difficultyBonusXp`, plus the existing `modeBonusXp`.
+- **Fitness (Phase 3B):** `{ type: 'fitness', exercise, difficulty, adaptation? }`. It uses two reusable building blocks, rep-based (push-ups, squats, jumping jacks) and timed (stretch, walk in place), in `fitness/session.ts`. They are pure functions of timestamps, so backgrounding or a slow screen can't distort time.
+  - Reps need one deliberate tap each; taps faster than `minRepIntervalMs` are ignored.
+  - Timers run from the end of a 3-second countdown and can be paused.
+  - Results are marked `self_reported`; there's no camera yet.
+  - Targets and anti-tap limits live in `fitness/exercises.ts`.
+  - XP counts toward Fitness.
+  - `adaptation` and `reducedMobilityAlternative` reserve space for the accessibility options (Phase 3D).
 
 ## Progression (Phase 2A, device-local)
 

@@ -229,7 +229,11 @@ export function reachedAchievements(history: AlarmOccurrence[], dayKey: DayKeyFn
   }
 
   return policy.achievements.flatMap((a) => {
-    const o = reachedAt[a.metric][a.threshold - 1];
+    // A discipline filter (e.g. "first Fitness mission") narrows mission metrics to that discipline.
+    const list = a.category
+      ? reachedAt[a.metric].filter((o) => o.mission.type !== 'none' && policy.missionCategory[o.mission.type] === a.category)
+      : reachedAt[a.metric];
+    const o = list[a.threshold - 1];
     return o ? [{ id: a.id, unlockedAt: earnedAt(o), occurrenceId: o.id }] : [];
   });
 }

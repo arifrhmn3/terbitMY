@@ -43,22 +43,29 @@ export default function AlarmsScreen() {
 
       <Section
         title="Wake-up missions"
-        footer="Pick a mission that must be completed before the alarm can be dismissed.">
+        footer="Choose a mission in each alarm’s settings. Tap to practise (no alarm, no XP).">
         <ListRow
           icon={{ ios: 'function', android: 'calculate', web: 'calculate' }}
-          title="Maths & quiz"
-          subtitle="Solve problems to prove you’re awake. Tap to practise."
-          href="/alarms/practice"
+          title="Maths"
+          subtitle="Solve sums to prove you’re awake"
+          href={{ pathname: '/alarms/practice', params: { mission: 'math' } }}
+        />
+        <ListRow
+          icon={{ ios: 'questionmark.bubble', android: 'quiz', web: 'quiz' }}
+          title="Quiz"
+          subtitle="General Knowledge, Geography, Vocabulary or Logic"
+          href={{ pathname: '/alarms/practice', params: { mission: 'quiz' } }}
         />
         <ListRow
           icon={{ ios: 'figure.strengthtraining.traditional', android: 'fitness_center', web: 'fitness_center' }}
           title="Fitness"
-          subtitle="Squats or jumping jacks, counted on device"
+          subtitle="Push-ups, squats, jumping jacks, stretch or walk in place (self-reported)"
+          href={{ pathname: '/alarms/practice', params: { mission: 'fitness' } }}
         />
         <ListRow
           icon={{ ios: 'book', android: 'menu_book', web: 'menu_book' }}
           title="Recitation & reflection"
-          subtitle="Read or recite a passage, then reflect"
+          subtitle="Coming later: read or recite a passage, then reflect"
         />
       </Section>
 

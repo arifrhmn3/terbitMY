@@ -20,8 +20,8 @@ export const MODE_FEATURE: Record<CompletionMode, FeatureKey> = {
 /** Every feature this alarm's settings rely on. */
 export function requiredFeatures(alarm: Pick<Alarm, 'completionMode' | 'mission' | 'soundId'>): FeatureKey[] {
   const features: FeatureKey[] = [MODE_FEATURE[alarm.completionMode], findSound(alarm.soundId).feature];
-  // Maths and the core quiz packs are basic missions (provisional policy: free).
-  if (alarm.mission.type === 'math' || alarm.mission.type === 'quiz') features.push('basic_missions');
+  // Maths, the core quiz packs and self-reported fitness are basic missions (provisional policy: free).
+  if (alarm.mission.type !== 'none') features.push('basic_missions');
   return [...new Set(features)];
 }
 

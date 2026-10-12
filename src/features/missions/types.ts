@@ -1,3 +1,4 @@
+import type { FitnessMissionResult } from './fitness/types';
 import type { MathMissionResult } from './math/session';
 import type { QuizMissionResult } from './quiz/types';
 
@@ -15,8 +16,16 @@ export const MISSION_QUESTION_COUNTS: readonly MissionQuestionCount[] = [3, 5, 1
 export const DIFFICULTY_LABEL: Record<MissionDifficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
 /** Maths results predate the `type` field, so a result without one is maths. */
-export type MissionResult = MathMissionResult | QuizMissionResult;
+export type MissionResult = MathMissionResult | QuizMissionResult | FitnessMissionResult;
 
 export function isQuizResult(result: MissionResult): result is QuizMissionResult {
   return (result as { type?: string }).type === 'quiz';
+}
+
+export function isFitnessResult(result: MissionResult): result is FitnessMissionResult {
+  return (result as { type?: string }).type === 'fitness';
+}
+
+export function isMathResult(result: MissionResult): result is MathMissionResult {
+  return !isQuizResult(result) && !isFitnessResult(result);
 }

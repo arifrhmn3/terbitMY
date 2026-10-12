@@ -13,9 +13,10 @@ import { describeMission, formatAlarmTime } from '@/features/alarms/alarm';
 import { handOff, occurrences } from '@/features/alarms/alarms';
 import { followUpAt, isActive, type AlarmOccurrence } from '@/features/alarms/occurrence';
 import { OccurrenceError } from '@/features/alarms/occurrence-manager';
+import { FitnessMissionView, FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
 import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
-import { isQuizResult, type MissionResult } from '@/features/missions/types';
+import { isFitnessResult, isMathResult, isQuizResult, type MissionResult } from '@/features/missions/types';
 import { useTheme } from '@/hooks/use-theme';
 import { xpEntryTitle } from '@/features/progress/format';
 import { CATEGORY_LABEL, PROGRESSION_POLICY } from '@/features/progress/policy';
@@ -286,14 +287,21 @@ function Mission(props: {
       <ThemedText type="headline" style={styles.center}>
         {clock(now)} · {occurrence.alarmLabel || 'Alarm'}
       </ThemedText>
-      {mission.type === 'math' ? (
+      {mission.type === 'math' && (
         <MathMissionView
           config={{ difficulty: mission.difficulty, questionCount: mission.questionCount }}
           onComplete={onComplete}
         />
-      ) : (
+      )}
+      {mission.type === 'quiz' && (
         <QuizMissionView
           config={{ category: mission.category, difficulty: mission.difficulty, questionCount: mission.questionCount }}
+          onComplete={onComplete}
+        />
+      )}
+      {mission.type === 'fitness' && (
+        <FitnessMissionView
+          config={{ exercise: mission.exercise, difficulty: mission.difficulty, adaptation: mission.adaptation }}
           onComplete={onComplete}
         />
       )}
@@ -330,7 +338,8 @@ function MorningComplete({ occurrence }: { occurrence: AlarmOccurrence }) {
       <ThemedView type="backgroundElement" style={styles.card}>
         <ThemedText type="title">Morning complete</ThemedText>
         {finishedAt !== null && <ThemedText>You were up at {clock(new Date(finishedAt))}.</ThemedText>}
-        {result && !isQuizResult(result) && <MathResultSummary result={result} />}
+        {result && isMathResult(result) && <MathResultSummary result={result} />}
+        {result && isFitnessResult(result) && <FitnessResultSummary result={result} />}
         {tookMs !== null && (
           <ThemedText themeColor="textSecondary">From alarm to done: {formatDuration(tookMs)}</ThemedText>
         )}
