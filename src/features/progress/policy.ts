@@ -39,6 +39,8 @@ export type AchievementDefinition = {
   description: string;
   metric: AchievementMetric;
   threshold: number;
+  /** Optional: only count missions of this discipline (for missions_completed). */
+  category?: Category;
   /** Extra XP when unlocked (counts toward total XP only, not a discipline). */
   bonusXp: number;
 };
@@ -69,9 +71,9 @@ export type ProgressionPolicy = {
 };
 
 export const PROGRESSION_POLICY: ProgressionPolicy = {
-  // Maths and every quiz topic train Education. Fitness and Faith missions come later.
-  missionCategory: { math: 'education', quiz: 'education' },
-  missionXp: { math: 10, quiz: 10 },
+  // Maths and every quiz topic train Education; fitness missions train Fitness. Faith comes later.
+  missionCategory: { math: 'education', quiz: 'education', fitness: 'fitness' },
+  missionXp: { math: 10, quiz: 10, fitness: 10 },
   difficultyBonusXp: { easy: 0, medium: 2, hard: 5 },
   modeBonusXp: { reward: 0, gentle: 0, challenge: 5 },
   streak: { maxGapDays: null },
@@ -115,6 +117,15 @@ export const PROGRESSION_POLICY: ProgressionPolicy = {
       title: 'First Challenge completed',
       description: 'Complete a mission in Challenge mode.',
       metric: 'challenge_completions',
+      threshold: 1,
+      bonusXp: 0,
+    },
+    {
+      id: 'first_fitness',
+      title: 'First Fitness mission',
+      description: 'Complete a fitness mission on any alarm.',
+      metric: 'missions_completed',
+      category: 'fitness',
       threshold: 1,
       bonusXp: 0,
     },

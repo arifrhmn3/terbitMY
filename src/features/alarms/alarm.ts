@@ -1,3 +1,5 @@
+import { EXERCISES, formatTarget } from '@/features/missions/fitness/exercises';
+import type { FitnessAdaptation, FitnessExercise } from '@/features/missions/fitness/types';
 import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math/questions';
 import { QUIZ_CATEGORY_LABEL, type QuizCategory } from '@/features/missions/quiz/types';
 import { DIFFICULTY_LABEL, type MissionDifficulty, type MissionQuestionCount } from '@/features/missions/types';
@@ -25,7 +27,8 @@ export const WEEKDAY_SHORT: Record<Weekday, string> = {
 export type AlarmMission =
   | { type: 'none' }
   | { type: 'math'; difficulty: MathDifficulty; questionCount: MathQuestionCount }
-  | { type: 'quiz'; category: QuizCategory; difficulty: MissionDifficulty; questionCount: MissionQuestionCount };
+  | { type: 'quiz'; category: QuizCategory; difficulty: MissionDifficulty; questionCount: MissionQuestionCount }
+  | { type: 'fitness'; exercise: FitnessExercise; difficulty: MissionDifficulty; adaptation?: FitnessAdaptation };
 
 export type SnoozeMinutes = 5 | 10 | 15;
 export const SNOOZE_MINUTES: readonly SnoozeMinutes[] = [5, 10, 15];
@@ -137,6 +140,9 @@ export function describeRepeat(weekdays: readonly Weekday[]): string {
 export function describeMission(mission: AlarmMission): string {
   if (mission.type === 'none') return 'No mission';
   const level = DIFFICULTY_LABEL[mission.difficulty];
+  if (mission.type === 'fitness') {
+    return `${EXERCISES[mission.exercise].label} · ${level} · ${formatTarget(mission.exercise, mission.difficulty)}`;
+  }
   const topic = mission.type === 'quiz' ? QUIZ_CATEGORY_LABEL[mission.category] : 'Maths';
   return `${topic} · ${level} · ${mission.questionCount} questions`;
 }

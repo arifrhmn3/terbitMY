@@ -12,6 +12,7 @@ import {
   type OccurrenceSource,
   type TransitionResult,
 } from '@/features/alarms/occurrence';
+import { EXERCISES, fitnessTarget } from '@/features/missions/fitness/exercises';
 import type { MissionResult } from '@/features/missions/types';
 
 export type MorningOutcome = 'completed' | 'missed' | 'dismissed' | 'cancelled' | 'open' | 'turned_off';
@@ -75,7 +76,19 @@ export function buildMorning(params: {
               durationMs: 90_000,
               answers: [],
             }
-          : { difficulty: 'easy', questionCount: 3, attempts: 3, wrongAttempts: 0, accuracy: 1, durationMs: 90_000 };
+          : mission.type === 'fitness'
+            ? {
+                type: 'fitness',
+                exercise: mission.exercise,
+                difficulty: mission.difficulty,
+                kind: EXERCISES[mission.exercise].kind,
+                target: fitnessTarget(mission.exercise, mission.difficulty),
+                achieved: fitnessTarget(mission.exercise, mission.difficulty),
+                durationMs: 90_000,
+                verification: 'self_reported',
+                adaptation: 'standard',
+              }
+            : { difficulty: 'easy', questionCount: 3, attempts: 3, wrongAttempts: 0, accuracy: 1, durationMs: 90_000 };
       return step(completeMission(started, result, scheduledAt + 4 * MINUTE));
     }
   }

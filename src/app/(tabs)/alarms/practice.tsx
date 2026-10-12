@@ -10,11 +10,15 @@ import { Section } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
+import { FitnessMissionView, FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
+import { EXERCISES } from '@/features/missions/fitness/exercises';
+import { FITNESS_EXERCISES, type FitnessExercise } from '@/features/missions/fitness/types';
 import { MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
 import { QUIZ_CATEGORIES, QUIZ_CATEGORY_LABEL, QUIZ_CATEGORY_SHORT, type QuizCategory } from '@/features/missions/quiz/types';
 import {
   DIFFICULTY_LABEL,
+  isFitnessResult,
   isQuizResult,
   MISSION_DIFFICULTIES,
   MISSION_QUESTION_COUNTS,
@@ -24,12 +28,24 @@ import {
 
 /**
  * Practise a mission outside an alarm. Nothing rings and no XP is earned.
- * Params: mission=math|quiz, category, difficulty, count. Development builds
- * also offer switches for topic/difficulty and a fixed question set.
+ * Params: mission=math|quiz|fitness, category, exercise, difficulty, count.
+ * Development builds also offer switches to launch any mission directly
+ * (type, topic/exercise, difficulty) and a fixed quiz question set.
  */
 export default function PracticeMissionScreen() {
-  const params = useLocalSearchParams<{ mission?: string; category?: string; difficulty?: string; count?: string }>();
-  const [kind, setKind] = useState<'math' | 'quiz'>(params.mission === 'quiz' ? 'quiz' : 'math');
+  const params = useLocalSearchParams<{
+    mission?: string;
+    category?: string;
+    exercise?: string;
+    difficulty?: string;
+    count?: string;
+  }>();
+  const [kind, setKind] = useState<'math' | 'quiz' | 'fitness'>(
+    params.mission === 'quiz' || params.mission === 'fitness' ? params.mission : 'math',
+  );
+  const [exercise, setExercise] = useState<FitnessExercise>(
+    FITNESS_EXERCISES.find((e) => e === params.exercise) ?? 'squats',
+  );
   const [category, setCategory] = useState<QuizCategory>(QUIZ_CATEGORIES.find((c) => c === params.category) ?? 'general');
   const [difficulty, setDifficulty] = useState<MissionDifficulty>(
     MISSION_DIFFICULTIES.find((d) => d === params.difficulty) ?? 'easy',
@@ -49,7 +65,7 @@ export default function PracticeMissionScreen() {
       <Stack.Screen options={{ title: 'Practice mission', headerLargeTitleEnabled: false }} />
       <Notice
         title="Practice mode"
-        description={`A practice run of the ${kind === 'quiz' ? `${QUIZ_CATEGORY_LABEL[category]} quiz` : 'maths mission'}. It isn’t connected to any alarm and earns no XP.`}
+        description={`A practice run of the ${PRACTICE_NAME[kind](category, exercise)}. It isn’t connected to any alarm and earns no XP.`}
       />
 
       {__DEV__ && !result && (
@@ -58,6 +74,7 @@ export default function PracticeMissionScreen() {
             options={[
               { value: 'math' as const, label: 'Maths' },
               { value: 'quiz' as const, label: 'Quiz' },
+              { value: 'fitness' as const, label: 'Fitness' },
             ]}
             value={kind}
             onChange={(next) => {
@@ -71,6 +88,16 @@ export default function PracticeMissionScreen() {
               value={category}
               onChange={(next) => {
                 setCategory(next);
+                restart();
+              }}
+            />
+          )}
+          {kind === 'fitness' && (
+            <ChoiceRow
+              options={FITNESS_EXERCISES.map((e) => ({ value: e, label: EXERCISES[e].short }))}
+              value={exercise}
+              onChange={(next) => {
+                setExercise(next);
                 restart();
               }}
             />
@@ -103,11 +130,19 @@ export default function PracticeMissionScreen() {
         <>
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="title">Mission complete</ThemedText>
-            {isQuizResult(result) ? <QuizResultSummary result={result} /> : <MathResultSummary result={result} />}
+            {isQuizResult(result) ? (
+              <QuizResultSummary result={result} />
+            ) : isFitnessResult(result) ? (
+              <FitnessResultSummary result={result} />
+            ) : (
+              <MathResultSummary result={result} />
+            )}
           </ThemedView>
           <Button title="Done" onPress={() => router.back()} />
           <Button title="Try again" variant="secondary" onPress={restart} />
         </>
+      ) : kind === 'fitness' ? (
+        <FitnessMissionView key={round} config={{ exercise, difficulty }} onComplete={setResult} />
       ) : kind === 'quiz' ? (
         <QuizMissionView
           key={round}
@@ -121,6 +156,12 @@ export default function PracticeMissionScreen() {
     </Screen>
   );
 }
+
+const PRACTICE_NAME: Record<'math' | 'quiz' | 'fitness', (category: QuizCategory, exercise: FitnessExercise) => string> = {
+  math: () => 'maths mission',
+  quiz: (category) => `${QUIZ_CATEGORY_LABEL[category]} quiz`,
+  fitness: (_category, exercise) => `${EXERCISES[exercise].label} mission`,
+};
 
 const styles = StyleSheet.create({
   card: {

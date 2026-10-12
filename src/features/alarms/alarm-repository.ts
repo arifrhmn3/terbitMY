@@ -15,6 +15,7 @@ import {
   type Weekday,
 } from './alarm';
 import { MATH_DIFFICULTIES, MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
+import { FITNESS_EXERCISES } from '@/features/missions/fitness/types';
 import { QUIZ_CATEGORIES } from '@/features/missions/quiz/types';
 import { MISSION_DIFFICULTIES, MISSION_QUESTION_COUNTS } from '@/features/missions/types';
 
@@ -81,6 +82,14 @@ export function parseMission(json: string): AlarmMission {
       QUIZ_CATEGORIES.includes(value.category as never) &&
       MISSION_DIFFICULTIES.includes(value.difficulty as never) &&
       MISSION_QUESTION_COUNTS.includes(value.questionCount as never)
+    ) {
+      return value as AlarmMission;
+    }
+    if (
+      value?.type === 'fitness' &&
+      FITNESS_EXERCISES.includes(value.exercise as never) &&
+      MISSION_DIFFICULTIES.includes(value.difficulty as never) &&
+      (value.adaptation === undefined || value.adaptation === 'standard')
     ) {
       return value as AlarmMission;
     }

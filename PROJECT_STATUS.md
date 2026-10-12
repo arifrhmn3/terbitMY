@@ -19,7 +19,7 @@ _Last updated: 11 October 2026_
 | Progress tab with real data; XP shown on "Morning complete" | ✅ Verified on iPhone |
 | Developer panel: inspect, reset, seed an example week; XP accounting (total = disciplines + general/bonus) with every bonus line's source | ✅ Development builds only |
 | First iPhone test (11 Oct) | ✅ XP once per mission, Education XP, one streak day per day, Challenge bonus, persistence, seeding |
-| **Morning vs general accountability** (from the test): only the Main Wake-Up Alarm counts as a morning; other alarms earn XP and count in "All alarms". Each occurrence stores `isMainWakeUp` when it fires (migration 7) | ✅ Unit-tested · ⏳ iPhone retest |
+| **Morning vs general accountability** (from the test): only the Main Wake-Up Alarm counts as a morning; other alarms earn XP and count in "All alarms". Each occurrence stores `isMainWakeUp` when it fires (migration 7) | ✅ Unit-tested · ✅ Verified on iPhone |
 
 Provisional policy (all in `src/features/progress/policy.ts`): maths mission 10 XP; Challenge +5; Reward/Gentle +0; incomplete 0; 3-day streak +10; 7-day streak +25; overall ranks at 0/50/150/300/600/1000/2000 XP; discipline ranks at 0/30/100/250/500/1000 XP. See docs/ARCHITECTURE.md → Progression.
 
@@ -150,3 +150,20 @@ Branch `phase-3/education-quiz-missions`. ✅ **Complete and verified on iPhone 
 | Practice screen for quizzes; development builds: switch topic/difficulty, “fixed set” | ✅ Developer-only |
 
 No database migration (missions are stored as JSON). Existing Maths alarms and history are unchanged.
+
+## Phase 3B: Fitness Missions
+
+Branch `phase-3/fitness-missions`. ✅ **Complete and verified on iPhone (12 Oct 2026):** rep missions and targets, too-fast tap protection, timed missions with pause/resume and accurate background timing, real alarm → fitness hand-off, Fitness XP once, Main Wake-Up rule, persistence after restart.
+
+| Item | Status |
+|---|---|
+| Fitness mission type: Push-ups, Squats, Jumping jacks (rep-based); Stretch, Walk in place (timed); Easy/Medium/Hard | ✅ Unit-tested |
+| Reusable rep and timer building blocks: 3 s countdown; one deliberate tap per rep (too-fast taps ignored); timer from timestamps (background-safe), pause/resume; abandon = existing skip/give up | ✅ Unit-tested · ✅ Verified on iPhone |
+| Targets and anti-tap limits central in `fitness/exercises.ts` (prototype values) | ✅ |
+| Marked self-reported everywhere (editor, mission, result, history); no camera or pose detection | ✅ |
+| Fitness XP via central policy: 10 + difficulty bonus + existing Challenge bonus; awarded once; Fitness rank; "First Fitness mission" achievement | ✅ Unit-tested |
+| Main Wake-Up rule unchanged: non-main fitness alarms earn XP and count in All alarms only | ✅ Unit-tested |
+| Accessibility-ready model: `adaptation` field + reduced-mobility alternative per exercise (built in 3D) | ✅ Data model only |
+| Practice for every mission from the Alarms tab; development builds can launch any type/exercise/difficulty directly | ✅ |
+
+No database migration (missions are stored as JSON). Maths and Quiz unchanged.

@@ -1,7 +1,8 @@
 import { evaluateMorning, MODE_POLICIES } from './accountability';
 import { describeMission, formatAlarmTime } from './alarm';
 import type { AlarmOccurrence } from './occurrence';
-import { isQuizResult } from '@/features/missions/types';
+import { EXERCISES, formatSeconds } from '@/features/missions/fitness/exercises';
+import { isFitnessResult, isQuizResult } from '@/features/missions/types';
 
 export type HistoryEntry = {
   id: string;
@@ -55,6 +56,9 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
       const result = o.result.mission;
       if (isQuizResult(result)) {
         done += ` · ${result.correctCount}/${result.questionCount} correct`;
+      } else if (isFitnessResult(result)) {
+        const amount = result.kind === 'reps' ? `${result.achieved} reps` : formatSeconds(result.achieved);
+        done += ` · ${EXERCISES[result.exercise].label} ${amount} (self-reported)`;
       } else {
         const wrong = result.wrongAttempts;
         done += wrong === 0 ? ' · no wrong answers' : ` · ${wrong} wrong ${wrong === 1 ? 'answer' : 'answers'}`;
