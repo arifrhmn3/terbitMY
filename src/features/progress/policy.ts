@@ -1,4 +1,5 @@
 import type { AlarmMission, CompletionMode } from '@/features/alarms/alarm';
+import type { MissionDifficulty } from '@/features/missions/types';
 
 /**
  * PROVISIONAL PROGRESSION POLICY. Every number and rule that turns mornings
@@ -54,8 +55,10 @@ export type StreakPolicy = {
 export type ProgressionPolicy = {
   /** Which discipline each mission type trains. */
   missionCategory: Record<MissionType, Category>;
-  /** XP for completing a mission, by mission type. */
+  /** XP for completing a mission, by mission type (Maths, quiz…). */
   missionXp: Record<MissionType, number>;
+  /** Extra XP on top of `missionXp` for the mission's difficulty (every mission type). */
+  difficultyBonusXp: Record<MissionDifficulty, number>;
   /** Extra XP for completing the mission, by the mode the alarm actually rang with. */
   modeBonusXp: Record<CompletionMode, number>;
   streak: StreakPolicy;
@@ -66,8 +69,10 @@ export type ProgressionPolicy = {
 };
 
 export const PROGRESSION_POLICY: ProgressionPolicy = {
-  missionCategory: { math: 'education' },
-  missionXp: { math: 10 },
+  // Maths and every quiz topic train Education. Fitness and Faith missions come later.
+  missionCategory: { math: 'education', quiz: 'education' },
+  missionXp: { math: 10, quiz: 10 },
+  difficultyBonusXp: { easy: 0, medium: 2, hard: 5 },
   modeBonusXp: { reward: 0, gentle: 0, challenge: 5 },
   streak: { maxGapDays: null },
   overallRankThresholds: [0, 50, 150, 300, 600, 1000, 2000],

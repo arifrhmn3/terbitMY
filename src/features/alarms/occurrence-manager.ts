@@ -1,4 +1,4 @@
-import type { MathMissionResult } from '@/features/missions/math/session';
+import type { MissionResult } from '@/features/missions/types';
 import type { AlarmFiredEvent } from '@/services/alarm-scheduler';
 
 import type { Alarm } from './alarm';
@@ -172,7 +172,7 @@ export function createOccurrenceManager(
     /** The phone's own Stop control ended the alarm; the mission can still be completed. */
     recordSystemStop: (id: string) => apply(id, recordSystemStop),
     startMission: (id: string) => apply(id, startMission),
-    completeMission: (id: string, result: MathMissionResult) =>
+    completeMission: (id: string, result: MissionResult) =>
       apply(id, (o, at) => completeMission(o, result, at)),
     completeWithoutMission: (id: string) => apply(id, completeWithoutMission),
     /** Gives up on the morning without the mission (Emergency Dismiss / skip). */

@@ -133,3 +133,20 @@ These are the current working assumptions for beta. They're deliberately configu
 Live backend checks (12 Oct): project reachable; all five tables and three functions exist; anonymous access refused (RLS + grants working). Public values are in `.env.local` (git-ignored).
 
 
+
+## Phase 3A: Education Quiz Missions
+
+Branch `phase-3/education-quiz-missions`. ✅ **Complete and verified on iPhone (12 Oct 2026):** all topics, difficulties and question counts; real alarm → quiz hand-off; feedback and explanations; Education XP once; Challenge bonus; Main Wake-Up rule; persistence after restart.
+
+| Item | Status |
+|---|---|
+| Quiz mission type: General Knowledge, Geography, Vocabulary, Logic × Easy/Medium/Hard × 3/5/10 questions; Maths unchanged | ✅ Unit-tested |
+| Offline curated packs: 156 questions (13 per topic and difficulty), stable IDs, explanations; `QuestionSource` ready for more packs | ✅ Validated by tests |
+| Selection avoids recently asked questions (last 300 IDs on the phone) | ✅ Unit-tested |
+| One question at a time, instant right/wrong + explanation; completes at any score | ✅ Unit-tested · ✅ Verified on iPhone |
+| Result: score, review (question, your answer, correct answer, explanation), XP breakdown, achievements unlocked, morning vs all-alarms note | ✅ Built · ✅ Verified on iPhone |
+| XP via central policy: quiz 10 (Education) + difficulty bonus (0/2/5, every mission type) + existing Challenge bonus; awarded once | ✅ Unit-tested |
+| Main Wake-Up rule unchanged: non-main quiz alarms earn XP but never touch morning statistics | ✅ Unit-tested |
+| Practice screen for quizzes; development builds: switch topic/difficulty, “fixed set” | ✅ Developer-only |
+
+No database migration (missions are stored as JSON). Existing Maths alarms and history are unchanged.

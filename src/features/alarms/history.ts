@@ -1,6 +1,7 @@
 import { evaluateMorning, MODE_POLICIES } from './accountability';
 import { describeMission, formatAlarmTime } from './alarm';
 import type { AlarmOccurrence } from './occurrence';
+import { isQuizResult } from '@/features/missions/types';
 
 export type HistoryEntry = {
   id: string;
@@ -51,8 +52,13 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
   if (o.status === 'completed' && o.endedAt !== null) {
     let done = `Done at ${time(o.endedAt)}`;
     if (o.result?.kind === 'mission_completed') {
-      const wrong = o.result.mission.wrongAttempts;
-      done += wrong === 0 ? ' · no wrong answers' : ` · ${wrong} wrong ${wrong === 1 ? 'answer' : 'answers'}`;
+      const result = o.result.mission;
+      if (isQuizResult(result)) {
+        done += ` · ${result.correctCount}/${result.questionCount} correct`;
+      } else {
+        const wrong = result.wrongAttempts;
+        done += wrong === 0 ? ' · no wrong answers' : ` · ${wrong} wrong ${wrong === 1 ? 'answer' : 'answers'}`;
+      }
     }
     details.push(done);
   } else if (o.status === 'dismissed' && o.result?.kind === 'emergency_dismiss' && o.endedAt !== null) {
