@@ -14,6 +14,7 @@ import {
   type SnoozeMinutes,
   type Weekday,
 } from './alarm';
+import { isTradition } from '@/features/faith/types';
 import { MATH_DIFFICULTIES, MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
 import { FITNESS_EXERCISES } from '@/features/missions/fitness/types';
 import { QUIZ_CATEGORIES } from '@/features/missions/quiz/types';
@@ -90,6 +91,17 @@ export function parseMission(json: string): AlarmMission {
       FITNESS_EXERCISES.includes(value.exercise as never) &&
       MISSION_DIFFICULTIES.includes(value.difficulty as never) &&
       (value.adaptation === undefined || value.adaptation === 'standard')
+    ) {
+      return value as AlarmMission;
+    }
+    if (value?.type === 'recitation' && isTradition(value.tradition)) return { type: 'recitation', tradition: value.tradition };
+    if (value?.type === 'reflection' && MISSION_DIFFICULTIES.includes(value.difficulty as never)) {
+      return value as AlarmMission;
+    }
+    if (
+      value?.type === 'recitation_reflection' &&
+      isTradition(value.tradition) &&
+      MISSION_DIFFICULTIES.includes(value.difficulty as never)
     ) {
       return value as AlarmMission;
     }

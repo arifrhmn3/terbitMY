@@ -23,9 +23,14 @@ import {
   type AlarmDraft,
   type AlarmMission,
   type CompletionMode,
+  missionDifficulty,
 } from '@/features/alarms/alarm';
 import { alarmStore, occurrences } from '@/features/alarms/alarms';
-import { EXERCISES, formatTarget } from '@/features/missions/fitness/exercises';
+import { faithMissionKinds, primaryTradition, visibleTraditions, type FaithMissionKind } from '@/features/faith/faith-settings';
+import { FAITH_POLICY } from '@/features/faith/policy';
+import { TRADITION_LABEL, type FaithSettings } from '@/features/faith/types';
+import { useFaithSettings } from '@/features/faith/use-faith';
+import { EXERCISES, formatSeconds, formatTarget } from '@/features/missions/fitness/exercises';
 import { FITNESS_EXERCISES } from '@/features/missions/fitness/types';
 import { QUIZ_CATEGORIES, QUIZ_CATEGORY_LABEL, QUIZ_CATEGORY_SHORT } from '@/features/missions/quiz/types';
 import {
@@ -49,12 +54,25 @@ type AlarmEditorProps = {
   alarmId?: string;
 };
 
-const missionOptions: { value: AlarmMission['type']; label: string }[] = [
+/** The top-level choice; Recitation and Reflection are both under Faith. */
+type MissionGroup = 'math' | 'quiz' | 'fitness' | 'faith' | 'none';
+
+const missionOptions: { value: MissionGroup; label: string }[] = [
   { value: 'math', label: 'Maths' },
   { value: 'quiz', label: 'Quiz' },
   { value: 'fitness', label: 'Fitness' },
+  { value: 'faith', label: 'Faith' },
   { value: 'none', label: 'None' },
 ];
+
+const groupOf = (mission: AlarmMission): MissionGroup =>
+  mission.type === 'recitation' || mission.type === 'reflection' || mission.type === 'recitation_reflection' ? 'faith' : mission.type;
+
+const FAITH_KIND_LABEL: Record<FaithMissionKind, string> = {
+  recitation: 'Recitation',
+  reflection: 'Reflection',
+  recitation_reflection: 'Both',
+};
 
 const topicOptions = QUIZ_CATEGORIES.map((category) => ({ value: category, label: QUIZ_CATEGORY_SHORT[category] }));
 const difficultyOptions = MISSION_DIFFICULTIES.map((difficulty) => ({ value: difficulty, label: DIFFICULTY_LABEL[difficulty] }));
@@ -64,9 +82,23 @@ const snoozeOptions = SNOOZE_MINUTES.map((minutes) => ({ value: minutes, label: 
 
 const exerciseOptions = FITNESS_EXERCISES.map((exercise) => ({ value: exercise, label: EXERCISES[exercise].short }));
 
-/** Switching mission type keeps the difficulty (and question count) already chosen. */
-function missionOfType(type: AlarmMission['type'], current: AlarmMission): AlarmMission {
-  const difficulty: MissionDifficulty = current.type === 'none' ? 'easy' : current.difficulty;
+/**
+ * Switching mission type keeps the difficulty (and question count) already
+ * chosen. Faith starts with the user's default: Recitation in their own
+ * tradition, or Reflection for Non-religious / Prefer not to say.
+ */
+function missionOfType(type: MissionGroup | FaithMissionKind, current: AlarmMission, faith: FaithSettings): AlarmMission {
+  const difficulty: MissionDifficulty = missionDifficulty(current) ?? 'easy';
+  if (type === 'faith') return missionOfType(faithMissionKinds(faith)[0], current, faith);
+  if (type === 'recitation') {
+    const tradition = primaryTradition(faith) ?? visibleTraditions(faith)[0];
+    return tradition ? { type: 'recitation', tradition } : { type: 'reflection', difficulty };
+  }
+  if (type === 'reflection') return { type: 'reflection', difficulty };
+  if (type === 'recitation_reflection') {
+    const tradition = current.type === 'recitation' ? current.tradition : (primaryTradition(faith) ?? visibleTraditions(faith)[0]);
+    return tradition ? { type: 'recitation_reflection', tradition, difficulty } : { type: 'reflection', difficulty };
+  }
   const questionCount: MissionQuestionCount = current.type === 'math' || current.type === 'quiz' ? current.questionCount : 3;
   if (type === 'math') return { type: 'math', difficulty, questionCount };
   if (type === 'quiz') return { type: 'quiz', category: current.type === 'quiz' ? current.category : 'general', difficulty, questionCount };
@@ -79,8 +111,19 @@ const MISSION_FOOTER: Record<AlarmMission['type'], string> = {
   quiz: 'Answer each question to turn the alarm off. You see the right answer after each one; every completed quiz earns Education XP.',
   fitness:
     'Do the exercise to turn the alarm off and earn Fitness XP. Reps and time are self-reported for now (no camera). Go at your own pace and stop if anything hurts.',
+  recitation:
+    'Read or recite today’s Daily Recitation to turn the alarm off and earn Faith XP. Self-reported: Terbit MY can’t check recitation. Today’s passage is saved on the phone ahead of time, so it works offline.',
+  reflection:
+    'A guided Reflection / Meditation with today’s theme, prompts and relaxation music. Earns Faith XP. The music plays even in silent mode.',
+  recitation_reflection:
+    'Recitation + Reflection: today’s Daily Recitation first, then a guided Reflection. The alarm’s mission is done when both are finished, and it earns Faith XP once.',
   none: 'Without a mission, the alarm can be turned off straight away.',
 };
+
+const reflectionLengthOptions = MISSION_DIFFICULTIES.map((difficulty) => ({
+  value: difficulty,
+  label: formatSeconds(FAITH_POLICY.reflection.durationSec[difficulty]),
+}));
 
 export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   const theme = useTheme();
@@ -91,6 +134,13 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
 
   const update = (changes: Partial<AlarmDraft>) => setDraft((current) => ({ ...current, ...changes }));
   const mission = draft.mission;
+  const faith = useFaithSettings();
+  const faithKinds = faithMissionKinds(faith);
+  const difficulty = missionDifficulty(mission);
+  const traditionChoices =
+    mission.type === 'recitation' || mission.type === 'recitation_reflection'
+      ? [...new Set([...visibleTraditions(faith), mission.tradition])].map((t) => ({ value: t, label: TRADITION_LABEL[t] }))
+      : [];
   const savedModeLocked = !isModeAvailable(draft.completionMode, has);
 
   // Labels come from the entitlement layer: nothing here decides what is premium.
@@ -205,12 +255,41 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
         />
       </Section>
 
-      <Section title="Wake-up mission" footer={MISSION_FOOTER[mission.type]}>
+      <Section
+        title="Wake-up mission"
+        footer={
+          groupOf(mission) === 'faith' && !faithKinds.includes('recitation')
+            ? `${MISSION_FOOTER[mission.type]} To add Recitation, choose your faith in Settings → Faith.`
+            : MISSION_FOOTER[mission.type]
+        }>
         <ChoiceRow
           options={missionOptions}
-          value={mission.type}
-          onChange={(type) => update({ mission: missionOfType(type, mission) })}
+          value={groupOf(mission)}
+          onChange={(type) => update({ mission: missionOfType(type, mission, faith) })}
         />
+        {groupOf(mission) === 'faith' && faithKinds.length > 1 && (
+          <ChoiceRow
+            options={faithKinds.map((kind) => ({ value: kind, label: FAITH_KIND_LABEL[kind] }))}
+            value={mission.type as FaithMissionKind}
+            onChange={(kind) => update({ mission: missionOfType(kind, mission, faith) })}
+          />
+        )}
+        {(mission.type === 'recitation' || mission.type === 'recitation_reflection') && traditionChoices.length > 1 && (
+          <ChoiceRow
+            title="Tradition"
+            options={traditionChoices}
+            value={mission.tradition}
+            onChange={(tradition) => update({ mission: { ...mission, tradition } })}
+          />
+        )}
+        {(mission.type === 'reflection' || mission.type === 'recitation_reflection') && (
+          <ChoiceRow
+            title={`${mission.type === 'reflection' ? 'Length' : 'Reflection length'}: ${DIFFICULTY_LABEL[mission.difficulty]}`}
+            options={reflectionLengthOptions}
+            value={mission.difficulty}
+            onChange={(next) => update({ mission: { ...mission, difficulty: next } })}
+          />
+        )}
         {mission.type === 'quiz' && (
           <ChoiceRow
             title={`Topic: ${QUIZ_CATEGORY_LABEL[mission.category]}`}
@@ -227,12 +306,12 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(exercise) => update({ mission: { ...mission, exercise } })}
           />
         )}
-        {mission.type !== 'none' && (
+        {(mission.type === 'math' || mission.type === 'quiz' || mission.type === 'fitness') && (
           <ChoiceRow
             title="Difficulty"
             options={difficultyOptions}
             value={mission.difficulty}
-            onChange={(difficulty) => update({ mission: { ...mission, difficulty } })}
+            onChange={(next) => update({ mission: { ...mission, difficulty: next } })}
           />
         )}
         {(mission.type === 'math' || mission.type === 'quiz') && (
@@ -254,8 +333,9 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
                 mission: mission.type,
                 category: mission.type === 'quiz' ? mission.category : undefined,
                 exercise: mission.type === 'fitness' ? mission.exercise : undefined,
-                difficulty: mission.difficulty,
-                count: mission.type === 'fitness' ? undefined : String(mission.questionCount),
+                tradition: mission.type === 'recitation' || mission.type === 'recitation_reflection' ? mission.tradition : undefined,
+                difficulty: difficulty ?? undefined,
+                count: mission.type === 'math' || mission.type === 'quiz' ? String(mission.questionCount) : undefined,
               },
             }}
           />

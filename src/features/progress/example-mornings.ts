@@ -12,12 +12,46 @@ import {
   type OccurrenceSource,
   type TransitionResult,
 } from '@/features/alarms/occurrence';
+import type { RecitationMissionResult } from '@/features/faith/recitation/types';
+import type { ReflectionMissionResult } from '@/features/faith/reflection/types';
+import type { FaithTradition } from '@/features/faith/types';
 import { EXERCISES, fitnessTarget } from '@/features/missions/fitness/exercises';
-import type { MissionResult } from '@/features/missions/types';
+import type { MissionDifficulty, MissionResult } from '@/features/missions/types';
 
 export type MorningOutcome = 'completed' | 'missed' | 'dismissed' | 'cancelled' | 'open' | 'turned_off';
 
 const MINUTE = 60_000;
+
+function exampleRecitation(tradition: FaithTradition): RecitationMissionResult {
+  return {
+    type: 'recitation',
+    tradition,
+    date: '2026-10-01',
+    assignmentId: `daily-${tradition}-2026-10-01`,
+    provider: 'dev-remote',
+    contentId: `${tradition}-sample-a`,
+    reference: 'Sample passage A (development sample, not scripture)',
+    sectionCount: 12,
+    durationMs: 600_000,
+    usedFallback: false,
+    verification: 'self_reported',
+  };
+}
+
+function exampleReflection(difficulty: MissionDifficulty): ReflectionMissionResult {
+  return {
+    type: 'reflection',
+    difficulty,
+    date: '2026-10-01',
+    theme: 'gratitude',
+    promptSetId: 'gratitude-1',
+    trackId: 'reflection-001',
+    trackTitle: 'Still Water',
+    musicSource: 'cache',
+    targetMs: 45_000,
+    durationMs: 45_000,
+  };
+}
 
 function step(result: TransitionResult): AlarmOccurrence {
   if (!result.ok) throw new Error(`Example morning: ${result.error}`);
@@ -88,7 +122,20 @@ export function buildMorning(params: {
                 verification: 'self_reported',
                 adaptation: 'standard',
               }
-            : { difficulty: 'easy', questionCount: 3, attempts: 3, wrongAttempts: 0, accuracy: 1, durationMs: 90_000 };
+            : mission.type === 'recitation'
+              ? exampleRecitation(mission.tradition)
+              : mission.type === 'reflection'
+                ? exampleReflection(mission.difficulty)
+                : mission.type === 'recitation_reflection'
+                  ? {
+                      type: 'recitation_reflection',
+                      tradition: mission.tradition,
+                      difficulty: mission.difficulty,
+                      recitation: exampleRecitation(mission.tradition),
+                      reflection: exampleReflection(mission.difficulty),
+                      durationMs: 645_000,
+                    }
+                  : { difficulty: 'easy', questionCount: 3, attempts: 3, wrongAttempts: 0, accuracy: 1, durationMs: 90_000 };
       return step(completeMission(started, result, scheduledAt + 4 * MINUTE));
     }
   }

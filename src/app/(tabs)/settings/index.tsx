@@ -4,12 +4,15 @@ import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { useAccount, useSyncStatus } from '@/features/account/account';
+import { FAITH_PREFERENCE_LABEL } from '@/features/faith/types';
+import { useFaithSettings } from '@/features/faith/use-faith';
 import { syncStatusLabel } from '@/features/sync/status-label';
 import { settingsSections } from '@/lib/settings-sections';
 
 export default function SettingsScreen() {
   const { status, user } = useAccount();
   const sync = useSyncStatus();
+  const faithSettings = useFaithSettings();
   const subtitle =
     status === 'signed_in'
       ? `${user?.email ?? 'Signed in'} · ${syncStatusLabel(sync).title}`
@@ -25,6 +28,12 @@ export default function SettingsScreen() {
           title="Account"
           subtitle={subtitle}
           href="/settings/account"
+        />
+        <ListRow
+          icon={{ ios: 'book', android: 'menu_book', web: 'menu_book' }}
+          title="Faith"
+          subtitle={faithSettings.primary ? FAITH_PREFERENCE_LABEL[faithSettings.primary] : 'Recitation and Reflection settings'}
+          href="/settings/faith"
         />
       </Section>
 

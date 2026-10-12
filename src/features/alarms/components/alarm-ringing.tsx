@@ -13,10 +13,21 @@ import { describeMission, formatAlarmTime } from '@/features/alarms/alarm';
 import { handOff, occurrences } from '@/features/alarms/alarms';
 import { followUpAt, isActive, type AlarmOccurrence } from '@/features/alarms/occurrence';
 import { OccurrenceError } from '@/features/alarms/occurrence-manager';
+import { CombinedFaithMissionView, CombinedFaithResultSummary } from '@/features/faith/combined-mission-view';
+import { RecitationMissionView, RecitationResultSummary } from '@/features/faith/recitation/recitation-view';
+import { ReflectionMissionView, ReflectionResultSummary } from '@/features/faith/reflection/reflection-mission-view';
 import { FitnessMissionView, FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
 import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
 import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
-import { isFitnessResult, isMathResult, isQuizResult, type MissionResult } from '@/features/missions/types';
+import {
+  isCombinedFaithResult,
+  isFitnessResult,
+  isMathResult,
+  isQuizResult,
+  isRecitationResult,
+  isReflectionResult,
+  type MissionResult,
+} from '@/features/missions/types';
 import { useTheme } from '@/hooks/use-theme';
 import { xpEntryTitle } from '@/features/progress/format';
 import { CATEGORY_LABEL, PROGRESSION_POLICY } from '@/features/progress/policy';
@@ -305,6 +316,11 @@ function Mission(props: {
           onComplete={onComplete}
         />
       )}
+      {mission.type === 'recitation' && <RecitationMissionView config={{ tradition: mission.tradition }} onComplete={onComplete} />}
+      {mission.type === 'reflection' && <ReflectionMissionView config={{ difficulty: mission.difficulty }} onComplete={onComplete} />}
+      {mission.type === 'recitation_reflection' && (
+        <CombinedFaithMissionView config={{ tradition: mission.tradition, difficulty: mission.difficulty }} onComplete={onComplete} />
+      )}
       <DismissLink
         label={occurrence.completionMode === 'challenge' ? 'Give up (Challenge incomplete)' : 'Skip mission (no reward)'}
         onPress={onDismiss}
@@ -340,6 +356,9 @@ function MorningComplete({ occurrence }: { occurrence: AlarmOccurrence }) {
         {finishedAt !== null && <ThemedText>You were up at {clock(new Date(finishedAt))}.</ThemedText>}
         {result && isMathResult(result) && <MathResultSummary result={result} />}
         {result && isFitnessResult(result) && <FitnessResultSummary result={result} />}
+        {result && isRecitationResult(result) && <RecitationResultSummary result={result} />}
+        {result && isReflectionResult(result) && <ReflectionResultSummary result={result} />}
+        {result && isCombinedFaithResult(result) && <CombinedFaithResultSummary result={result} />}
         {tookMs !== null && (
           <ThemedText themeColor="textSecondary">From alarm to done: {formatDuration(tookMs)}</ThemedText>
         )}

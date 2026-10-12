@@ -60,7 +60,7 @@ export function createMemoryCloud() {
         if (!user) {
           user = { id: `user-${users.size + 1}`, email };
           users.set(user.id, user);
-          tables.profiles.set(user.id, { displayName: null, avatarUrl: null, timezone: null }); // like the signup trigger
+          tables.profiles.set(user.id, { displayName: null, avatarUrl: null, timezone: null, faithPreference: null }); // like the signup trigger
         }
         session = user;
         emit();
@@ -83,7 +83,7 @@ export function createMemoryCloud() {
       async upsertProfile(userId, profile) {
         const me = guard();
         if (me !== userId) throw new CloudError('Row level security', 'server');
-        const current = tables.profiles.get(userId) ?? { displayName: null, avatarUrl: null, timezone: null };
+        const current = tables.profiles.get(userId) ?? { displayName: null, avatarUrl: null, timezone: null, faithPreference: null };
         tables.profiles.set(userId, { ...current, ...profile });
       },
       async pushAlarms(rows) {

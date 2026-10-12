@@ -53,7 +53,12 @@ export function createAccountStore(deps: {
       const tz = timeZone();
       if (!profile || (tz && profile.timezone !== tz)) {
         await cloud.store.upsertProfile(user.id, { timezone: tz });
-        profile = { displayName: profile?.displayName ?? null, avatarUrl: profile?.avatarUrl ?? null, timezone: tz };
+        profile = {
+          displayName: profile?.displayName ?? null,
+          avatarUrl: profile?.avatarUrl ?? null,
+          timezone: tz,
+          faithPreference: profile?.faithPreference ?? null,
+        };
       }
       if (state.user?.id === user.id) set({ profile });
     } catch {
@@ -108,7 +113,7 @@ export function createAccountStore(deps: {
       if (!cloud || !state.user) throw new Error('Not signed in.');
       const displayName = name.trim().slice(0, 50) || null;
       await cloud.store.upsertProfile(state.user.id, { displayName });
-      set({ profile: { ...(state.profile ?? { avatarUrl: null, timezone: null }), displayName } });
+      set({ profile: { ...(state.profile ?? { avatarUrl: null, timezone: null, faithPreference: null }), displayName } });
     },
     /**
      * Deletes the account and its cloud data (profile, alarms, occurrences,

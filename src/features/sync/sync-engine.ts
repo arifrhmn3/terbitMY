@@ -12,6 +12,11 @@ export type LocalSource = {
   occurrences(): Promise<AlarmOccurrence[]>;
   xp(): Promise<XpEntry[]>;
   achievements(): Promise<AchievementUnlock[]>;
+  /**
+   * Private profile settings chosen on the phone (Faith preference). Null
+   * fields are not sent, so a new phone never clears a choice made elsewhere.
+   */
+  privateProfile?(): Promise<{ faithPreference: string | null }>;
 };
 
 /**
@@ -71,17 +76,22 @@ export function createSyncEngine(deps: {
 
   /** What still has to be sent for `userId`, per entity, plus alarms deleted on the phone. */
   async function plan(userId: string): Promise<{ batches: Batch[]; deletedAlarmIds: string[] }> {
-    const [alarms, occurrences, xp, achievements] = await Promise.all([
+    const [alarms, occurrences, xp, achievements, profile] = await Promise.all([
       local.alarms(),
       local.occurrences(),
       local.xp(),
       local.achievements(),
+      local.privateProfile?.() ?? null,
     ]);
     const sources: { entity: SyncEntity; rows: { id: string; row: unknown }[] }[] = [
       { entity: 'alarm', rows: alarms.map((a) => ({ id: a.id, row: alarmToCloud(a) })) },
       { entity: 'occurrence', rows: occurrences.map((o) => ({ id: o.id, row: occurrenceToCloud(o) })) },
       { entity: 'xp', rows: xp.map((e) => ({ id: e.key, row: xpToCloud(e) })) },
       { entity: 'achievement', rows: achievements.map((u) => ({ id: u.id, row: achievementToCloud(u) })) },
+      {
+        entity: 'profile',
+        rows: profile?.faithPreference ? [{ id: 'me', row: { faithPreference: profile.faithPreference } }] : [],
+      },
     ];
     const batches: Batch[] = [];
     let deletedAlarmIds: string[] = [];
@@ -117,6 +127,9 @@ export function createSyncEngine(deps: {
           break;
         case 'achievement':
           await cloud.pushAchievements(rows as never);
+          break;
+        case 'profile':
+          for (const row of rows) await cloud.upsertProfile(userId, row as { faithPreference: string });
           break;
       }
       // Only after the cloud accepted them.

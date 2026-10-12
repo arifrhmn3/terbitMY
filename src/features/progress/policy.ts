@@ -9,7 +9,7 @@ import type { MissionDifficulty } from '@/features/missions/types';
  * ranks and summaries are recalculated from the morning history.
  */
 
-/** The three disciplines. Maths counts as Education; Fitness and Faith missions come later. */
+/** The three disciplines: Maths and quizzes train Education; fitness missions, Fitness; Recitation and Reflection, Faith. */
 export type Category = 'education' | 'fitness' | 'faith';
 
 export const CATEGORIES: readonly Category[] = ['education', 'fitness', 'faith'];
@@ -59,7 +59,7 @@ export type ProgressionPolicy = {
   missionCategory: Record<MissionType, Category>;
   /** XP for completing a mission, by mission type (Maths, quiz…). */
   missionXp: Record<MissionType, number>;
-  /** Extra XP on top of `missionXp` for the mission's difficulty (every mission type). */
+  /** Extra XP on top of `missionXp` for the mission's difficulty (missions without one, like Recitation, get none). */
   difficultyBonusXp: Record<MissionDifficulty, number>;
   /** Extra XP for completing the mission, by the mode the alarm actually rang with. */
   modeBonusXp: Record<CompletionMode, number>;
@@ -71,9 +71,17 @@ export type ProgressionPolicy = {
 };
 
 export const PROGRESSION_POLICY: ProgressionPolicy = {
-  // Maths and every quiz topic train Education; fitness missions train Fitness. Faith comes later.
-  missionCategory: { math: 'education', quiz: 'education', fitness: 'fitness' },
-  missionXp: { math: 10, quiz: 10, fitness: 10 },
+  // Maths and every quiz topic train Education; fitness missions train Fitness; Recitation and Reflection train Faith.
+  // Recitation + Reflection is one alarm occurrence, so it earns one Faith mission reward, not one per stage.
+  missionCategory: {
+    math: 'education',
+    quiz: 'education',
+    fitness: 'fitness',
+    recitation: 'faith',
+    reflection: 'faith',
+    recitation_reflection: 'faith',
+  },
+  missionXp: { math: 10, quiz: 10, fitness: 10, recitation: 10, reflection: 10, recitation_reflection: 10 },
   difficultyBonusXp: { easy: 0, medium: 2, hard: 5 },
   modeBonusXp: { reward: 0, gentle: 0, challenge: 5 },
   streak: { maxGapDays: null },
@@ -126,6 +134,15 @@ export const PROGRESSION_POLICY: ProgressionPolicy = {
       description: 'Complete a fitness mission on any alarm.',
       metric: 'missions_completed',
       category: 'fitness',
+      threshold: 1,
+      bonusXp: 0,
+    },
+    {
+      id: 'first_faith',
+      title: 'First Faith mission',
+      description: 'Complete a Faith mission (Recitation, Reflection or both) on any alarm.',
+      metric: 'missions_completed',
+      category: 'faith',
       threshold: 1,
       bonusXp: 0,
     },

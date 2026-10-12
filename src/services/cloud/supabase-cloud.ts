@@ -68,17 +68,20 @@ function createAuth(client: SupabaseClient): AuthService {
 function createStore(client: SupabaseClient): CloudStore {
   return {
     async getProfile(userId) {
-      type ProfileRow = { display_name: string | null; avatar_url: string | null; timezone: string | null };
+      type ProfileRow = { display_name: string | null; avatar_url: string | null; timezone: string | null; faith_preference: string | null };
       const row = await run<ProfileRow | null>(
-        client.from('profiles').select('display_name, avatar_url, timezone').eq('id', userId).maybeSingle<ProfileRow>(),
+        client.from('profiles').select('display_name, avatar_url, timezone, faith_preference').eq('id', userId).maybeSingle<ProfileRow>(),
       );
-      return row ? { displayName: row.display_name, avatarUrl: row.avatar_url, timezone: row.timezone } : null;
+      return row
+        ? { displayName: row.display_name, avatarUrl: row.avatar_url, timezone: row.timezone, faithPreference: row.faith_preference }
+        : null;
     },
     async upsertProfile(userId, profile) {
       const row: Record<string, unknown> = { id: userId, updated_at: new Date().toISOString() };
       if (profile.displayName !== undefined) row.display_name = profile.displayName;
       if (profile.avatarUrl !== undefined) row.avatar_url = profile.avatarUrl;
       if (profile.timezone !== undefined) row.timezone = profile.timezone;
+      if (profile.faithPreference !== undefined) row.faith_preference = profile.faithPreference;
       await run(client.from('profiles').upsert(row, { onConflict: 'id' }));
     },
     async pushAlarms(rows) {
