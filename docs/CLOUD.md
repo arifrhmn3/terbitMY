@@ -103,3 +103,22 @@ Settings → Account → Delete account calls it, signs out, and **keeps the pho
 7. *(Optional)* **Check the security rules:** run `supabase/tests/rls_check.sql` after two test accounts exist.
 
 For EAS cloud builds, add the same two variables as EAS environment variables (`EXPO_PUBLIC_…`). `.env.local` stays on your computer.
+
+## Status and beta-stage verification
+
+**Done (12 Oct 2026):**
+- The project is created, and the schema and RLS are applied.
+- Public values are in `.env.local`.
+- A live probe confirmed that all tables and functions exist and that anonymous access is refused.
+
+**Deferred to beta.** Terbit MY is a working name, so no permanent domain or email sender exists yet. Before beta testers are invited:
+1. Set up a custom SMTP provider, a sender domain and a branded sender address (step 6 above). Confirm the email templates show the `{{ .Token }}` code.
+2. Check real OTP delivery to an address outside the Supabase project team.
+3. On iPhone, test guest → account: sign in, then confirm existing alarms, occurrences, XP and achievements appear in the Table Editor.
+4. Test offline → reconnect backup: the Account status goes from Offline to Synced, and no rows are duplicated.
+5. Sign out (local data stays), then sign in again (no duplicates, only changes sent).
+6. Delete the account against the live backend (cloud rows gone, local data kept).
+7. Run `supabase/tests/rls_check.sql` with two real test accounts.
+8. Cross-device restore. **Not built yet:** the cloud is backup-only. It's a later phase item, using the conflict policy above.
+
+Until then, Terbit MY is used as a guest. Nothing requires an account, and guests make no cloud calls.

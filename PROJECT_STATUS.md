@@ -6,7 +6,7 @@ _Last updated: 11 October 2026_
 
 **Phase 1 (iOS prototype) is closed: complete, physically verified on iPhone (11 October 2026) and merged into `main`.** Android work is deferred to the dedicated Android parity phase (see "Android status" below). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
-**Phase 2A (local Progress Engine) is complete and verified on iPhone. Phase 2B (Accounts & Cloud Foundation) is built and unit-tested on `phase-2/accounts-cloud-foundation`; it waits for the Supabase project to be created (see docs/CLOUD.md → Supabase setup), then an iPhone test.**
+**Phase 2A (local Progress Engine) is complete and verified on iPhone. Phase 2B (Accounts & Cloud Foundation) is complete on the repository side (12 Oct 2026): the Supabase project, schema and RLS are live; live sign-in and cloud-sync testing are deferred to the beta stage (see "Deferred to beta" below).**
 
 ## Phase 2A: local Progress Engine
 
@@ -16,7 +16,7 @@ _Last updated: 11 October 2026_
 | Streak engine (local calendar day, any-success-per-day rule, neutral days, multiple alarms per day) | ✅ Unit-tested, including time zone and midnight cases |
 | Education / Fitness / Faith XP and placeholder ranks (overall + per discipline) | ✅ Maths = Education; Fitness and Faith ready for later missions |
 | Achievements (first morning, 3- and 7-day streaks, 10 missions, first Challenge), data-driven | ✅ Unlock once, unit-tested |
-| Progress tab with real data; XP shown on "Morning complete" | ✅ Built · ⏳ iPhone test |
+| Progress tab with real data; XP shown on "Morning complete" | ✅ Verified on iPhone |
 | Developer panel: inspect, reset, seed an example week; XP accounting (total = disciplines + general/bonus) with every bonus line's source | ✅ Development builds only |
 | First iPhone test (11 Oct) | ✅ XP once per mission, Education XP, one streak day per day, Challenge bonus, persistence, seeding |
 | **Morning vs general accountability** (from the test): only the Main Wake-Up Alarm counts as a morning; other alarms earn XP and count in "All alarms". Each occurrence stores `isMainWakeUp` when it fires (migration 7) | ✅ Unit-tested · ⏳ iPhone retest |
@@ -124,10 +124,12 @@ These are the current working assumptions for beta. They're deliberately configu
 | Item | Status |
 |---|---|
 | Optional account; guest/local-only use unchanged; app runs local-only when no Supabase is configured | ✅ Unit-tested |
-| Email one-time code sign-in, session restored on restart, sign out (keeps local data) | ✅ Unit-tested against an in-memory cloud · ⏳ needs Supabase project + iPhone test |
-| Profile (display name, avatar URL, time zone), created at sign-up | ✅ Schema + app · ⏳ live test |
-| Supabase schema: profiles, alarms, alarm_occurrences, xp_ledger, achievements; RLS own-rows-only on every table; cascade delete | ✅ `supabase/migrations/…accounts_cloud_foundation.sql`; SQL checked by tests; manual RLS script |
+| Email one-time code sign-in, session restored on restart, sign out (keeps local data) | ✅ Unit-tested against an in-memory cloud · live test deferred to beta |
+| Profile (display name, avatar URL, time zone), created at sign-up | ✅ Schema live in Supabase + app · live test deferred to beta |
+| Supabase schema: profiles, alarms, alarm_occurrences, xp_ledger, achievements; RLS own-rows-only on every table; cascade delete | ✅ Applied to the live project (12 Oct); SQL checked by tests; manual RLS script |
 | Local-first backup sync: pending-by-fingerprint (migration 8 `sync_state`), retries with back-off, idempotent, newest-wins conflicts, alarm tombstones | ✅ Unit-tested (offline, retry, duplicates, conflicts, guest → account) |
-| Settings → Account screen: local / sign-in / email, display name, sync status, sign out, delete account; developer sync diagnostics | ✅ Built · ⏳ iPhone test |
+| Settings → Account screen: local / sign-in / email, display name, sync status, sign out, delete account; developer sync diagnostics | ✅ Built; local-only view in use · signed-in view deferred to beta |
 
-Not in 2B: restoring cloud data onto a phone (cross-device sync), Apple/Google sign-in, custom SMTP. See docs/CLOUD.md.
+Live backend checks (12 Oct): project reachable; all five tables and three functions exist; anonymous access refused (RLS + grants working). Public values are in `.env.local` (git-ignored).
+
+
