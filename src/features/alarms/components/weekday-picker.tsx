@@ -39,13 +39,17 @@ export function WeekdayPicker({ value, onChange }: WeekdayPickerProps) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three - Spacing.one,
   },
+  // Grows with large text instead of clipping the letter.
   day: {
-    width: 40,
-    height: 40,
+    minWidth: 40,
+    minHeight: 40,
+    padding: Spacing.half,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',

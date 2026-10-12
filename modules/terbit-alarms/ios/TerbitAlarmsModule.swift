@@ -158,6 +158,21 @@ public class TerbitAlarmsModule: Module {
       await TerbitAlarmsModule.reminderPermission(askIfNeeded: true) ? "granted" : "denied"
     }
 
+    /// Reads (never asks for) the notification permission, for the Permissions screen.
+    AsyncFunction("getReminderPermissionAsync") { () async -> String in
+      let settings = await UNUserNotificationCenter.current().notificationSettings()
+      switch settings.authorizationStatus {
+      case .authorized, .provisional, .ephemeral:
+        return "granted"
+      case .denied:
+        return "denied"
+      case .notDetermined:
+        return "undetermined"
+      @unknown default:
+        return "unknown"
+      }
+    }
+
     AsyncFunction("scheduleReminderAsync") { (options: ReminderOptions) async -> Bool in
       await TerbitAlarmsModule.scheduleReminder(options)
     }

@@ -120,7 +120,6 @@ export function buildMorning(params: {
                 achieved: fitnessTarget(mission.exercise, mission.difficulty),
                 durationMs: 90_000,
                 verification: 'self_reported',
-                adaptation: 'standard',
               }
             : mission.type === 'recitation'
               ? exampleRecitation(mission.tradition)

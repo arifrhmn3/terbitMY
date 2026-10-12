@@ -8,12 +8,13 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { alarmStore, useAlarms } from '@/features/alarms/alarms';
 import { AlarmRow } from '@/features/alarms/components/alarm-row';
-import { NativeAlarmTest } from '@/features/alarms/components/native-alarm-test';
 import { RingingStatus } from '@/features/alarms/components/ringing-status';
-import { EntitlementDevPanel } from '@/features/entitlements/components/entitlement-dev-panel';
+import { catalogueFor, EXERCISES } from '@/features/missions/fitness/exercises';
+import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 
 export default function AlarmsScreen() {
   const { status, alarms } = useAlarms();
+  const { value: access } = useAccessibilitySettings();
 
   return (
     <Screen>
@@ -59,7 +60,9 @@ export default function AlarmsScreen() {
         <ListRow
           icon={{ ios: 'figure.strengthtraining.traditional', android: 'fitness_center', web: 'fitness_center' }}
           title="Fitness"
-          subtitle="Push-ups, squats, jumping jacks, stretch or walk in place (self-reported)"
+          subtitle={catalogueFor(access.mobilityProfile)
+            .map((e) => EXERCISES[e].label)
+            .join(', ')}
           href={{ pathname: '/alarms/practice', params: { mission: 'fitness' } }}
         />
         <ListRow
@@ -69,10 +72,6 @@ export default function AlarmsScreen() {
           href="/alarms/faith"
         />
       </Section>
-
-      {/* Developer test tool, hidden in release builds. */}
-      {__DEV__ && <NativeAlarmTest />}
-      {__DEV__ && <EntitlementDevPanel />}
 
       <ComingSoon
         phase={1}

@@ -30,8 +30,10 @@ import { faithMissionKinds, primaryTradition, visibleTraditions, type FaithMissi
 import { FAITH_POLICY } from '@/features/faith/policy';
 import { TRADITION_LABEL, type FaithSettings } from '@/features/faith/types';
 import { useFaithSettings } from '@/features/faith/use-faith';
-import { EXERCISES, formatSeconds, formatTarget } from '@/features/missions/fitness/exercises';
-import { FITNESS_EXERCISES } from '@/features/missions/fitness/types';
+import { missionForProfile } from '@/features/accessibility/accessibility-settings';
+import { catalogueFor, EXERCISES, formatSeconds, formatTarget } from '@/features/missions/fitness/exercises';
+import type { MobilityProfile } from '@/features/missions/fitness/types';
+import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { QUIZ_CATEGORIES, QUIZ_CATEGORY_LABEL, QUIZ_CATEGORY_SHORT } from '@/features/missions/quiz/types';
 import {
   DIFFICULTY_LABEL,
@@ -80,16 +82,21 @@ const countOptions = MISSION_QUESTION_COUNTS.map((count) => ({ value: count, lab
 const gentleOptions = GENTLE_REMINDER_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 const snoozeOptions = SNOOZE_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 
-const exerciseOptions = FITNESS_EXERCISES.map((exercise) => ({ value: exercise, label: EXERCISES[exercise].short }));
 
 /**
  * Switching mission type keeps the difficulty (and question count) already
  * chosen. Faith starts with the user's default: Recitation in their own
- * tradition, or Reflection for Non-religious / Prefer not to say.
+ * tradition, or Reflection for Non-religious / Prefer not to say. Fitness
+ * offers the user's Mobility Profile catalogue.
  */
-function missionOfType(type: MissionGroup | FaithMissionKind, current: AlarmMission, faith: FaithSettings): AlarmMission {
+function missionOfType(
+  type: MissionGroup | FaithMissionKind,
+  current: AlarmMission,
+  faith: FaithSettings,
+  profile: MobilityProfile,
+): AlarmMission {
   const difficulty: MissionDifficulty = missionDifficulty(current) ?? 'easy';
-  if (type === 'faith') return missionOfType(faithMissionKinds(faith)[0], current, faith);
+  if (type === 'faith') return missionOfType(faithMissionKinds(faith)[0], current, faith, profile);
   if (type === 'recitation') {
     const tradition = primaryTradition(faith) ?? visibleTraditions(faith)[0];
     return tradition ? { type: 'recitation', tradition } : { type: 'reflection', difficulty };
@@ -102,7 +109,10 @@ function missionOfType(type: MissionGroup | FaithMissionKind, current: AlarmMiss
   const questionCount: MissionQuestionCount = current.type === 'math' || current.type === 'quiz' ? current.questionCount : 3;
   if (type === 'math') return { type: 'math', difficulty, questionCount };
   if (type === 'quiz') return { type: 'quiz', category: current.type === 'quiz' ? current.category : 'general', difficulty, questionCount };
-  if (type === 'fitness') return { type: 'fitness', exercise: current.type === 'fitness' ? current.exercise : 'squats', difficulty };
+  if (type === 'fitness') {
+    if (current.type === 'fitness') return missionForProfile(current, profile);
+    return { type: 'fitness', exercise: catalogueFor(profile)[0], difficulty };
+  }
   return { type: 'none' };
 }
 
@@ -110,7 +120,7 @@ const MISSION_FOOTER: Record<AlarmMission['type'], string> = {
   math: 'Solve these to turn the alarm off. A wrong answer means you try that question again.',
   quiz: 'Answer each question to turn the alarm off. You see the right answer after each one; every completed quiz earns Education XP.',
   fitness:
-    'Do the exercise to turn the alarm off and earn Fitness XP. Reps and time are self-reported for now (no camera). Go at your own pace and stop if anything hurts.',
+    'Do the activity to turn the alarm off and earn Fitness XP. Movement is self-reported (no camera); go at your own pace and stop if anything hurts. The activities shown follow your Mobility Profile (Settings → Accessibility).',
   recitation:
     'Read or recite today’s Daily Recitation to turn the alarm off and earn Faith XP. Self-reported: Terbit MY can’t check recitation. Today’s passage is saved on the phone ahead of time, so it works offline.',
   reflection:
@@ -119,6 +129,9 @@ const MISSION_FOOTER: Record<AlarmMission['type'], string> = {
     'Recitation + Reflection: today’s Daily Recitation first, then a guided Reflection. The alarm’s mission is done when both are finished, and it earns Faith XP once.',
   none: 'Without a mission, the alarm can be turned off straight away.',
 };
+
+const NON_PHYSICAL_FOOTER =
+  'A calm activity to turn the alarm off, from your Non-physical Mobility Profile (Settings → Accessibility). It isn’t exercise; for now it earns the same XP as any Fitness mission.';
 
 const reflectionLengthOptions = MISSION_DIFFICULTIES.map((difficulty) => ({
   value: difficulty,
@@ -133,7 +146,11 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   const { has, isPremium } = useEntitlement();
 
   const update = (changes: Partial<AlarmDraft>) => setDraft((current) => ({ ...current, ...changes }));
-  const mission = draft.mission;
+  const { value: access } = useAccessibilitySettings();
+  const profile = access.mobilityProfile;
+  // Fitness alarms show (and save) the activity from the user's Mobility Profile catalogue.
+  const mission = missionForProfile(draft.mission, profile);
+  const exerciseOptions = catalogueFor(profile).map((exercise) => ({ value: exercise, label: EXERCISES[exercise].short }));
   const faith = useFaithSettings();
   const faithKinds = faithMissionKinds(faith);
   const difficulty = missionDifficulty(mission);
@@ -166,7 +183,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   async function save() {
     setSaving(true);
     try {
-      const { result } = await alarmStore.save(draft, alarmId);
+      const { result } = await alarmStore.save({ ...draft, mission }, alarmId);
       // Gentle mode follow-ups use local notifications: ask once, when it's first needed.
       if (draft.completionMode === 'gentle' && draft.enabled) await getReminderService().requestPermission();
       if (result?.status === 'permission-denied' || result?.status === 'failed') {
@@ -260,18 +277,20 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
         footer={
           groupOf(mission) === 'faith' && !faithKinds.includes('recitation')
             ? `${MISSION_FOOTER[mission.type]} To add Recitation, choose your faith in Settings → Faith.`
-            : MISSION_FOOTER[mission.type]
+            : mission.type === 'fitness' && profile === 'non_physical'
+              ? NON_PHYSICAL_FOOTER
+              : MISSION_FOOTER[mission.type]
         }>
         <ChoiceRow
           options={missionOptions}
           value={groupOf(mission)}
-          onChange={(type) => update({ mission: missionOfType(type, mission, faith) })}
+          onChange={(type) => update({ mission: missionOfType(type, mission, faith, profile) })}
         />
         {groupOf(mission) === 'faith' && faithKinds.length > 1 && (
           <ChoiceRow
             options={faithKinds.map((kind) => ({ value: kind, label: FAITH_KIND_LABEL[kind] }))}
             value={mission.type as FaithMissionKind}
-            onChange={(kind) => update({ mission: missionOfType(kind, mission, faith) })}
+            onChange={(kind) => update({ mission: missionOfType(kind, mission, faith, profile) })}
           />
         )}
         {(mission.type === 'recitation' || mission.type === 'recitation_reflection') && traditionChoices.length > 1 && (
@@ -300,7 +319,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
         )}
         {mission.type === 'fitness' && (
           <ChoiceRow
-            title={`Exercise: ${EXERCISES[mission.exercise].label} · ${formatTarget(mission.exercise, mission.difficulty)}`}
+            title={`${profile === 'non_physical' ? 'Activity' : 'Exercise'}: ${EXERCISES[mission.exercise].label} · ${formatTarget(mission.exercise, mission.difficulty)}`}
             options={exerciseOptions}
             value={mission.exercise}
             onChange={(exercise) => update({ mission: { ...mission, exercise } })}

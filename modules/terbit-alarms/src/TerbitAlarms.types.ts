@@ -127,6 +127,8 @@ export type TerbitAlarmsNativeModule = {
   addListener?(eventName: 'onAlarmAction', listener: (action: NativeAlarmAction) => void): { remove(): void };
   /** iOS only: local notification reminders (Gentle mode). */
   requestReminderPermissionAsync?(): Promise<'granted' | 'denied'>;
+  /** Reads the notification permission without asking. Missing in builds before Phase 3D. */
+  getReminderPermissionAsync?(): Promise<'granted' | 'denied' | 'undetermined' | 'unknown'>;
   scheduleReminderAsync?(options: { id: string; title: string; body: string; fireAt: number }): Promise<boolean>;
   cancelReminderAsync?(id: string): Promise<void>;
 };

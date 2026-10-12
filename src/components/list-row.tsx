@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useLargeText } from '@/hooks/use-large-text';
 import { useTheme } from '@/hooks/use-theme';
 
 type ListRowProps = {
@@ -17,9 +18,15 @@ type ListRowProps = {
   onPress?: () => void;
 };
 
-/** A single row inside a `Section`. */
+/** A single row inside a `Section`. With large text, the value moves under the title instead of squeezing it. */
 export function ListRow({ title, subtitle, value, icon, href, onPress }: ListRowProps) {
   const theme = useTheme();
+  const largeText = useLargeText();
+  const valueText = value ? (
+    <ThemedText type="small" themeColor="textSecondary" style={largeText ? undefined : styles.value}>
+      {value}
+    </ThemedText>
+  ) : null;
 
   const content = (
     <View style={styles.row}>
@@ -31,12 +38,9 @@ export function ListRow({ title, subtitle, value, icon, href, onPress }: ListRow
             {subtitle}
           </ThemedText>
         )}
+        {largeText && valueText}
       </View>
-      {value && (
-        <ThemedText type="small" themeColor="textSecondary">
-          {value}
-        </ThemedText>
-      )}
+      {!largeText && valueText}
       {href && (
         <SymbolView
           name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
@@ -83,5 +87,10 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
     gap: Spacing.half,
+  },
+  value: {
+    flexShrink: 1,
+    maxWidth: '50%',
+    textAlign: 'right',
   },
 });

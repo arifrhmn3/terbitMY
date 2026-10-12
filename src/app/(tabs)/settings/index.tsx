@@ -3,51 +3,46 @@ import Constants from 'expo-constants';
 import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
+import { MISSION_PACING_LABEL, MOBILITY_PROFILE_LABEL } from '@/features/accessibility/accessibility-settings';
 import { useAccount, useSyncStatus } from '@/features/account/account';
 import { FAITH_PREFERENCE_LABEL } from '@/features/faith/types';
 import { useFaithSettings } from '@/features/faith/use-faith';
+import { visibleSettingsGroups, type SettingsPage } from '@/features/settings/settings-index';
+import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { syncStatusLabel } from '@/features/sync/status-label';
-import { settingsSections } from '@/lib/settings-sections';
 
+/** Settings: a short index; each group opens its own screen. */
 export default function SettingsScreen() {
   const { status, user } = useAccount();
   const sync = useSyncStatus();
   const faithSettings = useFaithSettings();
-  const subtitle =
-    status === 'signed_in'
-      ? `${user?.email ?? 'Signed in'} · ${syncStatusLabel(sync).title}`
-      : status === 'loading'
-        ? 'Loading…'
-        : 'Using Terbit MY locally';
+  const { value: access } = useAccessibilitySettings();
+
+  // Current value or status under each row, in plain language.
+  const subtitle: Record<SettingsPage, string> = {
+    account:
+      status === 'signed_in'
+        ? `${user?.email ?? 'Signed in'} · ${syncStatusLabel(sync).title}`
+        : status === 'loading'
+          ? 'Loading…'
+          : 'Using Terbit MY on this phone · optional sign-in',
+    faith: `${faithSettings.primary ? FAITH_PREFERENCE_LABEL[faithSettings.primary] : 'Not chosen'} · Recitation and Reflection`,
+    notifications: 'Alarms, and Gentle mode follow-ups',
+    accessibility: `Mobility: ${MOBILITY_PROFILE_LABEL[access.mobilityProfile]} · Pacing: ${MISSION_PACING_LABEL[access.missionPacing]}`,
+    permissions: 'Alarms, notifications, and what Terbit MY never asks for',
+    privacy: 'What stays on your phone, and what’s backed up',
+    developer: 'Alarm, progress, sync and plan test tools',
+  };
 
   return (
     <Screen>
-      <Section>
-        <ListRow
-          icon={{ ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' }}
-          title="Account"
-          subtitle={subtitle}
-          href="/settings/account"
-        />
-        <ListRow
-          icon={{ ios: 'book', android: 'menu_book', web: 'menu_book' }}
-          title="Faith"
-          subtitle={faithSettings.primary ? FAITH_PREFERENCE_LABEL[faithSettings.primary] : 'Recitation and Reflection settings'}
-          href="/settings/faith"
-        />
-      </Section>
-
-      <Section>
-        {settingsSections.map((section) => (
-          <ListRow
-            key={section.id}
-            icon={section.icon}
-            title={section.title}
-            subtitle={section.summary}
-            href={{ pathname: '/settings/[section]', params: { section: section.id } }}
-          />
-        ))}
-      </Section>
+      {visibleSettingsGroups(__DEV__).map((group) => (
+        <Section key={group.id} title={group.title} footer={group.footer}>
+          {group.rows.map((row) => (
+            <ListRow key={row.page} icon={row.icon} title={row.title} subtitle={subtitle[row.page]} href={row.href} />
+          ))}
+        </Section>
+      ))}
 
       <Section title="About">
         <ListRow
