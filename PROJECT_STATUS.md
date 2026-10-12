@@ -167,3 +167,7 @@ Branch `phase-3/fitness-missions`. ✅ **Complete and verified on iPhone (12 Oct
 | Practice for every mission from the Alarms tab; development builds can launch any type/exercise/difficulty directly | ✅ |
 
 No database migration (missions are stored as JSON). Maths and Quiz unchanged.
+
+## Beta requirements (must be done before public beta)
+
+- **Production Reflection Music Catalogue and Licensing Approval.** Every production Reflection / Meditation track needs a confirmed licence permitting Terbit MY’s actual usage (commercial app use, playback, caching/offline as used). Development placeholder tracks are never production-approved. Options A–D and the design: [docs/REFLECTION-MUSIC.md](docs/REFLECTION-MUSIC.md).
