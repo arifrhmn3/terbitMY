@@ -5,15 +5,18 @@ import {
   normalizeWeekdays,
   COMPLETION_MODES,
   GENTLE_REMINDER_MINUTES,
+  MAX_SNOOZES,
   SNOOZE_MINUTES,
   sortAlarms,
   type Alarm,
   type AlarmMission,
   type CompletionMode,
   type GentleReminderMinutes,
+  type MaxSnoozes,
   type SnoozeMinutes,
   type Weekday,
 } from './alarm';
+import { ALARM_DEFAULTS } from './alarm-defaults';
 import { isTradition } from '@/features/faith/types';
 import { MATH_DIFFICULTIES, MATH_QUESTION_COUNTS } from '@/features/missions/math/questions';
 import { FITNESS_EXERCISES } from '@/features/missions/fitness/types';
@@ -23,7 +26,7 @@ import { MISSION_DIFFICULTIES, MISSION_QUESTION_COUNTS } from '@/features/missio
 /** Saves and loads alarm settings. It never schedules or rings an alarm. */
 export interface AlarmRepository {
   list(): Promise<Alarm[]>;
-  /** Inserts or updates. If the alarm is primary, every other alarm stops being primary. */
+  /** Inserts or updates. (The one-Main-Wake-Up-per-day rule is applied by the alarm store.) */
   save(alarm: Alarm): Promise<void>;
   remove(id: string): Promise<void>;
 }
@@ -38,6 +41,7 @@ export type AlarmRow = {
   mission: string;
   snooze_enabled: number;
   snooze_minutes: number;
+  snooze_max: number;
   is_primary: number;
   completion_mode: string;
   gentle_reminder_minutes: number;
@@ -57,6 +61,7 @@ export function alarmToRow(alarm: Alarm): AlarmRow {
     mission: JSON.stringify(alarm.mission),
     snooze_enabled: alarm.snooze.enabled ? 1 : 0,
     snooze_minutes: alarm.snooze.minutes,
+    snooze_max: alarm.snooze.maxSnoozes,
     is_primary: alarm.isPrimary ? 1 : 0,
     completion_mode: alarm.completionMode,
     gentle_reminder_minutes: alarm.gentleReminderMinutes,
@@ -134,7 +139,11 @@ export function rowToAlarm(row: AlarmRow): Alarm {
     enabled: row.enabled === 1,
     label: row.label,
     mission: parseMission(row.mission),
-    snooze: { enabled: row.snooze_enabled === 1, minutes: snoozeMinutes },
+    snooze: {
+      enabled: row.snooze_enabled === 1,
+      minutes: snoozeMinutes,
+      maxSnoozes: MAX_SNOOZES.includes(row.snooze_max as MaxSnoozes) ? (row.snooze_max as MaxSnoozes) : ALARM_DEFAULTS.snooze.maxSnoozes,
+    },
     isPrimary: row.is_primary === 1,
     completionMode: parseCompletionMode(row.completion_mode),
     gentleReminderMinutes: GENTLE_REMINDER_MINUTES.includes(row.gentle_reminder_minutes as GentleReminderMinutes)
@@ -159,14 +168,11 @@ export function createSqliteAlarmRepository(db: AlarmDatabase): AlarmRepository 
     async save(alarm) {
       const row = alarmToRow(alarm);
       await db.withTransactionAsync(async () => {
-        if (alarm.isPrimary) {
-          await db.runAsync('UPDATE alarms SET is_primary = 0 WHERE id != ? AND is_primary = 1', alarm.id);
-        }
         await db.runAsync(
           `INSERT OR REPLACE INTO alarms
-            (id, hour, minute, weekdays, enabled, label, mission, snooze_enabled, snooze_minutes, is_primary,
+            (id, hour, minute, weekdays, enabled, label, mission, snooze_enabled, snooze_minutes, snooze_max, is_primary,
              completion_mode, gentle_reminder_minutes, sound_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           row.id,
           row.hour,
           row.minute,
@@ -176,6 +182,7 @@ export function createSqliteAlarmRepository(db: AlarmDatabase): AlarmRepository 
           row.mission,
           row.snooze_enabled,
           row.snooze_minutes,
+          row.snooze_max,
           row.is_primary,
           row.completion_mode,
           row.gentle_reminder_minutes,
@@ -206,10 +213,7 @@ export function createMemoryAlarmRepository(initial: Alarm[] = []): AlarmReposit
 
     async save(alarm) {
       const row = alarmToRow(alarm);
-      rows = rows
-        .filter((r) => r.id !== alarm.id)
-        .map((r) => (alarm.isPrimary ? { ...r, is_primary: 0 } : r))
-        .concat(row);
+      rows = rows.filter((r) => r.id !== alarm.id).concat(row);
     },
 
     async remove(id) {

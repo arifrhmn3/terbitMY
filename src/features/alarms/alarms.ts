@@ -17,7 +17,11 @@ export const alarmStore = createAlarmStore(
   async () => createSqliteAlarmRepository(await getDatabase()),
   getAlarmService(),
   {
-    onRemove: occurrences.cancelForAlarm,
+    // Deleting closes the alarm's open morning (history stays) and its Gentle reminder.
+    onRemove: async (id) => {
+      await occurrences.cancelForAlarm(id);
+      await handOff.syncReminders().catch(() => {});
+    },
     // Behaviour follows the user's entitlements (e.g. Challenge → Reward when unavailable).
     effective: (alarm) => withEffectiveSettings(alarm, entitlements.check()),
   },

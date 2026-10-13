@@ -43,7 +43,7 @@ export function ProgressDevPanel({ summary, onChange }: { summary: ProgressSumma
     }
     await progress.sync();
     onChange();
-    Alert.alert('Example week added', `${added} example mornings added (simulated, shown in Recent mornings).`);
+    Alert.alert('Example week added', `${added} example mornings added (simulated, shown in Progress → Recent mornings).`);
   }
 
   function reset() {

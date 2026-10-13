@@ -4,7 +4,7 @@ import type {
   TerbitAlarmsNativeModule,
 } from '../../../modules/terbit-alarms';
 
-import { alarmKitFireEvents, androidFireEvents, isNativeUpToDate, staleSavedAlarmIds } from './native-records';
+import { alarmKitFireEvents, androidFireEvents, isNativeUpToDate, snoozeRings, staleSavedAlarmIds } from './native-records';
 import type { AlarmBackend, AlarmService, NativeAlarmStatus, ScheduleResult } from './types';
 
 export function toNativeAlarmStatus(payload: NativeStatusPayload): NativeAlarmStatus {
@@ -90,6 +90,8 @@ export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backe
           completionMode: spec.completionMode,
           actionLabel: spec.actionLabel,
           actionIcon: spec.actionIcon,
+          snoozeOffsets: [...spec.snoozeOffsetsMinutes],
+          snoozeLabel: spec.snoozeLabel,
         }),
       );
     },
@@ -113,6 +115,15 @@ export function createNativeAlarmService(native: TerbitAlarmsNativeModule, backe
       if (backend !== 'alarmkit') return androidFireEvents(records, since);
       const actions = native.listActionsAsync ? await native.listActionsAsync() : [];
       return alarmKitFireEvents(records, since, now, actions);
+    },
+
+    async listSnoozes() {
+      if (backend !== 'alarmkit') return [];
+      return snoozeRings(await native.listAsync());
+    },
+
+    async cancelSnoozes(alarmId) {
+      await native.cancelSnoozesAsync?.(alarmId);
     },
 
     onAlarmAction(listener) {

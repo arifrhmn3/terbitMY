@@ -24,6 +24,18 @@ struct NativeAlarmRecord: Codable {
   var actionLabel: String?
   /// Which alert presentation was used (for developer diagnostics).
   var presentation: String?
+  /// Saved alarms: what a snooze ring needs to be scheduled from an App Intent
+  /// (no JavaScript involved). Empty / nil `snoozeOffsets` = no snooze.
+  var title: String? = nil
+  var actionIcon: String? = nil
+  var snoozeLabel: String? = nil
+  /// Minutes after the alarm time for each snooze ring (computed in JavaScript by
+  /// the same `snoozeSchedule` the Preview uses). Its count is the maximum.
+  var snoozeOffsets: [Double]? = nil
+  /// "snooze" records only: which snooze this ring is (1…), and the original ring
+  /// it belongs to (ms since 1970). Every snooze of one morning shares `originAt`.
+  var snoozeIndex: Int? = nil
+  var originAt: Double? = nil
 }
 
 enum NativeAlarmRecords {
@@ -56,7 +68,8 @@ enum NativeAlarmActions {
   /// Posted once a tap is saved, so a running app can react at once instead of guessing when the intent finished.
   static let recordedNotification = Notification.Name("TerbitAlarmActionRecorded")
 
-  /// action: "mission" (Stop & Open Terbit / Stop & Start Mission) or "stop" (the system Stop button).
+  /// action: "mission" (Stop & Open Terbit / Stop & Start Mission), "stop" (the system Stop button),
+  /// "snooze" (a snooze ring was scheduled) or "snooze_failed" (it couldn't be).
   static func record(alarmId: String, nativeId: String, action: String) {
     var actions = load()
     let entry: [String: Any] = ["alarmId": alarmId, "nativeId": nativeId, "action": action, "at": NativeAlarmRecords.nowMs()]

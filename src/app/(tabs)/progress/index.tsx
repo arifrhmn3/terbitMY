@@ -1,6 +1,5 @@
 import type { SymbolViewProps } from 'expo-symbols';
 
-import { ComingSoon } from '@/components/coming-soon';
 import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
@@ -14,7 +13,7 @@ const CATEGORY_ICON: Record<Category, SymbolViewProps['name']> = {
   faith: { ios: 'moon.stars', android: 'nights_stay', web: 'nights_stay' },
 };
 
-/** Streaks, XP, ranks and achievements, worked out on this phone from your mornings. */
+/** “How am I doing over time?” Streaks, Recent mornings, XP, ranks and achievements, worked out on this phone. */
 export default function ProgressScreen() {
   const { summary, error } = useProgressSummary();
 
@@ -53,6 +52,12 @@ export default function ProgressScreen() {
           title="Successful mornings"
           subtitle={morning.scheduled === 0 ? 'Mark an alarm as your Main Wake-Up Alarm to track mornings.' : undefined}
           value={`${morning.successful} of ${morning.scheduled}`}
+        />
+        <ListRow
+          icon={{ ios: 'clock.arrow.circlepath', android: 'history', web: 'history' }}
+          title="Recent mornings"
+          subtitle="Every alarm: completed, skipped and missed"
+          href="/progress/history"
         />
       </Section>
 
@@ -126,12 +131,6 @@ export default function ProgressScreen() {
           ))
         )}
       </Section>
-
-      <Section title="Sleep">
-        <ListRow icon={{ ios: 'bed.double', android: 'bed', web: 'bed' }} title="Bedtime consistency" value="—" />
-        <ListRow icon={{ ios: 'sunrise', android: 'wb_twilight', web: 'wb_twilight' }} title="Average wake-up" value="—" />
-      </Section>
-      <ComingSoon phase={4} description="Sleep and bedtime insights arrive with the bedtime routine." />
     </Screen>
   );
 }

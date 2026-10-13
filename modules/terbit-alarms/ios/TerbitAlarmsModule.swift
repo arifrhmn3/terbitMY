@@ -26,6 +26,10 @@ struct SavedAlarmOptions: Record {
   @Field var actionLabel: String = "Stop & Open Terbit"
   /// SF Symbol for that button.
   @Field var actionIcon: String = "sunrise.fill"
+  /// Minutes after the alarm time for each snooze ring (from JavaScript's `snoozeSchedule`). Empty = no snooze.
+  @Field var snoozeOffsets: [Double] = []
+  /// The Snooze button's label, e.g. "Snooze 10 min".
+  @Field var snoozeLabel: String = "Snooze"
 }
 
 struct ReminderOptions: Record {
@@ -87,6 +91,16 @@ public class TerbitAlarmsModule: Module {
       await TerbitAlarmsModule.scheduleSaved(options)
     }
 
+    /// Cancels this alarm's snooze rings that haven't rung yet (the morning was finished another way).
+    /// The saved alarm itself stays scheduled.
+    AsyncFunction("cancelSnoozesAsync") { (alarmId: String) -> Int in
+      guard #available(iOS 26.0, *) else { return 0 }
+      var records = NativeAlarmRecords.load()
+      let cancelled = NativeSnooze.cancelPending(alarmId: alarmId, in: &records)
+      NativeAlarmRecords.save(records)
+      return cancelled
+    }
+
     AsyncFunction("cancelAsync") { (alarmId: String) -> Int in
       var records = NativeAlarmRecords.load()
       let cancelled = TerbitAlarmsModule.cancelActive(alarmId: alarmId, in: &records)
@@ -127,6 +141,9 @@ public class TerbitAlarmsModule: Module {
           "completionMode": TerbitAlarmsModule.orNull(record.completionMode),
           "actionLabel": TerbitAlarmsModule.orNull(record.actionLabel),
           "presentation": TerbitAlarmsModule.orNull(record.presentation),
+          "snoozeOffsets": TerbitAlarmsModule.orNull(record.snoozeOffsets),
+          "snoozeIndex": TerbitAlarmsModule.orNull(record.snoozeIndex),
+          "originAt": TerbitAlarmsModule.orNull(record.originAt),
         ]
       }
     }
@@ -228,9 +245,14 @@ public class TerbitAlarmsModule: Module {
   }
 
   /// Cancels every not-yet-cancelled native alarm for this Terbit MY ID. Returns how many.
-  private static func cancelActive(alarmId: String, in records: inout [NativeAlarmRecord]) -> Int {
+  /// `keepingSnoozes`: re-scheduling the saved alarm (which happens whenever the app
+  /// re-syncs, e.g. on opening) must never cancel a snooze ring already on its way;
+  /// only turning the alarm off or deleting it (cancelAsync) does, or JavaScript
+  /// deliberately (cancelSnoozesAsync) when the morning is finished or the alarm changed.
+  private static func cancelActive(alarmId: String, in records: inout [NativeAlarmRecord], keepingSnoozes: Bool = false) -> Int {
     var cancelled = 0
     for index in records.indices where records[index].alarmId == alarmId && records[index].cancelledAt == nil {
+      if keepingSnoozes && records[index].kind == "snooze" { continue }
       if #available(iOS 26.0, *) {
         AlarmKitBridge.cancel(nativeId: records[index].nativeId)
       }
@@ -270,7 +292,7 @@ public class TerbitAlarmsModule: Module {
     }
 
     var records = NativeAlarmRecords.load()
-    _ = cancelActive(alarmId: options.alarmId, in: &records)
+    _ = cancelActive(alarmId: options.alarmId, in: &records, keepingSnoozes: true)
     do {
       let id = try await AlarmKitBridge.scheduleOneTime(
         alarmId: options.alarmId,
@@ -312,7 +334,7 @@ public class TerbitAlarmsModule: Module {
     let weekdays = Array(Set(options.weekdays.filter { (0...6).contains($0) })).sorted()
 
     var records = NativeAlarmRecords.load()
-    _ = cancelActive(alarmId: options.alarmId, in: &records)
+    _ = cancelActive(alarmId: options.alarmId, in: &records, keepingSnoozes: true)
     do {
       let id = try await AlarmKitBridge.scheduleSaved(
         alarmId: options.alarmId,
@@ -322,9 +344,10 @@ public class TerbitAlarmsModule: Module {
         date: Date(timeIntervalSince1970: options.fireAt / 1000),
         title: options.title,
         actionLabel: options.actionLabel,
-        actionIcon: options.actionIcon
+        actionIcon: options.actionIcon,
+        snoozeLabel: options.snoozeOffsets.isEmpty ? nil : options.snoozeLabel
       )
-      records.append(NativeAlarmRecord(
+      var record = NativeAlarmRecord(
         alarmId: options.alarmId,
         occurrenceId: nil,
         nativeId: id.uuidString,
@@ -338,7 +361,13 @@ public class TerbitAlarmsModule: Module {
         completionMode: options.completionMode,
         actionLabel: options.actionLabel,
         presentation: AlarmKitBridge.presentationName(hasButton: true)
-      ))
+      )
+      // Everything a snooze ring needs, so the Snooze App Intent can schedule it without JavaScript.
+      record.title = options.title
+      record.actionIcon = options.actionIcon
+      record.snoozeLabel = options.snoozeLabel
+      record.snoozeOffsets = options.snoozeOffsets.isEmpty ? nil : options.snoozeOffsets
+      records.append(record)
       NativeAlarmRecords.save(records)
       return ["ok": true, "nativeId": id.uuidString]
     } catch {

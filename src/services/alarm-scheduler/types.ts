@@ -22,6 +22,30 @@ export type AlarmSpec = {
   /** iOS: SF Symbol for that button. */
   actionIcon: string;
   soundId: string;
+  /**
+   * Minutes after the alarm time for each snooze ring, from `snoozeSchedule` (the
+   * same calculation as the Preview). Its length is the maximum. Empty = no snooze.
+   */
+  snoozeOffsetsMinutes: number[];
+  /** The Snooze button's label, e.g. "Snooze 10 min". */
+  snoozeLabel: string;
+};
+
+/**
+ * One snooze ring (iOS). Part of ONE morning of a saved alarm: never a
+ * separate alarm or morning. `originAt` is the original ring it belongs to.
+ */
+export type SnoozeRing = {
+  alarmId: string;
+  nativeId: string;
+  /** 1 = first snooze. */
+  index: number;
+  /** The maximum snoozes it was scheduled with. */
+  total: number;
+  originAt: number;
+  fireAt: number;
+  /** Still to ring (not cancelled, not yet rung). */
+  pending: boolean;
 };
 
 /** Which native system rings alarms on this device. */
@@ -68,7 +92,8 @@ export type NativeAlarmStatus = {
 export type NativeAlarmActionRecord = {
   alarmId: string;
   nativeId: string;
-  action: 'mission' | 'stop';
+  /** 'snooze' / 'snooze_failed': a Snooze tap (never a stop). */
+  action: 'mission' | 'stop' | 'snooze' | 'snooze_failed';
   at: number;
 };
 
@@ -93,8 +118,12 @@ export type NativeAlarmRecord = {
   firedAt: number | null;
   stoppedAt: number | null;
   cancelledAt: number | null;
-  /** 'test' (developer raw test) or 'saved' (a saved Terbit MY alarm). */
-  kind?: 'test' | 'saved';
+  /** 'test' (developer raw test), 'saved' (a saved Terbit MY alarm) or 'snooze' (a snooze ring of one). */
+  kind?: 'test' | 'saved' | 'snooze';
+  /** iOS saved alarms: snooze ring offsets (minutes). Snooze rings: their number and original ring. */
+  snoozeOffsets?: number[] | null;
+  snoozeIndex?: number | null;
+  originAt?: number | null;
   stopAction?: 'stop' | 'mission' | null;
   /** iOS saved alarms: the schedule, mode, button label and presentation AlarmKit was given (diagnostics). */
   hour?: number | null;
@@ -162,4 +191,8 @@ export interface AlarmService {
   listNativeActions(): Promise<NativeAlarmActionRecord[]>;
   /** Developer tool: cancels every native alarm of this app (then call syncAll). Returns how many. */
   resetNativeAlarms(): Promise<number>;
+  /** iOS: every snooze ring scheduled recently (pending or not). Empty elsewhere. */
+  listSnoozes(): Promise<SnoozeRing[]>;
+  /** iOS: cancels this alarm's snooze rings that haven't rung yet; the alarm itself stays scheduled. */
+  cancelSnoozes(alarmId: string): Promise<void>;
 }

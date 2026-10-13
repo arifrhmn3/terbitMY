@@ -58,6 +58,13 @@ export type SavedAlarmOptions = {
   actionLabel: string;
   /** iOS: SF Symbol for that button. */
   actionIcon?: string;
+  /**
+   * iOS: minutes after the alarm time for each snooze ring (from `snoozeSchedule`,
+   * the same calculation the Preview shows). Its length is the maximum. Empty = no snooze.
+   */
+  snoozeOffsets?: number[];
+  /** iOS: the Snooze button's label, e.g. "Snooze 10 min". */
+  snoozeLabel?: string;
 };
 
 /** iOS: a tap on the AlarmKit buttons, recorded natively by an App Intent. */
@@ -65,8 +72,12 @@ export type NativeAlarmAction = {
   alarmId: string;
   /** The AlarmKit alarm UUID. */
   nativeId: string;
-  /** 'mission' = "Stop & Open Terbit" / "Stop & Start Mission". 'stop' = the system Stop button. */
-  action: 'mission' | 'stop';
+  /**
+   * 'mission' = "Stop & Open Terbit" / "Stop & Start Mission". 'stop' = the system Stop button.
+   * 'snooze' = Snooze tapped and the next ring scheduled; 'snooze_failed' = it couldn't be.
+   * A snooze never stops the morning.
+   */
+  action: 'mission' | 'stop' | 'snooze' | 'snooze_failed';
   /** ms since 1970 */
   at: number;
 };
@@ -76,8 +87,11 @@ export type NativeScheduleResult =
   | { ok: false; code: NativeAlarmErrorCode; message: string };
 
 export type NativeRecordPayload = {
-  /** 'test' (developer test alarm) or 'saved' (a saved Terbit MY alarm). Older records have none (= test). */
-  kind?: 'test' | 'saved';
+  /**
+   * 'test' (developer test alarm), 'saved' (a saved Terbit MY alarm) or 'snooze' (one
+   * snooze ring of a saved alarm; never a morning of its own). Older records have none (= test).
+   */
+  kind?: 'test' | 'saved' | 'snooze';
   alarmId: string;
   occurrenceId: string | null;
   nativeId: string;
@@ -98,6 +112,11 @@ export type NativeRecordPayload = {
   hour?: number | null;
   minute?: number | null;
   weekdays?: number[] | null;
+  /** iOS saved alarms: the snooze ring offsets it was scheduled with (none = no snooze). */
+  snoozeOffsets?: number[] | null;
+  /** iOS snooze rings: which snooze (1…), and the original ring of the same morning (ms). */
+  snoozeIndex?: number | null;
+  originAt?: number | null;
   /** iOS saved alarms: the mode the AlarmKit alarm was created with (decides its button label). */
   completionMode?: 'reward' | 'challenge' | 'gentle' | null;
   /** iOS: the Terbit button label it was created with (null = no button). */
@@ -113,8 +132,10 @@ export type TerbitAlarmsNativeModule = {
   scheduleOneTimeAsync(options: OneTimeAlarmOptions): Promise<NativeScheduleResult>;
   /** A saved alarm (one-off or weekly). Replaces any earlier native alarm for the same ID. */
   scheduleAlarmAsync(options: SavedAlarmOptions): Promise<NativeScheduleResult>;
-  /** Cancels every native alarm scheduled for `alarmId`. Returns how many were cancelled. */
+  /** Cancels every native alarm scheduled for `alarmId` (pending snooze rings included). Returns how many were cancelled. */
   cancelAsync(alarmId: string): Promise<number>;
+  /** iOS: cancels only this alarm's snooze rings that haven't rung yet. Missing in builds before Phase 3.5. */
+  cancelSnoozesAsync?(alarmId: string): Promise<number>;
   /** The most recent native alarms this app scheduled, newest first. */
   listAsync(): Promise<NativeRecordPayload[]>;
   /** Opens the system settings page where the missing permission can be turned on. */

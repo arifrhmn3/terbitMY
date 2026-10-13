@@ -49,6 +49,7 @@ export type OccurrenceRow = {
   is_main_wake_up: number | null;
   mission: string;
   snooze_minutes: number | null;
+  snooze_count?: number | null;
   completion_mode: string;
   gentle_reminder_minutes: number;
   fire_evidence: string;
@@ -76,6 +77,7 @@ export function occurrenceToRow(o: AlarmOccurrence): OccurrenceRow {
     is_main_wake_up: o.isMainWakeUp ? 1 : 0,
     mission: JSON.stringify(o.mission),
     snooze_minutes: o.snoozeMinutes,
+    snooze_count: o.snoozeCount,
     completion_mode: o.completionMode,
     gentle_reminder_minutes: o.gentleReminderMinutes,
     fire_evidence: o.fireEvidence,
@@ -124,6 +126,7 @@ export function rowToOccurrence(row: OccurrenceRow): AlarmOccurrence {
     isMainWakeUp: row.is_main_wake_up === 1,
     mission: parseMission(row.mission),
     snoozeMinutes: row.snooze_minutes,
+    snoozeCount: row.snooze_count ?? 0,
     completionMode: parseCompletionMode(row.completion_mode),
     gentleReminderMinutes: row.gentle_reminder_minutes ?? 10,
     fireEvidence: FIRE_EVIDENCE.includes(row.fire_evidence as FireEvidence) ? (row.fire_evidence as FireEvidence) : 'app',
@@ -187,9 +190,9 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
         await db.runAsync(
           `INSERT INTO alarm_occurrences
             (id, alarm_id, scheduled_at, source, status, alarm_label, is_main_wake_up, mission, snooze_minutes,
-             completion_mode, gentle_reminder_minutes, fire_evidence, started_at, alarm_stopped_at,
+             snooze_count, completion_mode, gentle_reminder_minutes, fire_evidence, started_at, alarm_stopped_at,
              alarm_stop_reason, mission_started_at, mission_completed_at, ended_at, result, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           r.id,
           r.alarm_id,
           r.scheduled_at,
@@ -199,6 +202,7 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
           r.is_main_wake_up,
           r.mission,
           r.snooze_minutes,
+          r.snooze_count ?? 0,
           r.completion_mode,
           r.gentle_reminder_minutes,
           r.fire_evidence,
@@ -223,7 +227,7 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
       const { changes } = await db.runAsync(
         `UPDATE alarm_occurrences
             SET status = ?, started_at = ?, alarm_stopped_at = ?, alarm_stop_reason = ?, mission_started_at = ?,
-                mission_completed_at = ?, ended_at = ?, result = ?, updated_at = ?
+                mission_completed_at = ?, ended_at = ?, result = ?, snooze_count = ?, updated_at = ?
           WHERE id = ? AND status = ? AND (? IS NULL OR updated_at = ?)`,
         r.status,
         r.started_at,
@@ -233,6 +237,7 @@ export function createSqliteOccurrenceRepository(db: OccurrenceDatabase): Occurr
         r.mission_completed_at,
         r.ended_at,
         r.result,
+        r.snooze_count ?? 0,
         r.updated_at,
         r.id,
         expectedStatus,

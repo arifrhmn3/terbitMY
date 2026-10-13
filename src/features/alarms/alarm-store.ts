@@ -6,12 +6,13 @@ import {
   normalizeWeekdays,
   sortAlarms,
   validateAlarm,
-  withPrimary,
   type Alarm,
   type AlarmDraft,
 } from './alarm';
 import { MODE_POLICIES } from './accountability';
 import type { AlarmRepository } from './alarm-repository';
+import { legacyMainWakeUpFixes, mainWakeUpOverlaps, resolveMainWakeUpOverlaps } from './main-wake-up';
+import { snoozeSchedule } from './snooze';
 import type { AlarmService, AlarmSpec, ScheduleResult } from '@/services/alarm-scheduler';
 
 export type AlarmStoreState = {
@@ -46,7 +47,21 @@ export function toAlarmSpec(alarm: Alarm, now: number): AlarmSpec {
     actionLabel: MODE_POLICIES[alarm.completionMode].primaryActionLabel,
     actionIcon: MODE_POLICIES[alarm.completionMode].primaryActionIcon,
     soundId: alarm.soundId,
+    snoozeOffsetsMinutes: snoozeOffsetsFor(alarm),
+    snoozeLabel: `Snooze ${alarm.snooze.minutes} min`,
   };
+}
+
+/**
+ * Native snooze rings for an alarm: only the Main Wake-Up snoozes (one
+ * morning routine). The offsets come from `snoozeSchedule`, the same
+ * calculation the Preview shows, so the phone rings exactly as previewed.
+ */
+export function snoozeOffsetsFor(alarm: Pick<Alarm, 'hour' | 'minute' | 'isPrimary' | 'snooze'>): number[] {
+  if (!alarm.isPrimary || !alarm.snooze.enabled) return [];
+  return snoozeSchedule(alarm, alarm.snooze)
+    .slice(1)
+    .map((ring) => ring.offsetMinutes);
 }
 
 /**
@@ -59,7 +74,7 @@ export function createAlarmStore(
   service: AlarmService,
   options: {
     now?: () => number;
-    /** Called after an alarm is deleted, e.g. to cancel its active occurrence. */
+    /** Called after an alarm is deleted, e.g. to cancel its open morning and Gentle reminder. */
     onRemove?: (id: string) => Promise<void>;
     /**
      * How the alarm will actually behave given the user's entitlements (for
@@ -93,11 +108,13 @@ export function createAlarmStore(
   /**
    * A one-off alarm has rung: turn it off in Terbit MY without touching the
    * native alarm (cancelling could silence it while it's still ringing).
+   * `updatedAt` is kept, so the one-off still belongs to the date it rang
+   * (a one-off Main Wake-Up stays that date's Main Wake-Up).
    */
   async function disableAfterRinging(id: string, firedAt: number) {
     const alarm = await find(id);
     if (!alarm || !alarm.enabled || alarm.weekdays.length > 0 || alarm.updatedAt > firedAt) return;
-    const updated = { ...alarm, enabled: false, updatedAt: now() };
+    const updated = { ...alarm, enabled: false };
     await (await getRepository()).save(updated);
     setState({ alarms: sortAlarms(state.alarms.map((a) => (a.id === id ? updated : a))) });
   }
@@ -106,19 +123,31 @@ export function createAlarmStore(
     setState({ status: 'loading', error: null });
     try {
       const repository = await getRepository();
-      setState({ status: 'ready', alarms: await repository.list() });
+      let alarms = await repository.list();
+      // Older builds could leave overlapping Main Wake-Ups: fix them once, without deleting anything.
+      const fixes = legacyMainWakeUpFixes(alarms);
+      for (const fix of fixes) await repository.save(fix);
+      if (fixes.length > 0) alarms = sortAlarms(alarms.map((a) => fixes.find((f) => f.id === a.id) ?? a));
+      setState({ status: 'ready', alarms });
     } catch (error) {
       setState({ status: 'error', error: error instanceof Error ? error.message : String(error) });
     }
   }
 
-  async function write(alarm: Alarm) {
+  async function write(alarm: Alarm): Promise<ScheduleResult | null> {
     const repository = await getRepository();
     await repository.save(alarm);
-    const others = state.alarms.filter((a) => a.id !== alarm.id);
-    const alarms = [...others, alarm];
-    setState({ alarms: sortAlarms(alarm.isPrimary ? withPrimary(alarms, alarm.id) : alarms) });
-    return sync(alarm);
+    setState({ alarms: sortAlarms([...state.alarms.filter((a) => a.id !== alarm.id), alarm]) });
+    const result = await sync(alarm);
+    // One Main Wake-Up per day (the user confirmed the replacement before saving):
+    // a partly replaced Main Wake-Up keeps its other days and is re-scheduled now;
+    // a fully replaced one is deleted (native alarm and snoozes cancelled, history kept).
+    if (alarm.isPrimary && alarm.enabled) {
+      const replaced = resolveMainWakeUpOverlaps(mainWakeUpOverlaps(alarm, state.alarms, alarm.id, now()));
+      for (const update of replaced.update) await write({ ...update, updatedAt: now() });
+      for (const old of replaced.remove) await remove(old.id);
+    }
+    return result;
   }
 
   /** Creates a new alarm, or updates the one with `id`. */
@@ -146,11 +175,19 @@ export function createAlarmStore(
     return write({ ...alarm, enabled, updatedAt: now() });
   }
 
+  /**
+   * Deletes a saved alarm: it leaves Today, Next alarm, the weekly schedule
+   * and Manage straight away, and its future native alarm and any pending
+   * snooze rings are cancelled (`onRemove` closes its open morning and Gentle
+   * reminder). History is never deleted: past mornings, XP, streaks and
+   * achievements are separate records.
+   */
   async function remove(id: string) {
     const repository = await getRepository();
     await repository.remove(id);
     setState({ alarms: state.alarms.filter((a) => a.id !== id) });
     await service.cancel(id);
+    await service.cancelSnoozes(id).catch(() => {});
     await onRemove?.(id);
   }
 

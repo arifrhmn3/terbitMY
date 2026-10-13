@@ -4,11 +4,15 @@ import { createAlarmDraft, type Alarm } from './alarm';
 import { createMemoryAlarmRepository } from './alarm-repository';
 import { createAlarmStore } from './alarm-store';
 import { isRewardEligible, isStreakEligible } from './accountability';
-import { MISSED_AFTER_MS } from './occurrence';
+import { MISSION_WINDOW_MS } from './completion-policy';
+
 import { createOccurrenceManager, OccurrenceError } from './occurrence-manager';
 import { createMemoryOccurrenceRepository } from './occurrence-repository';
 import { currentQuestion, startMathSession, submitMathAnswer } from '@/features/missions/math/session';
 import { createNotImplementedAlarmService } from '@/services/alarm-scheduler/not-implemented';
+
+/** The test alarm uses the default mode (Reward). */
+const MISSED_AFTER_MS = MISSION_WINDOW_MS.reward;
 
 const alarm: Alarm = {
   ...createAlarmDraft({ label: 'Subuh', mission: { type: 'math', difficulty: 'easy', questionCount: 3 } }),

@@ -1,4 +1,5 @@
 import AlarmKit
+import AppIntents
 import Foundation
 import SwiftUI
 
@@ -9,10 +10,22 @@ struct TerbitAlarmMetadata: AlarmMetadata {
   var occurrenceId: String?
 }
 
+/// The one custom button an AlarmKit alert can have (next to the system's Stop).
+@available(iOS 26.0, *)
+enum TerbitAlertButton {
+  /// "Stop & Open Terbit" / "Stop & Start Mission".
+  case mission(label: String, icon: String)
+  /// Snooze: schedules ring number `nextIndex` of the same morning (`originAt`, ms; 0 = the
+  /// alarm's own time today). Only offered while snoozes remain, so the final ring has none.
+  case snooze(label: String, nextIndex: Int, originAt: Double)
+}
+
 /// The only file that talks to AlarmKit: authorisation, one-off and weekly
-/// alarms, cancel and state. No snooze or countdown, so no widget extension is
-/// needed (Apple only requires one for countdowns). The system's own Stop
-/// control is always shown; Terbit MY never hides or bypasses it.
+/// alarms, snooze rings, cancel and state. Snooze is Terbit's own button and
+/// App Intent (each snooze ring is a one-time AlarmKit alarm), not AlarmKit's
+/// countdown, so no widget extension is needed and the maximum can be
+/// enforced. The system's own Stop control is always shown; Terbit MY never
+/// hides or bypasses it.
 @available(iOS 26.0, *)
 enum AlarmKitBridge {
   static func permission() -> String {
@@ -28,12 +41,17 @@ enum AlarmKitBridge {
   }
 
   static func scheduleOneTime(alarmId: String, occurrenceId: String?, date: Date, title: String) async throws -> UUID {
-    try await schedule(alarmId: alarmId, occurrenceId: occurrenceId, title: title, schedule: .fixed(date), actionLabel: nil, actionIcon: nil)
+    try await schedule(alarmId: alarmId, occurrenceId: occurrenceId, title: title, schedule: .fixed(date), button: nil)
+  }
+
+  /// One snooze ring of a saved alarm: a one-time alarm at `date`, with the next Snooze or (final ring) the mission button.
+  static func scheduleSnoozeRing(alarmId: String, date: Date, title: String, button: TerbitAlertButton) async throws -> UUID {
+    try await schedule(alarmId: alarmId, occurrenceId: nil, title: title, schedule: .fixed(date), button: button)
   }
 
   /// A saved alarm: weekly at hour:minute on `weekdays` (0 = Sunday), or once at `date` when `weekdays` is empty.
   /// AlarmKit repeats weekly alarms itself, without Terbit MY running. `actionLabel` is the one-tap
-  /// "Stop & Open Terbit" / "Stop & Start Mission" button.
+  /// "Stop & Open Terbit" / "Stop & Start Mission" button, or Snooze when `snoozes` is true.
   static func scheduleSaved(
     alarmId: String,
     hour: Int,
@@ -42,7 +60,8 @@ enum AlarmKitBridge {
     date: Date,
     title: String,
     actionLabel: String,
-    actionIcon: String
+    actionIcon: String,
+    snoozeLabel: String?
   ) async throws -> UUID {
     let schedule: Alarm.Schedule
     if weekdays.isEmpty {
@@ -51,14 +70,16 @@ enum AlarmKitBridge {
       let days = weekdays.compactMap { localeWeekdays[$0] }
       schedule = .relative(.init(time: .init(hour: hour, minute: minute), repeats: .weekly(days)))
     }
-    return try await self.schedule(
-      alarmId: alarmId,
-      occurrenceId: nil,
-      title: title,
-      schedule: schedule,
-      actionLabel: actionLabel.isEmpty ? "Stop & Open Terbit" : actionLabel,
-      actionIcon: actionIcon.isEmpty ? "sunrise.fill" : actionIcon
-    )
+    let button: TerbitAlertButton
+    if let snoozeLabel {
+      button = .snooze(label: snoozeLabel, nextIndex: 1, originAt: 0)
+    } else {
+      button = .mission(
+        label: actionLabel.isEmpty ? "Stop & Open Terbit" : actionLabel,
+        icon: actionIcon.isEmpty ? "sunrise.fill" : actionIcon
+      )
+    }
+    return try await self.schedule(alarmId: alarmId, occurrenceId: nil, title: title, schedule: schedule, button: button)
   }
 
   private static let localeWeekdays: [Int: Locale.Weekday] = [
@@ -70,18 +91,23 @@ enum AlarmKitBridge {
     occurrenceId: String?,
     title: String,
     schedule: Alarm.Schedule,
-    actionLabel: String?,
-    actionIcon: String?
+    button: TerbitAlertButton?
   ) async throws -> UUID {
     let id = UUID()
     // Apple's own Stop control is always available; Terbit MY can't remove it
-    // or force the mission first. The secondary button ("Stop & Open Terbit")
-    // supplements it: it stops the alarm and opens the mission.
-    let secondaryButton = actionLabel.map {
-      AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: actionIcon ?? "sunrise.fill")
+    // or force the mission first. The one secondary button supplements it:
+    // "Stop & Open Terbit" (stops the alarm and opens the mission), or Snooze.
+    var secondaryButton: AlarmButton? = nil
+    switch button {
+    case .some(.mission(let label, let icon)):
+      secondaryButton = AlarmButton(text: LocalizedStringResource(stringLiteral: label), textColor: .white, systemImageName: icon)
+    case .some(.snooze(let label, _, _)):
+      secondaryButton = AlarmButton(text: LocalizedStringResource(stringLiteral: label), textColor: .white, systemImageName: "zzz")
+    case .none:
+      break
     }
     let secondaryBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior? =
-      actionLabel == nil ? nil : AlarmPresentation.Alert.SecondaryButtonBehavior.custom
+      secondaryButton == nil ? nil : AlarmPresentation.Alert.SecondaryButtonBehavior.custom
     let alert: AlarmPresentation.Alert
     if #available(iOS 26.1, *) {
       // Current API (iOS 26.1+): the system draws its own Stop control; we supply only the secondary button.
@@ -105,14 +131,22 @@ enum AlarmKitBridge {
       tintColor: Color.orange
     )
     let configuration: AlarmManager.AlarmConfiguration<TerbitAlarmMetadata>
-    if actionLabel != nil {
+    switch button {
+    case .some(.mission):
       configuration = .alarm(
         schedule: schedule,
         attributes: attributes,
         stopIntent: TerbitStopIntent(alarmId: alarmId, nativeId: id.uuidString),
         secondaryIntent: TerbitOpenMissionIntent(alarmId: alarmId, nativeId: id.uuidString)
       )
-    } else {
+    case .some(.snooze(_, let nextIndex, let originAt)):
+      configuration = .alarm(
+        schedule: schedule,
+        attributes: attributes,
+        stopIntent: TerbitStopIntent(alarmId: alarmId, nativeId: id.uuidString),
+        secondaryIntent: TerbitSnoozeIntent(alarmId: alarmId, nativeId: id.uuidString, nextIndex: nextIndex, originAt: originAt)
+      )
+    case .none:
       configuration = .alarm(schedule: schedule, attributes: attributes)
     }
     _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)

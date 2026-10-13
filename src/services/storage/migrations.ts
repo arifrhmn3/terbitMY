@@ -130,6 +130,14 @@ export const migrations: readonly string[] = [
     cached_at INTEGER NOT NULL,
     PRIMARY KEY (provider, content_id)
   );`,
+
+  // 10: snooze is one alarm with a limit (Phase 3.5): how many extra rings
+  // snoozing allows. Existing alarms get the default (3).
+  `ALTER TABLE alarms ADD COLUMN snooze_max INTEGER NOT NULL DEFAULT 3;`,
+
+  // 11: native snooze (Phase 3.5). How many times a morning's alarm was snoozed;
+  // snooze rings belong to that one morning.
+  `ALTER TABLE alarm_occurrences ADD COLUMN snooze_count INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

@@ -38,7 +38,7 @@ describe('alarm store', () => {
     const { store, repository, service } = setup();
     await store.load();
 
-    const { alarm, result } = await store.save(createAlarmDraft({ label: '  Subuh  ' }));
+    const { alarm, result } = await store.save(createAlarmDraft({ label: '  Subuh  ', weekdays: [1, 2, 3, 4, 5] }));
 
     expect(result).toEqual({ status: 'scheduled', nativeId: 'n1' });
     expect(alarm.label).toBe('Subuh');
@@ -140,7 +140,7 @@ describe('alarm store', () => {
   it('leaves repeating alarms, and one-offs edited after ringing, enabled', async () => {
     const { store } = setup();
     await store.load();
-    const { alarm: weekly } = await store.save(createAlarmDraft());
+    const { alarm: weekly } = await store.save(createAlarmDraft({ weekdays: [1, 2, 3, 4, 5] }));
     const { alarm: once } = await store.save(createAlarmDraft({ weekdays: [] }));
     await store.disableAfterRinging(weekly.id, weekly.updatedAt + 60_000);
     await store.disableAfterRinging(once.id, once.updatedAt - 60_000);

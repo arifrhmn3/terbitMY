@@ -1,12 +1,14 @@
 # Project Status
 
-_Last updated: 12 October 2026_
+_Last updated: 13 October 2026_
 
 ## Current phase
 
 **Phase 1 (iOS prototype) is closed: complete, physically verified on iPhone (11 October 2026) and merged into `main`.** Android work is deferred to the dedicated Android parity phase (see "Android status" below). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 **Phase 2A (local Progress Engine) is complete and verified on iPhone. Phase 2B (Accounts & Cloud Foundation) is complete on the repository side (12 Oct 2026): the Supabase project, schema and RLS are live; live sign-in and cloud-sync testing are deferred to the beta stage (see "Deferred to beta" below).**
+
+**Phase 3 (3A Education, 3B Fitness, 3C Faith, 3D Settings & Accessibility, 3.5 Core UX Consolidation) is complete, verified on iPhone and merged into `main` (13 Oct 2026). Phase 4 has not started.**
 
 ## Phase 2A: local Progress Engine
 
@@ -75,7 +77,7 @@ Final checks (11 Oct): `npm run check` passes (lint, typecheck and 242 unit test
 
 ### Accountability model (agreed product behaviour)
 
-The phone's own alarm controls can always stop an alarm, and **Terbit MY never tries to disable or bypass them.** Stopping the alarm is recorded, but the morning stays open: the mission can still be completed until the deadline (one hour after the alarm, or one hour after the Gentle follow-up).
+The phone's own alarm controls can always stop an alarm, and **Terbit MY never tries to disable or bypass them.** Stopping the alarm is recorded, but the morning stays open: the mission can still be completed until the deadline (`completion-policy.ts`: Reward 2 hours after the alarm, Challenge 1 hour, Gentle until the end of that day).
 
 | Mode | Behaviour | Reward / streak eligible when |
 |---|---|---|
@@ -105,7 +107,7 @@ These are the current working assumptions for beta. They're deliberately configu
 | Challenge | Premium (falls back to Reward without access) | same |
 | Trial | Full access for the configured trial period (`trialDays`, currently 7) | same; Model B (`TRIAL_POLICY`, trial on first launch) is prepared |
 | Rewards and streaks | Only a completed mission qualifies, in every mode | `MODE_POLICIES` |
-| Gentle follow-up | 5/10/15 minutes; completion deadline one hour after the alarm (Gentle: one hour after the follow-up) | alarm settings + `accountability.ts` |
+| Completion window | Reward 2 hours after the alarm; Challenge 1 hour (both plus snooze time); Gentle until the end of that day. Gentle follow-up 5/10/15 minutes (separate) | `completion-policy.ts` |
 | Billing | **None.** No paywall or pricing. Entitlement is a local mock, switchable only in developer builds | `src/services/entitlements` |
 
 ### Accepted iOS limitations for beta
@@ -209,6 +211,55 @@ Branch `phase-3/settings-permissions-accessibility`. ✅ **Built and verified on
 **Changes needing action:** a small native addition (reading the notification permission, `getReminderPermissionAsync` in the TerbitAlarms module) → **new iOS development build required** (until then the Permissions screen says notifications “can’t check on this version”). No new packages, no migration, no Supabase change. Android: no work done (deferred).
 
 **Open product decision (not changed in 3D):** fully non-physical activities currently earn **Fitness XP** (and count toward the Fitness rank), so accessibility choices aren’t penalised. Whether they should be named or counted differently (e.g. a neutral “Wellbeing” discipline) is a later product/UX decision.
+
+## Phase 3.5: Core UX Consolidation
+
+Branch `phase-3/core-ux-consolidation`, merged into `main`. ✅ **Complete and verified on iPhone (13 Oct 2026).** Verified on the iPhone:
+- Today shows active alarms only; deleted alarms leave Today while Progress, XP and streak history stay.
+- Main Wake-Up replacement: a full overlap deletes the old alarm; a partial overlap keeps its other days; weekday and weekend Main Wake-Ups coexist.
+- Today, the weekly schedule and Manage agree.
+- Completion windows: Reward 2 h, Gentle same day, Challenge 1 h. Completed missions open the editor.
+- Native snooze works and survives opening Terbit; replacing or deleting cancels obsolete snoozes.
+- Next alarm is correct; state persists after a restart; there is no duplicated XP or history.
+
+Not the final visual redesign. Details: [docs/UX-INVENTORY.md](docs/UX-INVENTORY.md).
+
+| Item | Status |
+|---|---|
+| Today as the daily home: morning status (Main Wake-Up only), next alarm from the real schedule, today's alarms in time order with status, daily practice, streak / today's XP / rank snapshot | ✅ Unit-tested |
+| Mission-first alarm creation: category → mission (Mobility Profile and Faith filtering) → time → Save Alarm or Customise | ✅ Unit-tested |
+| Central default policy `ALARM_DEFAULTS` (Reward, Easy, 3 questions, Monday–Friday, snooze every 10 min up to 3 times). Never Main Wake-Up by default | ✅ Unit-tested |
+| Morning window (prototype 03:00–11:00, `features/alarms/morning.ts`; later personalised in onboarding / Morning Routine). A new morning alarm asks: "Make this your Main Wake-Up?" (none yet), or "Replace Main Wake-Up" / "Keep existing Main Wake-Up" (→ one-off) | ✅ Unit-tested |
+| One-off morning alarms: ring once, turn themselves off, tagged "One-off" on Today, leave Today once done, never affect the streak | ✅ Unit-tested |
+| Main Wake-Up snooze: interval (5/10/15 min) + maximum snoozes (1/2/3/5), "Preview schedule". **Real iOS snooze**: the alarm shows Snooze until the last allowed ring (which shows the mission button); each snooze ring is scheduled natively by an App Intent (no JavaScript), from the same offsets as the Preview. All rings are one morning (snooze count recorded); Today shows one row ("Snoozed · next ring 06:40") | ✅ Verified on iPhone |
+| Customise: the editor with progressive disclosure (`missionControls`), reordered time → mission → mode → repeat → label / Main Wake-Up | ✅ Unit-tested |
+| Manage alarms (Alarms tab), grouped by mission then time; editing from Today; tapping an unfinished morning on Today resumes its mission first | ✅ Unit-tested |
+| One Main Wake-Up per calendar day, from ONE resolver (`resolvedMainWakeUp`): weekday and weekend Main Wake-Ups allowed; overlaps ask (partial: only those days move; full: the old alarm is deleted, history kept); one-off date override; older overlapping data fixed on load without deleting | ✅ Unit-tested |
+| Consistency pass: Today built from active saved alarms (occurrences add state only; no ghost rows after delete); central completion windows (Reward 2 h, Gentle same day, Challenge 1 h); central row action (resume only while resumable); deletion cascade (native alarm, snoozes, Gentle reminder; history kept); weekly schedule screen; Next alarm ignores deleted / off / rung one-offs | ✅ Unit-tested |
+| Recent mornings moved to Progress (navigation only, no data change); Sleep placeholder removed | ✅ Unit-tested |
+| Shared result layout (Success → summary → Reward → Progress → Action) for alarms and Practice; rank-ups shown; a real alarm returns to Today | ✅ Unit-tested |
+| Creation flow ready for a Morning / Day / Night step (`CREATION_STEPS`, `RoutineContext`); nothing about routines shown | ✅ Architecture only |
+
+**Changes needing action:**
+- **New iOS development build required**: native snooze. Changed Swift: `AlarmKitBridge.swift`, `AlarmIntents.swift` (new `TerbitSnoozeIntent`), `NativeAlarmRecords.swift`, `TerbitAlarmsModule.swift`, and new `NativeSnooze.swift`. No new packages.
+- SQLite migrations 10 (`alarms.snooze_max`) and 11 (`alarm_occurrences.snooze_count`), applied automatically.
+- Snooze fix after the first iPhone test: re-scheduling a saved alarm (which the app does when it opens) no longer cancels a pending snooze ring natively; only turning the alarm off or deleting it does, or the app when the morning is finished or the alarm no longer matches the ring.
+- No Supabase change (the cloud stores alarm snooze as JSON; the snooze count stays on the phone).
+
+**Snooze limitations (iOS AlarmKit):**
+- An alarm alert has the system Stop plus ONE custom button. While snoozes remain, that button is Snooze, so "Stop & Open Terbit / Start Mission" appears only on the last allowed ring (or with snooze off). To start the mission earlier, tap Stop and open Terbit MY.
+- If Snooze is tapped after the next planned time has already passed (the ring was left going), the next ring is one interval from the tap.
+- Scheduling each ring relies on iOS running Terbit MY's Snooze App Intent in the background (it does so even when the app is closed or the phone is locked). If AlarmKit refuses, no further ring is scheduled; this is recorded as `snooze_failed`.
+- Apple's built-in countdown snooze wasn't used: it needs a Live Activity widget extension and can't enforce a maximum.
+
+**Future work (documented, not started):**
+- **Onboarding and personalisation:** weekday and weekend wake times, snooze preference, Faith, Mobility Profile, Education and Fitness interests, accountability preferences. These would set `ALARM_DEFAULTS` and the Morning window per user.
+- **Routine selection:** Morning / Throughout the Day / Night when creating an alarm, and as sections in the weekly schedule. The structure is ready (`CREATION_STEPS`, `RoutineContext`, `sectionOf`).
+- **AlarmKit limitation:** a one-off Main Wake-Up override can't yet silence that day's repeating native alarm. It still rings, but isn't the Main Wake-Up and doesn't count as the morning.
+- **Final visual/UI redesign** (3.5 consolidated structure, not visuals).
+- **Final Faith content placement.**
+- **Naming decision:** whether non-physical activities keep earning Fitness XP, or get a neutral name such as "Wellbeing".
+- **Camera-verified Fitness missions** (on-device pose detection). Fitness is self-reported today; the camera is never requested.
 
 ## Beta requirements (must be done before public beta)
 

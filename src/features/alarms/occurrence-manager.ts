@@ -11,8 +11,8 @@ import {
   expireOccurrence,
   isActive,
   markAlarmFired,
+  recordSnoozes,
   recordSystemStop,
-  shouldExpire,
   startMission,
   type AlarmOccurrence,
   type DismissReason,
@@ -20,6 +20,7 @@ import {
   type TransitionError,
   type TransitionResult,
 } from './occurrence';
+import { shouldExpire } from './completion-policy';
 import { DuplicateOccurrenceError, type OccurrenceRepository } from './occurrence-repository';
 
 export type OccurrenceErrorCode = TransitionError | 'not-found' | 'conflict';
@@ -55,6 +56,19 @@ export function createOccurrenceManager(
 
     if (!(await save(repository, result.occurrence, current))) throw new OccurrenceError('conflict');
     return result.occurrence;
+  }
+
+  /**
+   * A user action on the morning (start, finish, turn off). Past its completion
+   * window the morning is closed instead, so a mission is never completed late.
+   */
+  async function applyOpen(id: string, transition: (o: AlarmOccurrence, at: number) => TransitionResult) {
+    const current = await (await getRepository()).get(id);
+    if (current && shouldExpire(current, now())) {
+      await apply(id, expireOccurrence);
+      throw new OccurrenceError('already-finished');
+    }
+    return apply(id, transition);
   }
 
   /** Closes active occurrences past their completion deadline (dismissed if stopped by the phone, else missed). */
@@ -109,7 +123,7 @@ export function createOccurrenceManager(
    * the same alarm is closed first. Records a stop with the phone's controls
    * when native code reports one.
    */
-  async function recordNativeFire(alarm: Alarm, event: AlarmFiredEvent): Promise<AlarmOccurrence> {
+  async function recordNativeFire(alarm: Alarm, event: AlarmFiredEvent, snoozeCount = 0): Promise<AlarmOccurrence> {
     await expireStale();
     const repository = await getRepository();
 
@@ -141,6 +155,10 @@ export function createOccurrenceManager(
       const stoppedAt = event.stoppedAt;
       occurrence = await apply(occurrence.id, (o, at) => recordSystemStop(o, at, stoppedAt));
     }
+    // Snoozes are recorded before the deadline check: snoozing extends the morning.
+    if (snoozeCount > occurrence.snoozeCount) {
+      occurrence = await apply(occurrence.id, (o, at) => recordSnoozes(o, snoozeCount, at));
+    }
     if (shouldExpire(occurrence, now())) {
       occurrence = await apply(occurrence.id, expireOccurrence);
     }
@@ -157,8 +175,11 @@ export function createOccurrenceManager(
   }
 
   return {
+    /** One morning, closed first if its completion window has passed. */
     async get(id: string) {
-      return (await getRepository()).get(id);
+      const current = await (await getRepository()).get(id);
+      if (current && shouldExpire(current, now())) return apply(id, expireOccurrence).catch(() => current);
+      return current;
     },
     async findForEvent(alarmId: string, scheduledAt: number) {
       return (await getRepository()).findByEvent(alarmId, scheduledAt);
@@ -171,10 +192,12 @@ export function createOccurrenceManager(
     recordNativeFire,
     /** The phone's own Stop control ended the alarm; the mission can still be completed. */
     recordSystemStop: (id: string) => apply(id, recordSystemStop),
-    startMission: (id: string) => apply(id, startMission),
+    startMission: (id: string) => applyOpen(id, startMission),
     completeMission: (id: string, result: MissionResult) =>
-      apply(id, (o, at) => completeMission(o, result, at)),
-    completeWithoutMission: (id: string) => apply(id, completeWithoutMission),
+      applyOpen(id, (o, at) => completeMission(o, result, at)),
+    completeWithoutMission: (id: string) => applyOpen(id, completeWithoutMission),
+    /** Records how many times this morning's alarm was snoozed (never lowers it; nothing else changes). */
+    recordSnoozes: (id: string, count: number) => apply(id, (o, at) => recordSnoozes(o, count, at)),
     /** Gives up on the morning without the mission (Emergency Dismiss / skip). */
     dismiss: (id: string, reason: DismissReason = 'emergency') =>
       apply(id, (o, at) => dismissOccurrence(o, at, reason)),

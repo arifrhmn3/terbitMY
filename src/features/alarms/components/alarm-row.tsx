@@ -10,6 +10,7 @@ import {
   formatAlarmTime,
   type Alarm,
 } from '@/features/alarms/alarm';
+import { MAIN_WAKE_UP_TAG, ONE_OFF_TAG } from '@/features/alarms/main-wake-up';
 import { missionForProfile } from '@/features/accessibility/accessibility-settings';
 import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,7 +27,8 @@ export function AlarmRow({ alarm, onToggle }: AlarmRowProps) {
   const time = formatAlarmTime(alarm);
   const details = [
     alarm.label,
-    describeRepeat(alarm.weekdays),
+    // Same words as Today: a one-time alarm is a "One-off".
+    alarm.weekdays.length === 0 ? ONE_OFF_TAG : describeRepeat(alarm.weekdays),
     describeMission(missionForProfile(alarm.mission, access.mobilityProfile)),
     alarm.mission.type !== 'none' ? COMPLETION_MODE_LABEL[alarm.completionMode] : null,
   ]
@@ -43,7 +45,7 @@ export function AlarmRow({ alarm, onToggle }: AlarmRowProps) {
             </ThemedText>
             {alarm.isPrimary && (
               <ThemedText type="caption" themeColor="tint">
-                Main wake-up
+                {MAIN_WAKE_UP_TAG}
               </ThemedText>
             )}
           </View>

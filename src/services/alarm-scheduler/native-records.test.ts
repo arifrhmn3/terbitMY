@@ -50,6 +50,8 @@ function spec(overrides: Partial<AlarmSpec> = {}): AlarmSpec {
     actionLabel: 'Stop & Open Terbit',
     actionIcon: 'sunrise.fill',
     soundId: 'system-default',
+    snoozeOffsetsMinutes: [],
+    snoozeLabel: 'Snooze 10 min',
     ...overrides,
   };
 }
