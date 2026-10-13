@@ -8,16 +8,9 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { account } from '../account';
+import { friendlyAuthError } from '../auth-messages';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function friendly(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/network|fetch|offline/i.test(message)) return 'You’re offline. Connect to the internet and try again.';
-  if (/rate|security purposes|too many/i.test(message)) return 'Please wait a minute before asking for another code.';
-  if (/expired|invalid|token/i.test(message)) return 'That code didn’t work. Check it, or ask for a new one.';
-  return message;
-}
 
 /** Email one-time code: enter email → receive a 6-digit code → enter it. Creates the account on first use. */
 export function SignInForm() {
@@ -40,7 +33,7 @@ export function SignInForm() {
       setStep('code');
       setMessage(`We sent a code to ${email.trim()}. It can take a minute to arrive.`);
     } catch (error) {
-      setMessage(friendly(error));
+      setMessage(friendlyAuthError(error, 'send'));
     } finally {
       setBusy(false);
     }
@@ -52,7 +45,7 @@ export function SignInForm() {
     try {
       await account.verifyCode(email, code);
     } catch (error) {
-      setMessage(friendly(error));
+      setMessage(friendlyAuthError(error, 'verify'));
     } finally {
       setBusy(false);
     }
@@ -61,8 +54,8 @@ export function SignInForm() {
   const inputStyle = [styles.input, { color: theme.text }];
   return (
     <Section
-      title="Create an account or sign in"
-      footer="Optional. Your alarms, history, XP and streaks stay on this phone either way; signing in also backs them up to your account.">
+      title="Sign in / Create account (optional)"
+      footer="We email you a one-time code; no password. Your alarms, history, XP and streaks stay on this phone either way; signing in also backs them up to your account. Your Night Routine stays on this phone only.">
       {step === 'email' ? (
         <TextInput
           value={email}

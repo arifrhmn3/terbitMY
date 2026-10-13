@@ -21,11 +21,13 @@ export type LocalSource = {
 
 /**
  * - local: no account (or no cloud in this build); everything stays on the phone;
+ * - pending: something changed on the phone and will be backed up shortly;
  * - syncing / synced;
  * - offline: no connection; changes wait and are retried;
+ * - signin_required: the cloud didn't accept the sign-in; changes wait and are retried;
  * - error: something else went wrong; changes wait and are retried.
  */
-export type SyncState = 'local' | 'syncing' | 'synced' | 'offline' | 'error';
+export type SyncState = 'local' | 'pending' | 'syncing' | 'synced' | 'offline' | 'signin_required' | 'error';
 
 export type SyncStatus = {
   state: SyncState;
@@ -143,7 +145,11 @@ export function createSyncEngine(deps: {
       set({ state: 'local', userId: null, pending: 0, lastError: null });
       return status;
     }
-    if (status.userId !== user.id) set({ userId: user.id, lastSyncedAt: null, lastError: null });
+    if (status.userId !== user.id) {
+      // A restart (or another account): show when this account last backed up.
+      const last = await state.lastSyncedAt?.(user.id).catch(() => null);
+      set({ userId: user.id, lastSyncedAt: last ?? null, lastError: null });
+    }
     const work = await plan(user.id);
     set({ state: 'syncing', pending: pendingIn(work) });
     try {
@@ -154,12 +160,14 @@ export function createSyncEngine(deps: {
         await state.forget(user.id, 'alarm', work.deletedAlarmIds);
       }
       for (const batch of work.batches.slice(1)) await push(store, user.id, batch);
-      set({ state: 'synced', pending: 0, lastSyncedAt: now(), lastError: null });
+      // With nothing to send the cloud wasn't contacted: keep the time of the last real backup.
+      const sent = pendingIn(work) > 0;
+      set({ state: 'synced', pending: 0, lastSyncedAt: sent || status.lastSyncedAt === null ? now() : status.lastSyncedAt, lastError: null });
     } catch (error) {
       const remaining = pendingIn(await plan(user.id).catch(() => work));
-      const offline = error instanceof CloudError && error.kind === 'offline';
+      const kind = error instanceof CloudError ? error.kind : 'server';
       set({
-        state: offline ? 'offline' : 'error',
+        state: kind === 'offline' ? 'offline' : kind === 'auth' ? 'signin_required' : 'error',
         pending: remaining,
         lastError: error instanceof Error ? error.message : String(error),
       });
@@ -185,6 +193,10 @@ export function createSyncEngine(deps: {
   return {
     sync,
     getStatus: () => status,
+    /** A local change is waiting for the next sync ("Sync pending"). Only changes what's shown. */
+    markChanged() {
+      if (status.state === 'synced') set({ state: 'pending' });
+    },
     subscribe(listener: (s: SyncStatus) => void): () => void {
       listeners.add(listener);
       return () => listeners.delete(listener);

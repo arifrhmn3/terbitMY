@@ -238,4 +238,9 @@ alarm_occurrences (Phase 1, unchanged) ──► progress engine (progress-engin
 
 Optional accounts (email one-time code) and a private Supabase **backup** of the phone's canonical records: alarms, occurrences, XP ledger and achievements. The phone stays the source of truth, and alarm-time features never touch the network. Full details, conflict policy and setup are in [CLOUD.md](CLOUD.md).
 
+- **Session (Phase 5A):** `services/cloud/supabase-cloud.ts` falls back to the saved session when Supabase can't refresh an expired token offline (`storedSessionUser`), and ignores the `INITIAL_SESSION` event. Only `SIGNED_OUT` means "no user". The account store marks an unexpected sign-out as `sessionEnded` ("Sign-in required").
+- **Sync status (Phase 5A):** `local · pending · syncing · synced · offline · signin_required · error`, shown in plain words by `syncStatusLabel`. "Last synced" comes from `sync_state` (`lastSyncedAt`).
+- **Live verification:** deferred to beta by owner decision (domain, SMTP, branded templates, live OTP, real-iPhone sign-in, two-account RLS, restore). See PROJECT_STATUS.md → Beta requirements.
+- **Circles groundwork:** the user ID (`auth.users.id` = `profiles.id`) is stable. Shareable identity must be a separate allow-listed view or table, never `profiles` itself (it holds the private Faith preference).
+
 Planned later, with RLS and explicit opt-in sharing: `circles`, `circle_members`, `circle_checkins`. Membership is checked with RLS. Nothing private (alarms, mission history, streaks, XP, faith settings) is visible to other users unless the user explicitly shares it.

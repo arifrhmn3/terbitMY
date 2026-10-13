@@ -1,4 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { createAccountStore } from '@/features/account/account-store';
 import { createAlarmDraft, type Alarm } from '@/features/alarms/alarm';
@@ -14,7 +16,7 @@ import { openTestDatabase } from '@/services/storage/testing/node-sqlite';
 
 import { newerWins } from './conflict';
 import { alarmToCloud, fingerprint } from './mapping';
-import { syncStatusLabel } from './status-label';
+import { formatLastSynced, syncStatusLabel } from './status-label';
 import { createSyncEngine } from './sync-engine';
 import { createMemorySyncStateRepository, createSqliteSyncStateRepository } from './sync-state-repository';
 
@@ -34,18 +36,22 @@ function setup() {
     dayKey: dayKeyAtOffset(480),
   });
   const repo = createMemoryProgressRepository();
-  const engine = createSyncEngine({
-    local: {
-      alarms: async () => [...alarms.values()],
-      occurrences: async () => [...mornings],
-      xp: async () => (await repo.listXp()),
-      achievements: async () => repo.listUnlocked(),
-    },
-    store: remote.cloud.store,
-    state: createMemorySyncStateRepository(),
-    currentUser: () => remote.cloud.auth.currentUser(),
-    now: () => clock.time,
-  });
+  const state = createMemorySyncStateRepository();
+  /** A sync engine as the app builds one at start-up (a "restart" builds another on the same phone data). */
+  const newEngine = () =>
+    createSyncEngine({
+      local: {
+        alarms: async () => [...alarms.values()],
+        occurrences: async () => [...mornings],
+        xp: async () => (await repo.listXp()),
+        achievements: async () => repo.listUnlocked(),
+      },
+      store: remote.cloud.store,
+      state,
+      currentUser: () => remote.cloud.auth.currentUser(),
+      now: () => clock.time,
+    });
+  const engine = newEngine();
   const account = createAccountStore({
     cloud: remote.cloud,
     onSignedIn: () => void engine.sync(),
@@ -71,7 +77,7 @@ function setup() {
     await account.sendCode(email);
     await account.verifyCode(email, '123456');
   };
-  return { remote, alarms, mornings, progress, engine, account, saveAlarm, completeMorning, signIn, clock, repo };
+  return { remote, alarms, mornings, progress, engine, newEngine, account, saveAlarm, completeMorning, signIn, clock, repo };
 }
 
 describe('guest (local-only) use', () => {
@@ -207,7 +213,7 @@ describe('local-first sync, offline queue and retry', () => {
     expect(syncStatusLabel(back).title).toBe('Synced');
   });
 
-  it('a server error shows "Sync problem", keeps the rest pending, and a retry finishes the job', async () => {
+  it('a server error shows "Sync failed", keeps the rest pending, and a retry finishes the job', async () => {
     const ctx = setup();
     await ctx.signIn();
     ctx.saveAlarm('a1');
@@ -215,7 +221,7 @@ describe('local-first sync, offline queue and retry', () => {
     ctx.remote.state.failNext = 1;
     const failed = await ctx.engine.sync();
     expect(failed.state).toBe('error');
-    expect(syncStatusLabel(failed).title).toBe('Sync problem');
+    expect(syncStatusLabel(failed).title).toBe('Sync failed');
     expect(failed.pending).toBeGreaterThan(0);
     expect(await ctx.engine.sync()).toMatchObject({ state: 'synced', pending: 0 });
   });
@@ -230,6 +236,176 @@ describe('local-first sync, offline queue and retry', () => {
     const s = await ctx.progress.summary();
     expect(s.xp).toEqual({ total: 40, byCategory: { education: 30, fitness: 0, faith: 0 }, general: 10 });
     expect(s.morning).toMatchObject({ successful: 3, scheduled: 3, streak: { current: 3 } });
+  });
+});
+
+describe('Phase 5A: status the user can understand', () => {
+  it('Sync pending after a local change, then Synced with the time', async () => {
+    const ctx = setup();
+    await ctx.signIn();
+    await ctx.engine.sync();
+    ctx.saveAlarm('a1');
+    ctx.engine.markChanged();
+    expect(syncStatusLabel(ctx.engine.getStatus()).title).toBe('Sync pending');
+    const done = await ctx.engine.sync();
+    expect(syncStatusLabel(done, ctx.clock.time)).toEqual({ title: 'Synced', detail: `Last synced ${formatLastSynced(ctx.clock.time, ctx.clock.time)}.` });
+    // Nothing to mark while signed out or offline.
+    ctx.engine.reset();
+    ctx.engine.markChanged();
+    expect(ctx.engine.getStatus().state).toBe('local');
+  });
+
+  it('a rejected sign-in shows "Sign-in required", keeps changes, and recovers on retry', async () => {
+    const ctx = setup();
+    await ctx.signIn();
+    ctx.saveAlarm('a1');
+    ctx.remote.state.failNext = 1;
+    ctx.remote.state.failKind = 'auth';
+    const failed = await ctx.engine.sync();
+    expect(failed).toMatchObject({ state: 'signin_required', pending: 1 });
+    expect(syncStatusLabel(failed).title).toBe('Sign-in required');
+    expect(await ctx.engine.sync()).toMatchObject({ state: 'synced', pending: 0 });
+  });
+
+  it('offline says how many changes are waiting and when it last synced; never a raw error', async () => {
+    const ctx = setup();
+    await ctx.signIn();
+    ctx.saveAlarm('a1');
+    await ctx.engine.sync();
+    const syncedAt = ctx.clock.time;
+    ctx.remote.state.online = false;
+    ctx.saveAlarm('a2');
+    const offline = await ctx.engine.sync();
+    const label = syncStatusLabel(offline, syncedAt);
+    expect(label.title).toBe('Offline');
+    expect(label.detail).toContain('1 change will back up when you’re online.');
+    expect(label.detail).toContain(`Last synced ${formatLastSynced(syncedAt, syncedAt)}.`);
+    expect(offline.lastError).toMatch(/Network request failed/); // kept for the developer panel only
+    for (const state of ['local', 'pending', 'syncing', 'synced', 'offline', 'signin_required', 'error'] as const) {
+      expect(JSON.stringify(syncStatusLabel({ ...offline, state, lastError: 'PGRST301 secret detail' }))).not.toMatch(/PGRST|secret detail|Network request/);
+    }
+  });
+
+  it('“Last synced” survives a restart (read from the phone’s sync record)', async () => {
+    const ctx = setup();
+    await ctx.signIn();
+    ctx.saveAlarm('a1');
+    await ctx.engine.sync();
+    const at = ctx.clock.time;
+    ctx.clock.time += 3_600_000;
+    ctx.remote.state.online = false; // restarted offline
+    // Nothing waiting: up to date as of the last real backup (not "now").
+    expect(await ctx.newEngine().sync()).toMatchObject({ state: 'synced', lastSyncedAt: at, pending: 0 });
+    ctx.saveAlarm('a2');
+    expect(await ctx.newEngine().sync()).toMatchObject({ state: 'offline', lastSyncedAt: at, pending: 1 });
+  });
+
+  it('dates other than today are shown with the day', () => {
+    const today = new Date(2026, 9, 13, 14, 5).getTime();
+    expect(formatLastSynced(today, today)).not.toMatch(/Oct/);
+    expect(formatLastSynced(new Date(2026, 9, 12, 9, 0).getTime(), today)).toMatch(/12/);
+  });
+});
+
+describe('Phase 5A: the full account lifecycle never duplicates anything', () => {
+  it('guest data → sign in → sync twice → restart → sign out → guest use → sign in → offline change → reconnect', async () => {
+    const ctx = setup();
+    await ctx.account.start();
+    // A guest with alarms, a weekday Main Wake-Up, history, XP, achievements and a streak.
+    ctx.saveAlarm('a1', { isPrimary: true, weekdays: [1, 2, 3, 4, 5] });
+    ctx.saveAlarm('evening', { hour: 21 });
+    for (const day of [1, 2, 3]) await ctx.completeMorning(day);
+    const guest = await ctx.progress.summary();
+    expect(guest).toMatchObject({ xp: { total: 40 }, morning: { streak: { current: 3 } } });
+
+    const cloudCounts = (userId: string) => ({
+      alarms: ctx.remote.owned(ctx.remote.tables.alarms, userId).length,
+      mains: ctx.remote.owned(ctx.remote.tables.alarms, userId).filter((a) => a.is_main_wake_up).length,
+      occurrences: ctx.remote.owned(ctx.remote.tables.occurrences, userId).length,
+      xp: ctx.remote.owned(ctx.remote.tables.xp, userId).reduce((n, e) => n + e.amount, 0),
+      achievements: ctx.remote.owned(ctx.remote.tables.achievements, userId).length,
+    });
+    const expected = { alarms: 2, mains: 1, occurrences: 3, xp: 40, achievements: 2 };
+
+    await ctx.signIn();
+    const userId = ctx.account.getState().user!.id;
+    await ctx.engine.sync();
+    await ctx.engine.sync(); // twice in a row
+    expect(cloudCounts(userId)).toEqual(expected);
+
+    // Restart: a new engine on the same phone data sends nothing again.
+    const calls = ctx.remote.state.calls;
+    expect(await ctx.newEngine().sync()).toMatchObject({ state: 'synced', pending: 0 });
+    expect(ctx.remote.state.calls).toBe(calls);
+
+    // Sign out: everything local stays and keeps working.
+    await ctx.account.signOut();
+    expect(ctx.alarms.size).toBe(2);
+    expect(await ctx.progress.summary()).toEqual(guest);
+    await ctx.completeMorning(4); // used as a guest
+
+    // Sign back in with the same account, then a change made offline.
+    await ctx.signIn();
+    expect(ctx.account.getState().user!.id).toBe(userId);
+    await ctx.engine.sync();
+    ctx.remote.state.online = false;
+    await ctx.completeMorning(5);
+    expect((await ctx.engine.sync()).state).toBe('offline');
+    ctx.remote.state.online = true;
+    expect(await ctx.engine.sync()).toMatchObject({ state: 'synced', pending: 0 });
+
+    // Cloud mirrors the phone exactly: no second Main Wake-Up, no XP or occurrence twice.
+    const local = await ctx.progress.summary();
+    expect(cloudCounts(userId)).toEqual({ alarms: 2, mains: 1, occurrences: 5, xp: local.xp.total, achievements: (await ctx.repo.listUnlocked()).length });
+    expect(local.morning.streak.current).toBe(5);
+    expect(new Set(ctx.remote.owned(ctx.remote.tables.occurrences, userId).map((o) => `${o.alarm_id}@${o.scheduled_at}`)).size).toBe(5);
+  });
+
+  it('rows already in the cloud (same IDs) are kept once; the phone’s copies are not changed', async () => {
+    const ctx = setup();
+    ctx.saveAlarm('a1', { isPrimary: true });
+    await ctx.completeMorning(1);
+    await ctx.signIn();
+    const userId = ctx.account.getState().user!.id;
+    // The same records reached the cloud before (e.g. a sync whose reply was lost).
+    const xp = await ctx.repo.listXp();
+    await ctx.remote.cloud.store.pushXp(xp.map((e) => ({ award_key: e.key, occurrence_id: e.occurrenceId, category: e.category, amount: e.amount, reason: e.reason, earned_at: e.earnedAt })));
+    await ctx.remote.cloud.store.pushAlarms([alarmToCloud(ctx.alarms.get('a1')!)]);
+    await ctx.engine.sync();
+    expect(ctx.remote.owned(ctx.remote.tables.xp, userId)).toHaveLength(xp.length);
+    expect(ctx.remote.owned(ctx.remote.tables.alarms, userId)).toHaveLength(1);
+    expect((await ctx.progress.summary()).xp.total).toBe(10);
+  });
+
+  it('the Night Routine never enters cloud sync (phone only)', () => {
+    const src = (p: string) => readFileSync(join(__dirname, p), 'utf8');
+    for (const file of ['sync.ts', 'sync-engine.ts', 'mapping.ts', 'sync-state-repository.ts']) {
+      expect(src(file)).not.toMatch(/night|screen.?time|selection/i);
+    }
+    expect(Object.keys(createMemoryCloud().tables)).toEqual(['profiles', 'alarms', 'occurrences', 'xp', 'achievements']);
+  });
+});
+
+describe('Phase 5A: session', () => {
+  it('Supabase ending the session (not the user) shows "Sign-in required"; local data stays', async () => {
+    const ctx = setup();
+    ctx.saveAlarm('a1');
+    await ctx.signIn();
+    await ctx.remote.cloud.auth.signOut(); // e.g. the refresh token was revoked
+    expect(ctx.account.getState()).toMatchObject({ status: 'guest', sessionEnded: true });
+    expect(ctx.alarms.size).toBe(1);
+    await ctx.signIn();
+    expect(ctx.account.getState()).toMatchObject({ status: 'signed_in', sessionEnded: false });
+  });
+
+  it('a deliberate sign-out or account deletion is not “Sign-in required”', async () => {
+    const ctx = setup();
+    await ctx.signIn();
+    await ctx.account.signOut();
+    expect(ctx.account.getState()).toMatchObject({ status: 'guest', sessionEnded: false });
+    await ctx.signIn('other@example.com');
+    await ctx.account.deleteAccount();
+    expect(ctx.account.getState()).toMatchObject({ status: 'guest', sessionEnded: false });
   });
 });
 
@@ -379,6 +555,11 @@ describe('sync state on real SQLite (migration 8)', () => {
     expect(await repo.fingerprints('u2', 'alarm')).toEqual(new Map([['a1', 'g1']]));
     await repo.forget('u1', 'alarm', ['a1']);
     expect((await repo.fingerprints('u1', 'alarm')).size).toBe(0);
+    // "Last synced" per account.
+    await repo.mark('u1', 'xp', [{ id: 'k', fingerprint: 'f' }], 9);
+    expect(await repo.lastSyncedAt!('u1')).toBe(9);
+    expect(await repo.lastSyncedAt!('u2')).toBe(3);
+    expect(await repo.lastSyncedAt!('nobody')).toBeNull();
   });
 
   it('fingerprints depend on content, not key order', () => {

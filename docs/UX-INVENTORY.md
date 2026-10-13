@@ -151,6 +151,10 @@ Settings → Faith (preference); Today → today's Recitation / Reflection; Alar
 
 ### E. Account: guest → optional sign-in → sync
 Settings → Account & backup → email code → signed in.
+- **Guest:** "Continue without an account" (everything works on the phone), then "Sign in / Create account (optional)": email → "Email me a code" → 6-digit code → Sign in.
+- **Signed in:** email, sync status ("Synced · Last synced 14:05", "Sync pending", "Offline · 2 changes will back up…", "Sign-in required", "Sync failed"; tap to sync now), display name, sign out, delete account.
+- **Session ended by Supabase:** guest view headed "Sign-in required"; local data kept.
+- **Not yet verified live (beta):** real email delivery, branded email and real-iPhone sign-in wait for the final name and domain (PROJECT_STATUS.md → Beta requirements). The signed-in screens are unit-tested only.
 
 **Remaining:**
 - No onboarding yet (Phase 6).
