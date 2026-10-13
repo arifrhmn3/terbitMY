@@ -14,8 +14,8 @@ export function usePermissionStatuses() {
   const [statuses, setStatuses] = useState<Record<PermissionId, PermissionStatus> | null>(null);
 
   const refresh = useCallback(() => {
-    Promise.all([systemPermissions.readAlarms(), systemPermissions.readNotifications()])
-      .then(([alarms, notifications]) => setStatuses(permissionStatuses({ alarms, notifications })))
+    Promise.all([systemPermissions.readAlarms(), systemPermissions.readNotifications(), systemPermissions.readCamera()])
+      .then(([alarms, notifications, camera]) => setStatuses(permissionStatuses({ alarms, notifications, camera })))
       .catch(() => {});
   }, []);
 

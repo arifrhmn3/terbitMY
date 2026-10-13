@@ -57,7 +57,7 @@ docs/
 | App state | React state plus small stores (Zustand, if needed) | Simple for a beginner to follow |
 | Server state and sync | Supabase JS client with an outbox queue in SQLite | Writes still succeed offline and are replayed later |
 | Auth | Supabase Auth: Sign in with Apple, Google, email | Free tier; Apple sign-in is required when other social logins are offered |
-| Camera pose detection | Apple Vision / Google ML Kit, on the device, through a native module | Free; video never leaves the phone |
+| Camera pose detection | Apple Vision body pose (iOS, local `terbit-pose` module); Android later (e.g. ML Kit) through the same joint format | Free; video never leaves the phone |
 | Alarm native code | Local Expo module: AlarmKit (iOS 26+), notifications fallback, `AlarmManager.setAlarmClock` (Android) | See FEASIBILITY.md |
 | Restrictions native code | Local Expo module + app extensions (iOS); UsageStats + overlay (Android) | See FEASIBILITY.md |
 | Builds | EAS Build (development, preview and production profiles) | Builds iOS from Windows |
@@ -133,10 +133,44 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - **Fitness (Phase 3B, catalogues in 3D):** `{ type: 'fitness', exercise, difficulty }` (`adaptation` only on alarms saved before 3D). It uses four reusable building blocks in `fitness/session.ts`: reps, timed (with optional guided cues), holds, and number sequence. They are pure functions of timestamps, so backgrounding or a slow screen can't distort time.
   - Reps need one deliberate tap each; taps faster than `minRepIntervalMs` are ignored.
   - Timers run from the end of a “get ready” countdown (3 s; 10 s with Extended pacing) and can be paused.
-  - Results are marked `self_reported`; there's no camera yet.
+  - Results are marked `self_reported`, `task_checked` (number focus) or `camera_verified` (Phase 4.5: every rep counted by the camera).
   - Targets and anti-tap limits live in `fitness/exercises.ts`.
   - XP counts toward Fitness.
   - Accessibility (Phase 3D): a user-level **Mobility Profile** (Standard / Reduced mobility / Non-physical) and `missionPacing` in `features/accessibility`. Each profile has its own catalogue (`FITNESS_CATALOGUES` in `exercises.ts`); screens show only the current catalogue. An alarm saved under another profile runs the activity in the same place in the current catalogue (`activityForProfile`, internal only; `missionForProfile`, `fitnessConfigFor`, `ProfileFitnessMission`). Non-physical activities are never called exercise; number focus is `task_checked`. XP never depends on the profile.
+- **Camera rep counting (Phase 4.5, verified on iPhone 13 Oct 2026):**
+  - **Native:** `modules/terbit-pose` (iOS). An `ExpoView` runs an `AVCaptureSession` (front camera, 640×480, portrait frames) with an `AVCaptureVideoDataOutput`. About 15 frames a second go to Apple Vision's `VNDetectHumanBodyPoseRequest`, in memory only. Only 12 joints (shoulders, elbows, wrists, hips, knees, ankles: x, y, confidence) are sent to JavaScript. There is no movie or photo output, and nothing is written or sent anywhere. The camera runs only while the `active` prop is true and the view is on screen.
+  - **Service:** `services/pose` (`getPoseCamera`: availability, permission read/request, the view). Unavailable on Android, web, Expo Go and older builds, so the option isn't offered.
+  - **Shared engine (pure, tested):** `fitness/pose/verifier.ts`. Frames go in; reps, movement state and feedback come out.
+    - **Readiness:** only the joints the activity needs, held for ~0.4 s.
+    - **Side:** one-sided activities use the clearer side and keep it for the rep (no flapping).
+    - **Values:** confidence ≥ 0.3; light smoothing (each new value moves the average 60%).
+    - **Evidence:** each activity has weighted evidence paths in groups. A rep reaches its target when the reached paths add up to 1, with only the best path per group counting. One strong path is enough, or several supporting ones together.
+    - **States:** home → leaving → away → home = 1 rep. Activities may start at either end (sit-to-stand). The start position is judged by the primary paths (weight 1) when visible, so supporting measures that depend on body proportions can't block it.
+    - **Speed:**
+      - a cycle under 0.2 s is a glitch (silent);
+      - under the activity's minimum, or with the target only glimpsed for one frame, it says "A little slower so I can count the full movement";
+      - a quick movement whose unsmoothed value holds the target for 2 frames counts.
+    - **Automatic start:** `steadyFor` (usable, ready and still, with joints moving under 3% of the image per frame) and `autoStart` in `camera-flow.ts`: ~1 s still → the mission countdown starts; the pose lost during the countdown cancels it (`cancelCountdown`); nothing cancels after Go.
+    - **Ends:** a dead zone between them; a minimum cycle per activity that blocks glitches, not brisk genuine reps.
+    - **Losing the body:** after 0.8 s the rep in progress is dropped. Completed reps are never removed.
+    - **Feedback:** partial reps and stalls give the hint of the most important missing path ("Lower a little more", "Bring your feet back together").
+  - **Activities** (`fitness/pose/camera-activities.ts`): each one only describes its movement. Every measurement comes from one frame, scaled by the user's own body lengths, so there's no calibration and side-on isn't strictly required.
+
+    | Activity | States | Primary evidence | Secondary evidence | Minimum landmarks | Min cycle |
+    |---|---|---|---|---|---|
+    | Push-ups (front, side or angled) | top → down → top | Shoulder height above the hands in forearm lengths, ≥1.75 → ≤1.5 (1; any view), **or** elbow angle ≥145° → ≤120° (1; side-on) | Elbow hidden, side-on: shoulder height in torso lengths ≥0.82 → ≤0.7 (0.6) **and** hip height ≤0.28 (0.4) | One side: shoulder + elbow + wrist (or shoulder + wrist + hip) | 0.35 s |
+    | Squats | standing → squat → standing | Knee angle ≥155° → ≤120° (1) | Hip height above the ankle, in shin lengths, 1.85 → 1.65 (0.7), **with** a knee bend ≥160° → ≤145° (0.3) **or** shoulder height (0.4) | One side: hip + knee + ankle | 0.35 s |
+    | Jumping jacks | closed → open → closed | — (arms and legs both needed) | Arm angle at the shoulder, both sides averaged, ≤60° → ≥110° (0.6) **and** feet spread (0.6), or knees spread if the feet are hidden (0.5) | Both shoulders + both hips + a wrist + both ankles (or both knees) | 0.25 s |
+    | Chair sit-to-stand | standing ↔ seated (either start) | Knee angle ≥145° ↔ ≤115° (1) **or** hip height 1.7 ↔ 1.35 (1) | — | One side: hip + knee + ankle | 0.8 s measured (≈1.3 s real) |
+
+    The head is never used. Leaning forward, small dips, bouncing, one arm or feet alone never complete a rep.
+  - **Classification of the whole catalogue:** `CAMERA_CATALOGUE` (enabled / later / not suitable, each with a reason). The Non-physical profile is never offered the camera.
+  - **Mission:** `camera-verification-view.tsx` inside `FitnessMissionView`. Camera reps go through `recordCameraRep` → `recordRep` (with the activity's own minimum cycle), so completion, XP and occurrence rules are unchanged. `verification: 'camera_verified'` is set only when every rep was camera-counted.
+  - **Why Apple Vision:** it's built into iOS (no download, licence or model file), runs on device, needs only a small local module, and its 2D joints are enough for angle-based reps. Alternatives considered:
+    - MediaPipe Pose: more landmarks and Android reuse, but adds model files and a pod;
+    - ML Kit Pose: Google's closed SDK, larger and still beta;
+    - VisionCamera frame processors: an extra worklets dependency and community pose plugins of mixed quality.
+    The counters take a generic joint format, so Android can use another detector later.
 - **Faith (Phase 3C):** `src/features/faith/`. Separate missions, each Faith XP once per occurrence: `{ type: recitation, tradition }`, `{ type: reflection, difficulty }` (difficulty = length), and `{ type: recitation_reflection, tradition, difficulty }` (Recitation then Reflection, one occurrence; `combined.ts`). `completeMission` only accepts a result of the alarm’s own mission type. Later Reflections on the same day are alternates (`reflection/sessions.ts`). Details: [FAITH-CONTENT.md](FAITH-CONTENT.md), [REFLECTION-MUSIC.md](REFLECTION-MUSIC.md).
   - Faith settings (primary preference, explore other traditions, display) in `app_settings`; private (`privacy.ts`); backed up to the private profile by the sync engine’s `profile` entity.
   - Daily schedules (`schedule.ts`): explicit entries + rotations, stored as layers so a newer schedule never changes past/today/tomorrow.
@@ -205,7 +239,7 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - **Settings index** (`features/settings/settings-index.ts`): groups → one sub-screen per page under `src/app/(tabs)/settings/`. Each setting lives on one screen only. Developer tools are a single development-build-only screen.
 - **Preferences** (`features/settings/preference-store.ts`): small typed groups in `app_settings` (`accessibility.settings`), normalised on read, phone-only (never synced). Faith keeps its own store.
 - **Notifications** (`features/notifications/notification-catalogue.ts`): alarm-critical (AlarmKit, not a preference) vs mission reminders (Gentle follow-ups: part of Gentle mode, automatic, no switch; Reward and Challenge never send them) vs optional engagement (planned; they become preferences when built).
-- **Permissions** (`services/permissions` reads/requests; `features/permissions` maps to plain statuses). Reading never asks; asking only on tap, and only if never asked. Unknown is shown as unknown, never as allowed. Microphone and camera have no request path. iPhone Settings opens with `Linking.openSettings()`.
+- **Permissions** (`services/permissions` reads/requests; `features/permissions` maps to plain statuses). Reading never asks; asking only on tap, and only if never asked. Unknown is shown as unknown, never as allowed. The microphone has no request path. The camera is asked for only from "Verify with camera" in a Fitness mission; Settings reads it and offers iPhone Settings. iPhone Settings opens with `Linking.openSettings()`.
 - **Motion and text** (`services/accessibility`, `features/accessibility/system-preferences.ts`, `hooks/use-large-text`, `constants/text-scale`): iPhone preferences, not permissions. Read only, shown as "Follows iPhone setting" (plus the value when the iPhone reports one), with the iPhone Settings path as help; Terbit never opens Settings for them (no supported link). Reduce Motion → fade transitions; large text → stacked rows and list-style choices; display numbers capped at 1.5×.
 - UX map and known issues: [UX-INVENTORY.md](UX-INVENTORY.md).
 

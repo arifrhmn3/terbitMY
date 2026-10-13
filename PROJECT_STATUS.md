@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 13 October 2026 (Phase 5A complete on the repository side)_
+_Last updated: 13 October 2026 (Phase 4.5 complete)_
 
 ## Current phase
 
@@ -11,6 +11,8 @@ _Last updated: 13 October 2026 (Phase 5A complete on the repository side)_
 **Phase 3 (3A Education, 3B Fitness, 3C Faith, 3D Settings & Accessibility, 3.5 Core UX Consolidation) is complete, verified on iPhone and merged into `main` (13 Oct 2026).**
 
 **Phase 4 (Bedtime & Restrictions: the Night Routine) is complete, verified on iPhone in the `development-screen-time` build and merged into `main` (13 Oct 2026).**
+
+**Phase 4.5 (Camera-Verified Fitness Missions: push-ups, squats, jumping jacks, chair sit-to-stand) is complete, physically verified on iPhone in the `development-screen-time` build and merged into `main` (13 Oct 2026).**
 
 **Phase 5A (Live Accounts & Sync Verification) is complete on the repository side and merged into `main` (13 Oct 2026). Live email sign-in testing is intentionally deferred to beta, because the public name and domain aren't chosen yet (see "Beta requirements"). Circles has not started.**
 
@@ -166,7 +168,7 @@ Branch `phase-3/fitness-missions`. ✅ **Complete and verified on iPhone (12 Oct
 | Fitness mission type: Push-ups, Squats, Jumping jacks (rep-based); Stretch, Walk in place (timed); Easy/Medium/Hard | ✅ Unit-tested |
 | Reusable rep and timer building blocks: 3 s countdown; one deliberate tap per rep (too-fast taps ignored); timer from timestamps (background-safe), pause/resume; abandon = existing skip/give up | ✅ Unit-tested · ✅ Verified on iPhone |
 | Targets and anti-tap limits central in `fitness/exercises.ts` (prototype values) | ✅ |
-| Marked self-reported everywhere (editor, mission, result, history); no camera or pose detection | ✅ |
+| Marked self-reported everywhere (editor, mission, result, history); no camera or pose detection in 3B (optional camera counting for push-ups and squats: Phase 4.5) | ✅ |
 | Fitness XP via central policy: 10 + difficulty bonus + existing Challenge bonus; awarded once; Fitness rank; "First Fitness mission" achievement | ✅ Unit-tested |
 | Main Wake-Up rule unchanged: non-main fitness alarms earn XP and count in All alarms only | ✅ Unit-tested |
 | Accessibility groundwork (replaced in 3D by Mobility Profile catalogues) | ✅ |
@@ -263,7 +265,99 @@ Not the final visual redesign. Details: [docs/UX-INVENTORY.md](docs/UX-INVENTORY
 - **Final visual/UI redesign** (3.5 consolidated structure, not visuals).
 - **Final Faith content placement.**
 - **Naming decision:** whether non-physical activities keep earning Fitness XP, or get a neutral name such as "Wellbeing".
-- **Camera-verified Fitness missions** (on-device pose detection). Fitness is self-reported today; the camera is never requested.
+- **Camera-verified Fitness missions:** Phase 4.5 covers push-ups, squats, jumping jacks and chair sit-to-stand. Wall push, step-out, walk in place and seated marching are later candidates.
+
+## Phase 4.5: Camera-Verified Fitness Missions
+
+Branch `phase-4.5/camera-fitness-verification`, merged into `main`. ✅ **Complete and physically verified on iPhone (13 Oct 2026)** in the `development-screen-time` build `d017a751`.
+
+**Final record:**
+- **Technology:** Apple Vision body pose (iOS), in the local `modules/terbit-pose` module.
+- **Privacy:** processed on the phone only. No photo or video recording, no saved or uploaded frames, no network or Supabase processing, no account needed. The microphone isn't used.
+- **Optional:** "Verify with camera" is optional, and tapping (manual) is always available. Camera progress carries over if you switch to tapping.
+- **XP:** the same XP for camera and manual completion. `camera_verified` is recorded only when the whole target was completed through camera recognition.
+- **Verification:** multi-signal evidence (weighted primary and secondary paths, any camera angle where the evidence allows).
+- **Start and guidance:** automatic Ready → countdown → Go (no tap); live positioning, movement and slow-down guidance.
+- **Supported:** push-ups, squats, jumping jacks, chair sit-to-stand.
+- **Future candidates:** wall push, step-out movement, walk in place, seated marching. Timed and static activities (stretches) and the whole Non-physical profile stay non-camera.
+- **Deferred:** the Android camera implementation (phase A) and any Challenge-mode camera requirement (future work).
+
+**Verified on the iPhone:**
+- The camera permission flow works, and `TerbitPose` loads.
+- The automatic Ready and countdown work without walking back to the phone.
+- Push-ups count reliably from the supported positions with acceptable leniency, and "Lower a little more" helps.
+- Squats and jumping jacks work smoothly.
+- There are no obvious phantom reps. Fast movements either count or get the slow-down prompt, and partial movements are rejected.
+- Leaving the frame keeps completed reps. The manual fallback keeps camera progress.
+- XP and completion happen exactly once.
+- Manual Fitness missions, Night Routine, Main Wake-Up, snooze, XP and streak, and guest/local-first behaviour are all unaffected.
+- Chair sit-to-stand is fully unit-tested, but wasn't part of the reported physical run; a quick check later is advised.
+
+**Purpose:** accountability ("did you genuinely get up and do it?"), not competition-form judging. Ten normal genuine reps should give about 8–10 counted. Small fake motions, jitter and moving an irrelevant body part shouldn't count. Camera verification is always optional; tapping always remains, with the same XP.
+
+**Catalogue audit (every activity classified, `CAMERA_CATALOGUE` in `pose/camera-activities.ts`):**
+
+| Profile | Activity (mission kind) | Camera | Why |
+|---|---|---|---|
+| Standard | Push-ups (reps) | ✅ Enabled | Clear elbow cycle; shoulder + hip lowering as a second path |
+| Standard | Squats (reps) | ✅ Enabled | Clear knee cycle; hip lowering with knees or shoulders as a second path |
+| Standard | Jumping jacks (reps) | ✅ Enabled | Closed → open → closed of arms AND legs |
+| Standard | Stretch (timed) | ❌ Not suitable | Static and varied: friction or form policing |
+| Standard | Walk in place (timed) | ⏸ Later | Needs continuous-movement verification (alternating legs, active time), not reps |
+| Reduced mobility | Wall push (reps) | ⏸ Later | Like a push-up, but inclusive ranges need testing first |
+| Reduced mobility | Chair sit-to-stand (reps) | ✅ Enabled (forgiving) | Large, unmistakable hip and knee movement; starts seated or standing |
+| Reduced mobility | Step-out movement (reps) | ⏸ Later | Alternates sides and may be seated: "one rep" varies; needs its own testing |
+| Reduced mobility | Seated stretch (timed) | ❌ Not suitable | Static |
+| Reduced mobility | Seated marching (timed) | ⏸ Later | Continuous-movement verification (alternating knee lifts) |
+| Non-physical | Breathing, Number focus, Hold and release, Grounding | ❌ Never | Non-physical profile: never camera |
+
+| Item | Status |
+|---|---|
+| Pose technology: **Apple Vision** body pose in the local module `modules/terbit-pose` (AVFoundation + Vision, iOS). About 15 frames a second at 640×480; late frames dropped; only 12 joints reach JavaScript | ✅ In build `d017a751` (binary checked) |
+| **Shared verification engine** (`pose/verifier.ts`): exercise-specific readiness; stable side; confidence filter; light smoothing (2 unsmoothed frames also count); multi-signal weighted evidence; movement states; partial-rep hints; glitch / too-quick / natural speed tiers; stillness for the automatic start; temporary-loss handling; reps never lost | ✅ Unit-tested · ✅ push-ups, squats, jumping jacks completed on iPhone |
+| Automatic start: hold still ~1 s → Ready · 3 → 2 → 1 → Go (no Start button); losing the pose cancels the countdown | ✅ Unit-tested · ✅ Verified on iPhone |
+| Activities (`pose/camera-activities.ts`): push-ups, squats, jumping jacks, chair sit-to-stand, each with evidence paths, minimum landmarks, timing, positioning text and live phrases | ✅ Unit-tested · ✅ push-ups, squats, jumping jacks verified on iPhone |
+| Live feedback: neutral and actionable (e.g. "Lower into the push-up", "Keep going", "Good — push back up", "Lower a little more", "Rep counted"); never "bad form" or "incorrect" | ✅ Unit-tested |
+| Same mission rules: camera reps go through `recordCameraRep` (active only, completes once; the activity's own minimum cycle); `camera_verified` only if every rep was camera-counted; switching to tapping keeps the reps so far (result: self-reported) | ✅ Unit-tested |
+| Same XP as tapping; stored in the existing result JSON (no migration) | ✅ Unit-tested |
+| Permission, fallback, privacy, offline: one camera permission for all activities; "Continue without camera" everywhere; on-device only; no recording or upload | ✅ Unit-tested (rules + source checks) |
+| Availability states ("Not in this build" / "Not asked yet" / "Not available on this phone" / "Can't check"), and the developer panel (Settings → Developer tools → Camera rep counting) | ✅ Unit-tested |
+
+**First iPhone run (13 Oct 2026), resolved:**
+- Settings showed the camera as unavailable, and no camera prompt appeared.
+- The developer panel showed the phone was running the **previous** Screen Time build `7f5805f1`: native modules were `TerbitAlarms` and `TerbitScreenTime`, with no `TerbitPose`.
+- Downloading both builds' binaries confirmed it:
+  - `d017a751` contains `TerbitPoseModule`, `PoseCameraView` and the camera purpose string;
+  - `7f5805f1` contains none of them.
+- **Fix:** install `d017a751` over the old app (don't delete it first, or local data is lost). No code fault.
+- The availability states were also separated (module / hardware / permission), so a failed check can never again look like "no camera on this phone".
+
+**Physical tuning pass (13 Oct 2026), after testing push-ups, squats and jumping jacks on the iPhone:**
+- **Results:** all three complete. Squats and jumping jacks were recognised almost immediately front-facing. Push-ups worked best front-facing (12 o'clock), but needed almost chest-to-floor depth. Very fast reps were occasionally missed. Walking back to the phone to tap Start lost the full-body framing.
+- **Push-ups (depth):** a new primary path, *shoulder height above the hands in forearm lengths* (reads the same from the front, side or an angle). The depth targets are more lenient: elbow ≤120° (was 105°); lowering ≤1.5 forearms (≈ a 120° elbow). The side-on fallback without an elbow is a little more lenient too.
+  - **Root cause:** from the front, the elbow angle barely changes, and the old backup scaled by torso length, which looks tiny from the front.
+  - The start position is now judged by primary paths only, so body proportions can't block "back at the top".
+- **Angles:** front-facing, side-on (either side) and angled all work for push-ups and squats; front-facing for jumping jacks; side-on or angled for sit-to-stand. The verifier adapts automatically (no mode to choose).
+- **Speed:**
+  - a cycle under 0.2 s is a detector glitch, ignored silently;
+  - a plausible movement that's too quick to verify (below the activity's minimum, or the target only glimpsed for one frame) says **"A little slower so I can count the full movement"**;
+  - a quick movement whose unsmoothed value holds the target for 2 frames now counts.
+  - Minimum measured cycle: push-ups and squats 0.35 s, jumping jacks 0.25 s, sit-to-stand 0.8 s (was 1.2 s; measured cycles are ~0.6 of the real time).
+- **Automatic start (no tap):** hold the activity's pose still for ~1 s → "Ready · 3" → 2 → 1 → "Go" → counting. Losing the pose during the countdown cancels it. After Go, movement never cancels anything. Leaving mid-set keeps the reps, and counting resumes after a short "Hold there" (no new countdown).
+- **Positioning:** what worked on the iPhone, plus one clear fix at a time ("Step back a little — keep your feet in frame", "Keep one arm visible", "Keep your arms in frame", "Move into view").
+
+**Changes needing action:** none beyond installing build `d017a751`. This round's framework is JavaScript only. No SQLite or Supabase migration; no new packages.
+
+**Known limits (prototype):**
+- Thresholds are provisional, to be tuned with the per-activity iPhone protocols.
+- Front camera and portrait only; no skeleton overlay.
+- Push-ups need one arm visible side-on (or shoulder, wrist and hip). Jumping jacks need the user facing the phone with arms and legs in frame.
+- Poor light, very loose clothing or a cluttered background can stop detection. Terbit then shows a positioning hint and doesn't count.
+- iOS only. Android can later feed the same joint format to the same engine.
+
+**Future (documented, not built):**
+- Camera candidates deferred for reliability testing: wall push, step-out movement, walk in place and seated marching (continuous-movement mode).
+- **Challenge mode:** `camera_verified` is recorded, so a later rule could make the camera recommended or required, or show a verified badge. Not in 4.5; XP stays the same.
 
 ## Phase 5A: Live Accounts & Sync Verification
 
@@ -352,7 +446,7 @@ The Night Routine works in any build. App restrictions need the `development-scr
 - Available Sleep Window analytics (the helper exists; no charts or sleep scoring yet).
 - Possible Apple Health sleep integration (the only route to actual sleep data).
 - Onboarding and personalisation (Phase 6).
-- Camera-verified Fitness missions.
+- More camera-verified activities (Phase 4.5 covers push-ups, squats, jumping jacks and chair sit-to-stand): wall push, step-out, walk in place, seated marching.
 - Android parity (phase A).
 - Final UI redesign.
 - Circles (Phase 5).

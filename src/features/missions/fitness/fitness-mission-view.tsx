@@ -7,8 +7,10 @@ import { ThemedView } from '@/components/themed-view';
 import { DisplayTextMaxScale } from '@/constants/text-scale';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { getPoseCamera } from '@/services/pose';
 
 import { DIFFICULTY_LABEL } from '../types';
+import { CameraVerificationView } from './camera-verification-view';
 import { EXERCISES, formatAmount, formatSeconds, formatTarget } from './exercises';
 import {
   countdownLeft,
@@ -16,7 +18,9 @@ import {
   currentCue,
   fitnessPhase,
   fitnessResult,
+  cancelCountdown,
   pauseFitness,
+  recordCameraRep,
   recordHold,
   recordRep,
   remainingMs,
@@ -27,6 +31,8 @@ import {
   type FitnessSession,
   type RepOutcome,
 } from './session';
+import { CAMERA_COPY, canVerifyWithCamera } from './pose/camera-flow';
+import { isCameraVerifiable } from './pose/camera-activities';
 import type { FitnessMissionConfig, FitnessMissionResult } from './types';
 
 const TICK_MS = 200;
@@ -61,6 +67,9 @@ const FEEDBACK: Partial<Record<RepOutcome, string>> = {
  * guided cues for breathing and grounding), holds, or number focus. Time
  * comes from timestamps, so it stays right in the background. Movement is
  * self-reported; non-physical activities are never presented as exercise.
+ * Camera-verifiable activities (`pose/camera-activities.ts`) can optionally
+ * be counted by the camera ("Verify with camera", on the phone); tapping
+ * always stays available, and both earn the same XP.
  */
 export function FitnessMissionView({ config, onComplete }: FitnessMissionViewProps) {
   const theme = useTheme();
@@ -72,6 +81,8 @@ export function FitnessMissionView({ config, onComplete }: FitnessMissionViewPro
   const activity = EXERCISES[config.exercise];
   const physical = activity.profile !== 'non_physical';
   const phase = fitnessPhase(session, now);
+  const cameraOffered = canVerifyWithCamera(config.exercise, getPoseCamera().available);
+  const [mode, setMode] = useState<'tap' | 'camera'>('tap');
 
   // Re-render a few times a second while counting down, timing or holding; time itself comes from timestamps.
   const ticking = phase === 'countdown' || (phase === 'active' && (session.kind === 'timed' || holdingSince !== null));
@@ -121,7 +132,22 @@ export function FitnessMissionView({ config, onComplete }: FitnessMissionViewPro
         {formatTarget(config.exercise, config.difficulty)}
       </ThemedText>
 
-      {phase === 'ready' && (
+      {mode === 'camera' && phase !== 'done' && isCameraVerifiable(config.exercise) && (
+        <CameraVerificationView
+          exercise={config.exercise}
+          session={session}
+          now={now}
+          onStart={start}
+          onCancelCountdown={() => setSession((s) => cancelCountdown(s, Date.now()))}
+          onRep={(at, minIntervalMs) => {
+            setNow(at);
+            setSession((s) => recordCameraRep(s, at, minIntervalMs).session);
+          }}
+          onFallback={() => setMode('tap')}
+        />
+      )}
+
+      {mode === 'tap' && phase === 'ready' && (
         <ThemedView type="backgroundElement" style={styles.card}>
           <ThemedText type="title" style={styles.center}>
             {activity.label}
@@ -135,10 +161,18 @@ export function FitnessMissionView({ config, onComplete }: FitnessMissionViewPro
             {physical ? ' Go at your own pace and stop if anything hurts.' : ''}
           </ThemedText>
           <Button title="Start" onPress={start} />
+          {cameraOffered && (
+            <>
+              <Button title="Verify with camera" variant="secondary" onPress={() => setMode('camera')} />
+              <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+                {CAMERA_COPY.offer}
+              </ThemedText>
+            </>
+          )}
         </ThemedView>
       )}
 
-      {phase === 'countdown' && (
+      {mode === 'tap' && phase === 'countdown' && (
         <ThemedView type="backgroundElement" style={styles.card}>
           <ThemedText type="headline">Get ready</ThemedText>
           <ThemedText style={[styles.big, { color: theme.tint }]} maxFontSizeMultiplier={DisplayTextMaxScale} accessibilityLiveRegion="polite">
@@ -147,7 +181,7 @@ export function FitnessMissionView({ config, onComplete }: FitnessMissionViewPro
         </ThemedView>
       )}
 
-      {phase === 'active' && session.kind === 'reps' && (
+      {mode === 'tap' && phase === 'active' && session.kind === 'reps' && (
         <ThemedView type="backgroundElement" style={styles.card}>
           <Counter session={session} unit="reps" />
           <Bar progress={progress} />
@@ -270,6 +304,12 @@ function Bar({ progress }: { progress: number }) {
   );
 }
 
+const VERIFICATION_LABEL: Record<FitnessMissionResult['verification'], string> = {
+  self_reported: 'Self-reported',
+  task_checked: 'Checked',
+  camera_verified: 'Counted by camera',
+};
+
 /** What was done, at what difficulty, and how it is known. */
 export function FitnessResultSummary({ result }: { result: FitnessMissionResult }) {
   return (
@@ -278,7 +318,7 @@ export function FitnessResultSummary({ result }: { result: FitnessMissionResult 
         {EXERCISES[result.exercise].label} · {formatAmount(result.exercise, result.achieved)} · {DIFFICULTY_LABEL[result.difficulty]}
       </ThemedText>
       <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-        {result.verification === 'task_checked' ? 'Checked' : 'Self-reported'} ·{' '}
+        {VERIFICATION_LABEL[result.verification]} ·{' '}
         {formatSeconds(Math.max(1, Math.round(result.durationMs / 1000)))} from start to done
       </ThemedText>
     </>

@@ -26,7 +26,7 @@ const ICON = {
   notifications: { ios: 'bell', android: 'notifications', web: 'notifications' },
   audio: { ios: 'speaker.wave.2', android: 'volume_up', web: 'volume_up' },
   microphone: { ios: 'mic.slash', android: 'mic_off', web: 'mic_off' },
-  camera: { ios: 'video.slash', android: 'videocam_off', web: 'videocam_off' },
+  camera: { ios: 'camera', android: 'photo_camera', web: 'photo_camera' },
 } as const;
 
 /**
