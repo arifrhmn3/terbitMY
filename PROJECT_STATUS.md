@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 13 October 2026_
+_Last updated: 13 October 2026 (Phase 4 complete)_
 
 ## Current phase
 
@@ -8,7 +8,9 @@ _Last updated: 13 October 2026_
 
 **Phase 2A (local Progress Engine) is complete and verified on iPhone. Phase 2B (Accounts & Cloud Foundation) is complete on the repository side (12 Oct 2026): the Supabase project, schema and RLS are live; live sign-in and cloud-sync testing are deferred to the beta stage (see "Deferred to beta" below).**
 
-**Phase 3 (3A Education, 3B Fitness, 3C Faith, 3D Settings & Accessibility, 3.5 Core UX Consolidation) is complete, verified on iPhone and merged into `main` (13 Oct 2026). Phase 4 has not started.**
+**Phase 3 (3A Education, 3B Fitness, 3C Faith, 3D Settings & Accessibility, 3.5 Core UX Consolidation) is complete, verified on iPhone and merged into `main` (13 Oct 2026).**
+
+**Phase 4 (Bedtime & Restrictions: the Night Routine) is complete, verified on iPhone in the `development-screen-time` build and merged into `main` (13 Oct 2026).**
 
 ## Phase 2A: local Progress Engine
 
@@ -260,6 +262,81 @@ Not the final visual redesign. Details: [docs/UX-INVENTORY.md](docs/UX-INVENTORY
 - **Final Faith content placement.**
 - **Naming decision:** whether non-physical activities keep earning Fitness XP, or get a neutral name such as "Wellbeing".
 - **Camera-verified Fitness missions** (on-device pose detection). Fitness is self-reported today; the camera is never requested.
+
+## Phase 4: Bedtime & Restrictions (Night Routine)
+
+Branch `phase-4/bedtime-restrictions`, merged into `main`. ✅ **Complete and verified on iPhone (13 Oct 2026)** in the `development-screen-time` build. Verified on the iPhone:
+- Screen Time authorization works, and the status becomes Allowed.
+- Apple's Family Activity Picker works. Terbit MY keeps only the opaque selection and counts.
+- Chosen apps are shielded at wind-down, before bedtime, with Terbit MY fully closed. Bedtime starts no second restriction event.
+- Today shows "Wind-down active" and the restriction end time.
+- "End tonight's restrictions" removes the shield and keeps the Night Routine. Restrictions return on the next scheduled night.
+- Restrictions lift automatically at the Main Wake-Up with Terbit MY closed.
+- The Night Routine persists across restarts.
+- Main Wake-Up, snooze, mission XP and streak still work.
+- The Sleep Focus guidance and notification wording don't claim control Terbit MY doesn't have.
+
+The Night Routine works in any build. App restrictions need the `development-screen-time` build (normal builds say "Not in this build").
+
+| Item | Status |
+|---|---|
+| Night Routine model in one place (`features/night/night-routine.ts`): nights, wind-down (restrictions start here: `restrictionStartTime`, no separate setting), bedtime, end rule (Main Wake-Up or fixed time) with a fallback morning time, Apple's opaque app selection, optional calming activity, wind-down reminder. Central defaults (`NIGHT_ROUTINE_DEFAULTS`) and `nightRoutineFromAnswers` for future onboarding | ✅ Unit-tested |
+| Time rules (`night-timeline.ts`): a night belongs to its evening; times before noon are the early morning after; bedtime after midnight; weekday and weekend wake-ups; local calendar arithmetic | ✅ Unit-tested |
+| Restrictions end at the next morning's Main Wake-Up (`resolvedMainWakeUp`); with no Main Wake-Up, at the fallback time (Today says "no morning wake alarm is scheduled") | ✅ Unit-tested |
+| Restriction state: inactive / unavailable / scheduled / active / overridden / ended | ✅ Unit-tested |
+| Restrictions start at WIND-DOWN, not bedtime: model, time rules, Tonight, weekly line, wind-down reminder and the native DeviceActivity interval (shield applied at interval start). Routines saved with an old separate restriction start are read safely and now restrict from wind-down | ✅ Unit-tested · ✅ Verified on iPhone |
+| Setup and editing (Alarms → Routines → Night Routine): wind-down, bedtime, apps, optional activity, Save; Customise for nights, end rule and reminder | ✅ Built |
+| Notifications: Terbit MY doesn't claim to block other apps' notifications or turn on Focus (Apple has no API for either). The "Quiet notifications" section optionally suggests Sleep Focus at the same time as wind-down | ✅ Unit-tested (copy + screen scan) |
+| Available Sleep Window (bedtime → relevant Main Wake-Up; not sleep): helper and terminology only, nothing shown, no usage data collected | ✅ Unit-tested |
+| Today → Tonight: "Wind-down begins · Apps restricted" → Bedtime → "Main Wake-Up tomorrow · Restrictions end"; shown first during wind-down and the night; "Tonight · Wind-down active", then "Tonight · Bedtime", with "Apps restricted until …" throughout; calming activity offered during wind-down | ✅ Unit-tested |
+| Weekly schedule: one Night Routine line per evening it applies to | ✅ Unit-tested |
+| Wind-down reminder (one local notification per evening, the next 7 evenings, refreshed when Terbit MY opens) | ✅ Unit-tested |
+| Screen Time (iOS): authorization, Apple's picker, ManagedSettings shields, DeviceActivity schedules, Device Activity Monitor extension | ✅ Verified on iPhone (`development-screen-time` build, 13 Oct 2026) |
+| "End tonight's restrictions" (deliberate, confirmed; back automatically the next night) | ✅ Unit-tested |
+| Settings → Screen Time access (status and recovery); Permissions and Your data explain it | ✅ Built |
+
+**Apple entitlement status: ✅ APPROVED (13 Oct 2026).**
+- **Approved:** Family Controls (Distribution) for both `com.terbitmy.app` and the extension `com.terbitmy.app.activity-monitor`.
+- **Portal (confirmed by the owner):**
+  - App Group `group.com.terbitmy.app` is attached to both identifiers.
+  - Team ID `663JDC7J6J` is set in `eas.json` (`development-screen-time` profile only).
+- **Why Distribution was needed:** Family Controls (Development) works only with *development* provisioning profiles (Xcode builds). EAS internal builds use *ad hoc* profiles, which need the Distribution capability (expo/eas-cli #2715, #3185). Without a Mac, Distribution approval was the only route.
+- **Build switch (still in place, by design):**
+  - Only `development-screen-time` sets `TERBIT_SCREEN_TIME=1`. It adds the entitlement, the App Group and the extension.
+  - The normal `development` profile is unchanged and has no Screen Time. Those builds report "Not in this build", and the Night Routine still works.
+- **Screen Time build:** `npx eas-cli@latest build --profile development-screen-time --platform ios`. The first build finished on 13 Oct 2026 and was used for the iPhone verification. EAS holds the credentials for both targets.
+- **Production / TestFlight** builds will also need the switch (a later step, before beta).
+
+**Changes needing action:**
+- New native code: the TerbitScreenTime module is compiled into every build. The extension is added only in `development-screen-time` builds. **A new iOS development build is required** to get the module.
+- New package `@bacons/apple-targets` (a config plugin by an Expo team member; it is only applied when the switch is on).
+  - `package.json` `overrides` makes it use the project's SDK 57 `@expo/prebuild-config` instead of the SDK 55 copy it pins (`~55.0.6`). That old copy declared a TypeScript 5 peer, so `npm ci` on EAS (npm 10.9.8) failed with "Missing: typescript@5.9.3 from lock file". The plugin only uses `writeContentsJsonAsync`, identical in both versions. Remove the override once apple-targets supports SDK 57.
+- SQLite migration 12 (`night_routines`), applied automatically.
+- No Supabase change: the Night Routine is not backed up.
+
+**Expo project (do not change):**
+- Terbit MY is linked to `@arifrhmn3/terbit-my` (ID `db6aa5b6-4442-4246-98d1-c1291806f69d`, in `app.json`).
+- A duplicate team project, `@arifrhmn3s-team/terbit-my` (ID `8363cdad-041c-4a6e-bd12-764116b82173`), is connected to GitHub and may start unwanted production builds.
+- **Owner to do:** on expo.dev, open the duplicate team project → GitHub → disconnect the repository. Don't change the local project ID.
+
+**Not in Phase 4 (future work, documented):**
+- Sleep Focus setup helper via App Shortcuts / Shortcuts (the user sets it up once; Terbit MY never claims to turn on a Focus itself).
+- Available Sleep Window analytics (the helper exists; no charts or sleep scoring yet).
+- Possible Apple Health sleep integration (the only route to actual sleep data).
+- Onboarding and personalisation (Phase 6).
+- Camera-verified Fitness missions.
+- Android parity (phase A).
+- Final UI redesign.
+- Circles (Phase 5).
+
+**Known Apple limitations:**
+- Restrictions are a commitment aid, not a lock. The user can always remove Terbit MY's Screen Time access in iPhone Settings, or end tonight's restrictions in the app. Emergency calls are never blocked by iOS.
+- Shields use Apple's standard screen (no custom shield extensions in Phase 4).
+- DeviceActivity allows 20 schedules per app. Terbit MY uses at most 7 nightly schedules plus up to 7 one-time "end early" markers.
+- A one-off Main Wake-Up *later* than usual doesn't extend restrictions: they end at the usual Main Wake-Up, the safe direction.
+- **Notifications:** Apple's Screen Time APIs (FamilyControls, ManagedSettings, DeviceActivity) give Terbit MY no way to silence, suppress or change other apps' notifications.
+  - Shielded apps' notifications may be suppressed in practice, but Apple doesn't document it, so Terbit MY doesn't promise it.
+  - For a quiet wind-down, Terbit MY recommends an iPhone Focus (e.g. Sleep). See docs/ARCHITECTURE.md.
 
 ## Beta requirements (must be done before public beta)
 

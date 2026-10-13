@@ -1,10 +1,13 @@
 import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
+import { formatAlarmTime } from '@/features/alarms/alarm';
 import { useAlarms } from '@/features/alarms/alarms';
 import { RingingStatus } from '@/features/alarms/components/ringing-status';
 import { categoriesFor } from '@/features/alarms/creation';
 import { useFaithSettings } from '@/features/faith/use-faith';
+import { describeNights } from '@/features/night/labels';
+import { useNightRoutine } from '@/features/night/night';
 import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 
 /**
@@ -18,6 +21,7 @@ export default function AlarmsScreen() {
   const { value: access } = useAccessibilitySettings();
   const categories = categoriesFor({ mobilityProfile: access.mobilityProfile, faith });
   const enabled = alarms.filter((a) => a.enabled).length;
+  const night = useNightRoutine();
 
   return (
     <Screen>
@@ -41,6 +45,20 @@ export default function AlarmsScreen() {
           title="Alarm without a mission"
           subtitle="Turns off straight away; no XP"
           href={{ pathname: '/alarms/create/time', params: { category: 'none' } }}
+        />
+      </Section>
+
+      {/* Routines: Night for now. Morning and Throughout the Day join here later (one selector). */}
+      <Section title="Routines">
+        <ListRow
+          icon={{ ios: 'moon.stars', android: 'bedtime', web: 'bedtime' }}
+          title="Night Routine"
+          subtitle={
+            night.routine
+              ? `${night.routine.enabled ? 'On' : 'Off'} · ${describeNights(night.routine.weekdays)} · bedtime ${formatAlarmTime(night.routine.bedtime)}`
+              : 'Restrict distracting apps from wind-down, wake with your Main Wake-Up'
+          }
+          href="/alarms/night"
         />
       </Section>
 

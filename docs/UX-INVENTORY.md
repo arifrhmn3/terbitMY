@@ -2,7 +2,7 @@
 
 A map of every screen and journey, with known usability issues. **It isn't a redesign.** It's the input for the dedicated UX/UI architecture phase.
 
-Status: 12 Oct 2026. Phase 3D was verified on iPhone; **Phase 3.5 (Core UX Consolidation) is built and awaiting its iPhone test.** Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
+Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase 4 (Night Routine and Screen Time)** are verified on iPhone. Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
 
 ## Tab roles
 
@@ -203,17 +203,48 @@ Settings → Account & backup → email code → signed in.
 - **Weekly schedule** (Today → View weekly schedule, `today/week`): the next 7 days of active alarms only. Repeating alarms appear on each weekday and upcoming one-offs on their date, in time order. Each day has at most one Main Wake-Up, and tapping an alarm opens it for editing. Days are already split into sections, so Morning / Day / Night can be added later.
 - **Words** (`today/labels.ts`, `MAIN_WAKE_UP_TAG`, `ONE_OFF_TAG`): Main Wake-Up, One-off (also in Manage alarms).
 
+## Night Routine (Phase 4) ✅ verified on iPhone (13 Oct 2026)
+- **Where:** Alarms → Routines → Night Routine (`alarms/night`), the one place it's edited. Morning and Throughout the Day can join the Routines section later.
+- **The rule:** chosen apps are restricted from **wind-down** (not bedtime) until the Main Wake-Up. Wind-down exists to remove distractions before sleep.
+- **Terms:**
+  - **Wind-down:** the start of the digital quiet period. The chosen apps are restricted, the optional calming activity becomes available, and the reminder may fire. It is not bedtime.
+  - **Bedtime:** the intended sleep target. Nothing new starts here; restrictions simply continue. It anchors the Available Sleep Window.
+  - **Main Wake-Up:** the normal end of restrictions. With no Main Wake-Up that morning, restrictions end at the fallback morning time.
+  - **Available Sleep Window:** the most sleep the plan allows, from bedtime to the relevant Main Wake-Up (23:00 → 06:30 = 7h 30m). It is never called sleep, hours slept, actual sleep or sleep quality. A helper exists (`availableSleepWindow`); nothing shows it yet.
+- **Setup (simple):** wind-down time (apps are restricted from here) → bedtime → apps to restrict (Apple's picker) → optional calming activity → Save. There's no separate "restrictions start" time.
+  - Customise adds nights, the end rule (Main Wake-Up or fixed time), the fallback morning time, the wind-down reminder, and on/off.
+- **Quiet notifications:** a separate section with the row "Notifications · Not changed by Terbit MY".
+  - Footer: "Terbit MY restricts opening the apps you choose. It can't turn off other apps' notifications or turn on a Focus for you. Optional: for a fully quiet wind-down, set up Sleep Focus to start at the same time as your Terbit wind-down (22:30). iPhone Settings → Focus → Sleep."
+  - Supportive, never required. "Notifications blocked / disabled / silenced by Terbit" is never claimed, and neither is automatic Focus (Apple has no API for either; a test scans the screens).
+- **Today → Tonight:**
+  - Rows: "22:30 · Wind-down begins · Apps restricted" → "23:00 · Bedtime" → "06:30 · Main Wake-Up tomorrow · Restrictions end".
+  - With no Main Wake-Up, or a fixed end time, a separate "Restrictions end" row appears, plus "No Main Wake-Up tomorrow".
+  - Heading while active: "Tonight · Wind-down active" from wind-down, then "Tonight · Bedtime" after bedtime. The footer stays "Apps restricted until 06:30" throughout, the same period. Before wind-down: "Apps restricted from wind-down (22:30) until 06:30".
+  - It's shown first during wind-down and the night. Calming activity during wind-down: Reflection / Meditation or Guided breathing (Practice, no XP, never required, no religious content needed).
+- **Without a routine:** a single "Set up a Night Routine" row.
+- **Weekly schedule:** one Night Routine line per evening ("22:30 · Night Routine" / "Apps restricted from wind-down · Bedtime 23:00 · Ends 06:30").
+- **Ending tonight early:** Night Routine → "End tonight's restrictions…" (available from wind-down) → confirm "End for tonight" (the default button keeps them). This removes tonight's shields only. The routine and its schedule are kept, and restrictions come back at the next wind-down.
+- **Wind-down reminder:** "Time to wind down · Bedtime is 23:00. Your chosen apps are restricted from now." The second sentence appears only when Screen Time can actually restrict.
+- **Future (not built in Phase 4):**
+  - **Onboarding:** recommend "For a completely quiet wind-down, set up an iPhone Focus or Sleep Focus that silences notifications."
+  - **Sleep Focus helper (App Shortcut / Shortcuts automation):** help the user configure Sleep Focus once, so that iOS turns it on at the same time as wind-down. Terbit MY must still never claim it turns on a Focus itself. No private APIs.
+  - **Night analytics:** Available Sleep Window, late-night screen activity, Night Routine adherence, screen-free overnight window. Actual sleep only if Apple Health (or another reliable sleep source) is integrated later. No charts or sleep scoring yet, and no new Screen Time usage data is collected for this.
+  - *Trade-off:* deliberate (two steps, clearly worded) but never punitive. There are no timers or penalties, and access can always be removed in iPhone Settings → Screen Time.
+- **Settings:** Night & Screen Time → Screen Time access (status, allow, recovery). Permissions links there; Your data explains it.
+
 ## Deferred to the UX/UI phase
 - **Onboarding and personalisation:** weekday and weekend wake times, snooze preference, Faith, Mobility Profile, Education and Fitness interests, accountability preferences.
 - **Routine selection:** Morning / Throughout the Day / Night in alarm creation.
 - **Final visual/UI redesign** and **final Faith content placement.**
 - **Non-physical activity naming:** these activities currently earn Fitness XP; a neutral name is still to be decided.
 - **Camera-verified Fitness missions** (on-device pose detection; never requested today).
+- **Night Routine follow-ups:** a Sleep Focus setup helper (App Shortcuts / Shortcuts), Available Sleep Window analytics, possible Apple Health sleep integration (see "Night Routine" → Future).
+- **Android parity** (phase A) and **Circles** (Phase 5).
 - **Weekly schedule sections:** Morning / Throughout the Day / Night sections in the weekly view (the structure is ready; `sectionOf` in `weekly-schedule.ts`).
 - **Skipping one ring (AlarmKit limitation):** a one-off Main Wake-Up override doesn't silence the usual repeating alarm that date. AlarmKit can't skip a single day of a repeating alarm, so it still rings physically, but it isn't the Main Wake-Up and doesn't count as the morning. An option to silence it needs calendar-based scheduling later.
 - Final Faith content placement (Today, its own area, or a tab).
 - Final tab and navigation architecture (Circles placeholder, cross-tab links from Today).
-- Morning / Throughout the Day / Night routine selection (Phase 4; the creation flow is ready for it).
+- Morning / Throughout the Day / Night routine selection (not built in Phase 4, which added the Night Routine only; the creation flow is ready for it).
 - Onboarding (Phase 6), including the Mobility Profile question (`MOBILITY_PROFILE_OPTIONS`).
 - The final visual system: a timeline on Today, visual mission pickers, Progress hierarchy, result styling.
 - Naming and category for non-physical activities. They earn Fitness XP so accessibility isn't penalised; a neutral name such as "Wellbeing", or a separate discipline, is still to decide.

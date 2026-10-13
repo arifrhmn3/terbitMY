@@ -60,6 +60,17 @@ export default function PrivacyScreen() {
         />
       </Section>
 
+      <Section
+        title="Night Routine and Screen Time"
+        footer="Terbit MY doesn’t collect app-usage data and never reads notifications. Your Night Routine and app choices stay on this phone, aren’t part of the cloud backup, and work without internet or an account.">
+        <ListRow
+          icon={{ ios: 'hourglass', android: 'hourglass_empty', web: 'hourglass_empty' }}
+          title="Apple’s Screen Time, on this phone"
+          subtitle="Restricted apps are chosen in Apple’s own picker. Terbit MY receives only private tokens Apple creates (not app names), and restrictions are applied by iOS on this phone, even offline."
+          href="/settings/screen-time"
+        />
+      </Section>
+
       <Section title="Camera and microphone" footer="See Permissions for everything Terbit MY can ask for.">
         <ListRow
           icon={{ ios: 'video.slash', android: 'videocam_off', web: 'videocam_off' }}

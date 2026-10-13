@@ -138,6 +138,16 @@ export const migrations: readonly string[] = [
   // 11: native snooze (Phase 3.5). How many times a morning's alarm was snoozed;
   // snooze rings belong to that one morning.
   `ALTER TABLE alarm_occurrences ADD COLUMN snooze_count INTEGER NOT NULL DEFAULT 0;`,
+
+  // 12: the Night Routine (Phase 4). One row per routine; its settings are JSON so
+  // future onboarding can add fields without another migration. Apple's opaque
+  // app selection is kept here too (on this phone only, never backed up).
+  `CREATE TABLE IF NOT EXISTS night_routines (
+    id TEXT PRIMARY KEY NOT NULL,
+    config TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );`,
 ];
 
 /** The parts of an expo-sqlite database that migrations need. */

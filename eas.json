@@ -12,6 +12,13 @@
     },
     "production": {
       "autoIncrement": true
+    },
+    "development-screen-time": {
+      "extends": "development",
+      "env": {
+        "TERBIT_SCREEN_TIME": "1",
+        "APPLE_TEAM_ID": "663JDC7J6J"
+      }
     }
   }
 }

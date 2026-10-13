@@ -168,6 +168,38 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 - **Navigation back to Today:** inside a tab, `showToday()`; from the full-screen alarm screen, `returnToToday()` (a single `router.dismissTo('/today')`; `dismissAll` + `navigate` could push the tabs on top of the modal).
 - **Results** (`features/missions/result-layout.tsx`, `mission-result-summary.tsx`, `progress/result-progress.ts`): one layout for alarm and practice results, with rank changes computed from `rankFor` before and after the gained XP.
 
+## Night Routine and Screen Time (Phase 4, verified on iPhone 13 Oct 2026)
+- **Model and rules (pure, tested):**
+  - `features/night/night-routine.ts`: the model, defaults, validation, `nightRoutineFromAnswers`.
+  - **Restrictions start at wind-down** (`restrictionStartTime`): wind-down is the one source of truth. There is no separate restriction-start setting, simple or advanced.
+  - **Bedtime starts nothing:** there is no native event at bedtime. It is the sleep target and anchors `availableSleepWindow` (`night-timeline.ts`: bedtime → the relevant Main Wake-Up, null without one). That is a planning figure, never "sleep".
+  - `night-timeline.ts`: night windows (a night belongs to its evening), `restrictionEnd` (THE end policy: next morning's `resolvedMainWakeUp`, else the fallback), `restrictionState`, `tonightItems`, and `nativeRestrictionPlan` (what the phone schedules).
+- **Storage:** `night-repository.ts` (SQLite `night_routines`, JSON config, migration 12; never synced).
+  - Routines saved by earlier Phase 4 builds may hold a `restrictionStart` key. It is ignored on read and dropped on the next save. Everything else is kept, and those routines now restrict from wind-down. No SQL migration is needed (the config is JSON).
+- **Store:** `night-store.ts` saves first, then syncs the Screen Time plan and the wind-down reminders.
+- **Wiring:** `night.ts` re-syncs on every hand-off run (app open or foreground) and when alarms change.
+- **Service:** `services/screen-time` → local module `modules/terbit-screen-time` (iOS 16+):
+  - `requestAuthorization(for: .individual)`;
+  - Apple's `FamilyActivityPicker` (only opaque tokens reach Terbit MY);
+  - `ManagedSettingsStore(named: "terbit.night")` shields;
+  - `DeviceActivityCenter` schedules.
+- **Extension** `targets/activity-monitor` (Device Activity Monitor, via `@bacons/apple-targets`): iOS calls it at each schedule's start and end with Terbit MY closed. The shield rules are in `NightShield.swift`; the app and the extension hold identical copies, which a test checks. They share `group.com.terbitmy.app` (selection, override, state).
+- **Schedules:**
+  - One repeating DeviceActivity schedule per night (`terbit.night.<weekday>`, start weekday → next weekday). It **starts at wind-down** and ends at that weekday's *repeating* Main Wake-Up, so it keeps working if Terbit MY isn't opened.
+  - The extension's `intervalDidStart` applies the ManagedSettings shield, and `intervalDidEnd` removes it. The Swift side is time-agnostic: it schedules exactly the start and end computed in TypeScript.
+  - A wind-down after midnight (e.g. 00:15) starts on the next weekday.
+  - A one-off Main Wake-Up that's earlier than usual adds a dated `terbit.night.end.<date>` marker that ends that night early.
+  - Schedules are restarted only when their signature changes.
+- **Notifications (Apple limitation, checked against Apple's documentation, Oct 2026):**
+  - `ManagedSettingsStore` has no notification setting. Its groups are account, appStore, application, cellular, dateAndTime, gameCenter, media, passcode, safari, shield, siri and webContent.
+  - `ShieldSettings` covers apps and websites "with a shielding view". Its documentation says nothing about notifications.
+  - `UserNotifications` only manages the calling app's own notifications.
+  - Focus filters (`SetFocusFilterIntent` / `FocusFilterAppContext`) filter only the *implementing* app's notifications. Apps can't turn on a Focus or choose which other apps a Focus silences.
+  - **So Terbit MY never promises to block or silence other apps' notifications.** The UI says "Apps restricted", separately from "Notifications: Not changed by Terbit MY" (`NOTIFICATION_INFO` in `features/night/labels.ts`). It recommends an iPhone Focus such as Sleep for a completely quiet wind-down.
+  - Some developers report that shielded apps' notifications are suppressed too. Apple doesn't document this, so it is treated as incidental, never promised.
+  - No private APIs, settings URLs (`App-prefs:`) or automation hacks are used; a test checks this.
+- **Build switch:** `app.config.js` adds the Family Controls entitlement, App Group, Info.plist flag and the extension only with `TERBIT_SCREEN_TIME=1` (eas.json profile `development-screen-time`; Apple approved Family Controls Distribution for both bundle IDs). Without it the module reports `not_configured` and nothing native is attempted.
+
 ## Settings, permissions and accessibility (Phase 3D)
 
 - **Settings index** (`features/settings/settings-index.ts`): groups → one sub-screen per page under `src/app/(tabs)/settings/`. Each setting lives on one screen only. Developer tools are a single development-build-only screen.
