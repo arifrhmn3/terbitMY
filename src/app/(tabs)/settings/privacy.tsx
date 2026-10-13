@@ -73,9 +73,15 @@ export default function PrivacyScreen() {
 
       <Section title="Camera and microphone" footer="See Permissions for everything Terbit MY can ask for.">
         <ListRow
-          icon={{ ios: 'video.slash', android: 'videocam_off', web: 'videocam_off' }}
-          title="Not used"
-          subtitle="Fitness and Recitation are self-reported. Terbit MY doesn’t use the camera or microphone, and never asks for them."
+          icon={{ ios: 'camera', android: 'photo_camera', web: 'photo_camera' }}
+          title="Camera: optional rep counting"
+          subtitle="Only if you choose “Verify with camera” in a Fitness mission that offers it (push-ups, squats, jumping jacks, chair sit-to-stand). Reps are counted on this phone; video is never recorded, saved or uploaded, and no account or internet is needed."
+          href="/settings/permissions"
+        />
+        <ListRow
+          icon={{ ios: 'mic.slash', android: 'mic_off', web: 'mic_off' }}
+          title="Microphone: not used"
+          subtitle="Recitation is self-reported. Terbit MY never listens, and never asks for the microphone."
           href="/settings/permissions"
         />
       </Section>

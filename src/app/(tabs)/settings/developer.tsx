@@ -6,6 +6,7 @@ import { Section } from '@/components/section';
 import { SyncDevPanel } from '@/features/account/components/sync-dev-panel';
 import { useAccount } from '@/features/account/account';
 import { NativeAlarmTest } from '@/features/alarms/components/native-alarm-test';
+import { CameraDevPanel } from '@/features/missions/fitness/camera-dev-panel';
 import { EntitlementDevPanel } from '@/features/entitlements/components/entitlement-dev-panel';
 import { ProgressDevPanel } from '@/features/progress/components/progress-dev-panel';
 import { useProgressSummary } from '@/features/progress/use-progress';
@@ -42,6 +43,7 @@ function DeveloperTools() {
       <NativeAlarmTest />
       <EntitlementDevPanel />
       <ProgressDevPanel summary={summary} onChange={refresh} />
+      <CameraDevPanel />
       {status !== 'unavailable' && <SyncDevPanel />}
     </Screen>
   );

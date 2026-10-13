@@ -45,11 +45,15 @@ export const FITNESS_EXERCISES: readonly FitnessExercise[] = [
 export type FitnessKind = 'reps' | 'timed' | 'holds' | 'sequence';
 
 /**
- * How the result is known. Movement is self-reported (no camera); a later
- * camera/pose-detection mode would record 'verified'. The number-focus task
- * checks each tap: 'task_checked'.
+ * How the result is known (the completion method):
+ * - self_reported: tapped after each rep, or timed;
+ * - task_checked: the number-focus task checks each tap;
+ * - camera_verified: every rep was counted by on-device pose detection
+ *   (Phase 4.5: push-ups, squats, jumping jacks, chair sit-to-stand). Same XP as self-reported; a
+ *   future rule could make it recommended or required in Challenge mode.
+ * Stored inside the occurrence's result JSON, so older results stay valid.
  */
-export type FitnessVerification = 'self_reported' | 'task_checked';
+export type FitnessVerification = 'self_reported' | 'task_checked' | 'camera_verified';
 
 export type FitnessMissionConfig = {
   exercise: FitnessExercise;

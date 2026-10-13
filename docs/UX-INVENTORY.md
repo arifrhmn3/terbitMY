@@ -96,6 +96,27 @@ Each mission has its own view (`features/missions/*`, `features/faith/*`).
 - **Fitness:**
   - Rep taps, a timer, holds or number focus, from the Mobility Profile catalogue.
   - The "get ready" countdown is 3 s, or 10 s with Extended pacing.
+  - **Verify with camera (Phase 4.5, verified on iPhone; optional):** offered only for push-ups, squats, jumping jacks and chair sit-to-stand. It never appears, disabled or otherwise, anywhere else. One camera permission covers all of them.
+    1. On the ready card, "Start" stays and "Verify with camera" is added below it ("Optional: let the camera count your reps on this phone.").
+    2. First time: "Count reps with the camera?", with "Terbit uses the camera to count exercise repetitions on your device. Video is not recorded or uploaded.", then Allow camera (the iOS prompt) or Continue without camera. Once allowed, it goes straight to positioning.
+    3. **Positioning** (per activity; what worked on the iPhone):
+       - Push-ups: "Place your phone about 2 m away. Front-facing or side-on both work. Keep your upper body and at least one arm clearly visible."
+       - Squats: "Place your phone 2–3 m away so your hips, knees and ankles are visible. Face the phone or turn slightly sideways."
+       - Jumping jacks: "Face the phone and step back until your arms and feet fit comfortably in frame (about 3 m)."
+       - Sit-to-stand: "Place your phone 2–3 m away, level with the chair, so your hips, knees and ankles are visible. Side-on or slightly angled works best."
+       - One fix at a time while not usable: "Step back a little — keep your feet in frame", "Keep one arm visible", "Keep your arms in frame", "Move into view".
+    4. **Automatic start (no Start button; nobody walks back to the phone):** "Hold there" → held still ~1 s → "Ready · 3" → "2" → "1" → "Go" → live guidance. "Ready" means enough of the needed joints, not the whole body. Losing the pose during the countdown cancels it, back to positioning.
+    5. **Live guidance** (neutral, never "bad form" or "incorrect"):
+       - Push-ups: "Lower into the push-up" → "Keep going" → "Good — push back up" → "Rep counted".
+       - Squats: "Lower into the squat" / "Good — stand back up".
+       - Jumping jacks: "Jump out, arms up" / "Good — back together".
+       - Sit-to-stand: "Stand up" / "Sit down slowly", depending on the starting position.
+       - Partial reps don't count and say what's left: "Lower a little more", "A little lower", "Stand all the way up", "Raise your arms a little higher", "Jump your feet a little wider", "Bring your feet back together", "Straighten your arms". A plausible movement that's too quick to verify says "A little slower so I can count the full movement" (detector glitches are ignored silently).
+    6. A live "8 / 10" count. Stepping out of frame never removes reps ("… to keep counting. Reps so far are kept.").
+    7. At the target, the normal Fitness result shows "Counted by camera". If the user switched to tapping part-way, the reps so far are kept and the result is "Self-reported".
+  - Camera access denied: "Camera access is off", with how to turn it on (iPhone Settings → Terbit MY → Camera), Open iPhone Settings, and Continue without camera. It's never asked again from here.
+  - Unavailable or failed camera: a plain message, Try again (if it failed), and Continue without camera. "Continue without camera" is offered on every camera screen and keeps the reps so far.
+  - Privacy note under the camera: "Counted on this phone. Video isn't recorded, saved or uploaded."
 - **Faith:** Recitation pages; Reflection guided session; Recitation + Reflection in two steps.
 
 **Remaining:**
@@ -241,7 +262,7 @@ Settings → Account & backup → email code → signed in.
 - **Routine selection:** Morning / Throughout the Day / Night in alarm creation.
 - **Final visual/UI redesign** and **final Faith content placement.**
 - **Non-physical activity naming:** these activities currently earn Fitness XP; a neutral name is still to be decided.
-- **Camera-verified Fitness missions** (on-device pose detection; never requested today).
+- **More camera-verified activities** (Phase 4.5 covers push-ups, squats, jumping jacks and chair sit-to-stand). Deferred for reliability testing: wall push, step-out movement, walk in place and seated marching (continuous-movement mode). Also a possible Challenge-mode rule (recommended / required / verified badge).
 - **Night Routine follow-ups:** a Sleep Focus setup helper (App Shortcuts / Shortcuts), Available Sleep Window analytics, possible Apple Health sleep integration (see "Night Routine" → Future).
 - **Android parity** (phase A) and **Circles** (Phase 5).
 - **Weekly schedule sections:** Morning / Throughout the Day / Night sections in the weekly view (the structure is ready; `sectionOf` in `weekly-schedule.ts`).

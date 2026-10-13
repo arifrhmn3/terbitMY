@@ -126,7 +126,7 @@ const MISSION_FOOTER: Record<AlarmMission['type'], string> = {
   math: 'Solve these to turn the alarm off. A wrong answer means you try that question again.',
   quiz: 'Answer each question to turn the alarm off. You see the right answer after each one; every completed quiz earns Education XP.',
   fitness:
-    'Do the activity to turn the alarm off and earn Fitness XP. Movement is self-reported (no camera); go at your own pace and stop if anything hurts. The activities shown follow your Mobility Profile (Settings → Accessibility).',
+    'Do the activity to turn the alarm off and earn Fitness XP. Movement is self-reported, or for some activities optionally counted by the camera on this phone; go at your own pace and stop if anything hurts. The activities shown follow your Mobility Profile (Settings → Accessibility).',
   recitation:
     'Read or recite today’s Daily Recitation to turn the alarm off and earn Faith XP. Self-reported: Terbit MY can’t check recitation. Today’s passage is saved on the phone ahead of time, so it works offline.',
   reflection:

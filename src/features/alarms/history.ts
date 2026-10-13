@@ -64,7 +64,7 @@ export function toHistoryEntry(o: AlarmOccurrence): HistoryEntry {
       if (isQuizResult(result)) {
         done += ` · ${result.correctCount}/${result.questionCount} correct`;
       } else if (isFitnessResult(result)) {
-        const how = result.verification === 'task_checked' ? 'checked' : 'self-reported';
+        const how = result.verification === 'task_checked' ? 'checked' : result.verification === 'camera_verified' ? 'counted by camera' : 'self-reported';
         done += ` · ${EXERCISES[result.exercise].label} ${formatAmount(result.exercise, result.achieved)} (${how})`;
       } else if (isRecitationResult(result)) {
         done += ` · ${result.reference} (self-reported)`;

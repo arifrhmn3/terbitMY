@@ -13,7 +13,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSAlarmKitUsageDescription": "Terbit MY uses alarms to wake you up at the times you set."
+        "NSAlarmKitUsageDescription": "Terbit MY uses alarms to wake you up at the times you set.",
+        "NSCameraUsageDescription": "Terbit uses the camera to count exercise repetitions on your device. Video is not recorded or uploaded."
       }
     },
     "android": {

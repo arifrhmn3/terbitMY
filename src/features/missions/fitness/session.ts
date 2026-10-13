@@ -30,6 +30,8 @@ export type FitnessSession = {
   startedAt: number | null;
   /** Reps, holds or completed rounds. */
   reps: number;
+  /** Reps counted by the camera (all of them: the result is camera-verified). */
+  cameraReps: number;
   lastRepAt: number | null;
   /** Timed: when the current pause began, and the total paused before it. */
   pausedAt: number | null;
@@ -62,6 +64,7 @@ export function createFitnessSession(config: FitnessMissionConfig, seed = Math.f
     minHoldMs: exercise.minHoldMs ?? 0,
     startedAt: null,
     reps: 0,
+    cameraReps: 0,
     lastRepAt: null,
     pausedAt: null,
     pausedMs: 0,
@@ -94,6 +97,11 @@ export function startFitness(s: FitnessSession, now: number): FitnessSession {
   return s.startedAt === null ? { ...s, startedAt: now } : s;
 }
 
+/** Cancels the "get ready" countdown (camera: the user left the frame before Go). Nothing else changes. */
+export function cancelCountdown(s: FitnessSession, now: number): FitnessSession {
+  return fitnessPhase(s, now) === 'countdown' ? { ...s, startedAt: null } : s;
+}
+
 export type RepOutcome = 'counted' | 'too_fast' | 'too_short' | 'wrong' | 'not_active';
 
 /** Reps: counts one rep if the activity is active and the previous rep wasn't too recent. */
@@ -105,6 +113,18 @@ export function recordRep(s: FitnessSession, now: number): { session: FitnessSes
     session: { ...s, reps, lastRepAt: now, completedAt: reps >= s.target ? now : null },
     outcome: 'counted',
   };
+}
+
+/**
+ * Reps counted by the camera: the same mission rules as a tap (active only,
+ * completes at the target, nothing after it), and remembered as
+ * camera-counted. The minimum time between reps is the camera activity's own
+ * cycle minimum (a movement measured end to end), not the tap limit.
+ */
+export function recordCameraRep(s: FitnessSession, now: number, minIntervalMs = s.minRepIntervalMs): { session: FitnessSession; outcome: RepOutcome } {
+  const next = recordRep({ ...s, minRepIntervalMs: minIntervalMs }, now);
+  if (next.outcome !== 'counted') return { session: s, outcome: next.outcome };
+  return { ...next, session: { ...next.session, minRepIntervalMs: s.minRepIntervalMs, cameraReps: s.cameraReps + 1 } };
 }
 
 /** Holds: a press from `pressedAt` to `releasedAt` counts if it started while active and lasted long enough. */
@@ -193,6 +213,6 @@ export function fitnessResult(s: FitnessSession): FitnessMissionResult | null {
     target: s.target,
     achieved: s.kind === 'timed' ? s.target : s.reps,
     durationMs: Math.max(0, s.completedAt - from),
-    verification: s.kind === 'sequence' ? 'task_checked' : 'self_reported',
+    verification: s.kind === 'sequence' ? 'task_checked' : s.kind === 'reps' && s.reps > 0 && s.cameraReps === s.reps ? 'camera_verified' : 'self_reported',
   };
 }
