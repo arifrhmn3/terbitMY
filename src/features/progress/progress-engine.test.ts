@@ -167,9 +167,9 @@ describe('progress engine on real SQLite', () => {
     expect((await reopened.summary()).xp.total).toBe(65);
   });
 
-  /** Inserts an occurrence the way a pre-migration-7 build stored it (no is_main_wake_up column). */
+  /** Inserts an occurrence the way a pre-migration-7 build stored it (no is_main_wake_up or later snooze_count column). */
   async function insertOldRow(db: ReturnType<typeof openTestDatabase>, o: AlarmOccurrence) {
-    const { is_main_wake_up: _dropped, ...row } = occurrenceToRow(o);
+    const { is_main_wake_up: _dropped, snooze_count: _later, ...row } = occurrenceToRow(o);
     const columns = Object.keys(row);
     await db.runAsync(
       `INSERT INTO alarm_occurrences (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,

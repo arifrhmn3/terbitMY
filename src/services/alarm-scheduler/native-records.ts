@@ -1,6 +1,6 @@
 import type { NativeAlarmAction, NativeRecordPayload } from '../../../modules/terbit-alarms';
 
-import type { AlarmBackend, AlarmFiredEvent, AlarmSpec } from './types';
+import type { AlarmBackend, AlarmFiredEvent, AlarmSpec, SnoozeRing } from './types';
 
 /** iOS AlarmKit states that mean the alarm is still registered with the system. */
 const ALARMKIT_LIVE = ['scheduled', 'alerting', 'countdown', 'paused'];
@@ -56,8 +56,14 @@ export function androidFireEvents(records: NativeRecordPayload[], since: number)
   );
 }
 
-/** An AlarmKit button tap belongs to the alarm that was due up to this long before it. */
-export const ACTION_MATCH_WINDOW_MS = 90 * 60 * 1000;
+/**
+ * An AlarmKit button tap belongs to the alarm that was due up to this long
+ * before it. It covers the longest snooze sequence (5 × 15 min) with room to spare.
+ */
+export const ACTION_MATCH_WINDOW_MS = 120 * 60 * 1000;
+
+/** Snooze taps confirm the alarm rang but never stop the morning. */
+const isSnoozeAction = (a: NativeAlarmAction) => a.action === 'snooze' || a.action === 'snooze_failed';
 
 /**
  * iOS: AlarmKit doesn't tell apps when an alarm fires, so the due times of
@@ -80,20 +86,45 @@ export function alarmKitFireEvents(
     const to = Math.min(now, r.cancelledAt ?? now);
     const schedule = { hour: r.hour, minute: r.minute, weekdays: r.weekdays ?? [], fireAt: r.fireAt };
     for (const due of dueTimesBetween(schedule, from, to)) {
-      const action = actions
+      // Taps on this morning's rings: the alarm's own, and its snooze rings (same alarmId).
+      const taps = actions
         .filter((a) => (a.nativeId === r.nativeId || a.alarmId === r.alarmId) && a.at >= due && a.at < due + ACTION_MATCH_WINDOW_MS)
-        .sort((a, b) => a.at - b.at)[0];
-      events.push(
-        action
-          ? { alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'system', stoppedAt: action.at, stopAction: action.action }
-          : { alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'schedule', stoppedAt: null, stopAction: null },
-      );
+        .sort((a, b) => a.at - b.at);
+      // The first Stop / Stop & Open Terbit ends the ringing; Snooze taps never do.
+      const stop = taps.find((a) => !isSnoozeAction(a));
+      if (stop && (stop.action === 'mission' || stop.action === 'stop')) {
+        events.push({ alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'system', stoppedAt: stop.at, stopAction: stop.action });
+      } else if (taps.length > 0) {
+        // Snoozed (still ringing on and off): confirmed, not stopped.
+        events.push({ alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'system', stoppedAt: null, stopAction: null });
+      } else {
+        events.push({ alarmId: r.alarmId, scheduledAt: due, firedAt: due, evidence: 'schedule', stoppedAt: null, stopAction: null });
+      }
     }
   }
   return uniqueSorted(events);
 }
 
 const sameDays = (a: number[], b: number[]) => [...a].sort().join() === [...b].sort().join();
+const sameOffsets = (a: readonly number[], b: readonly number[]) => a.join() === b.join();
+
+/**
+ * iOS snooze rings from the native records. Each belongs to ONE morning of a
+ * saved alarm (`originAt`); it's pending until it rings or is cancelled.
+ */
+export function snoozeRings(records: NativeRecordPayload[]): SnoozeRing[] {
+  return records
+    .filter((r) => r.kind === 'snooze' && r.snoozeIndex != null && r.originAt != null)
+    .map((r) => ({
+      alarmId: r.alarmId,
+      nativeId: r.nativeId,
+      index: r.snoozeIndex!,
+      total: r.snoozeOffsets?.length ?? r.snoozeIndex!,
+      originAt: r.originAt!,
+      fireAt: r.fireAt,
+      pending: r.cancelledAt === null && r.state === 'scheduled',
+    }));
+}
 
 /** Is this saved alarm already scheduled natively exactly as `spec` asks? */
 export function isNativeUpToDate(records: NativeRecordPayload[], spec: AlarmSpec, backend: AlarmBackend): boolean {
@@ -111,6 +142,8 @@ export function isNativeUpToDate(records: NativeRecordPayload[], spec: AlarmSpec
       r.hour === spec.hour &&
       r.minute === spec.minute &&
       sameDays(r.weekdays ?? [], spec.weekdays) &&
+      // Snooze rings come from the alarm's own record, so a snooze change needs a new AlarmKit alarm.
+      sameOffsets(r.snoozeOffsets ?? [], spec.snoozeOffsetsMinutes) &&
       (spec.weekdays.length > 0 || r.fireAt === spec.nextFireAt)
     );
   });

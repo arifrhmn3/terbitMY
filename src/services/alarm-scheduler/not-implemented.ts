@@ -43,6 +43,12 @@ export function createNotImplementedAlarmService(summary = DEFAULT_SUMMARY): Ala
     onAlarmAction() {
       return () => {};
     },
+    async listSnoozes() {
+      return [];
+    },
+    async cancelSnoozes() {
+      // Nothing was scheduled.
+    },
     async getNativeAlarmStatus() {
       return UNAVAILABLE;
     },

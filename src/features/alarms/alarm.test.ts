@@ -55,8 +55,9 @@ describe('formatting', () => {
     expect(describeMission({ type: 'math', difficulty: 'hard', questionCount: 10 })).toBe(
       'Maths · Hard · 10 questions',
     );
-    expect(describeSnooze({ enabled: false, minutes: 10 })).toBe('Off');
-    expect(describeSnooze({ enabled: true, minutes: 10 })).toBe('10 min');
+    expect(describeSnooze({ enabled: false, minutes: 10, maxSnoozes: 3 })).toBe('No snooze');
+    expect(describeSnooze({ enabled: true, minutes: 10, maxSnoozes: 3 })).toBe('Up to 3 snoozes · 10 min');
+    expect(describeSnooze({ enabled: true, minutes: 5, maxSnoozes: 1 })).toBe('Up to 1 snooze · 5 min');
   });
 });
 

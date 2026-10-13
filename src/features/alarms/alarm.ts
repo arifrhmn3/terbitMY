@@ -6,6 +6,8 @@ import type { MathDifficulty, MathQuestionCount } from '@/features/missions/math
 import { QUIZ_CATEGORY_LABEL, type QuizCategory } from '@/features/missions/quiz/types';
 import { DIFFICULTY_LABEL, type MissionDifficulty, type MissionQuestionCount } from '@/features/missions/types';
 
+import { ALARM_DEFAULTS } from './alarm-defaults';
+
 /** Same numbering as `Date.getDay()`: 0 is Sunday, 6 is Saturday. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -47,9 +49,18 @@ export function missionDifficulty(mission: AlarmMission): MissionDifficulty | nu
 export type SnoozeMinutes = 5 | 10 | 15;
 export const SNOOZE_MINUTES: readonly SnoozeMinutes[] = [5, 10, 15];
 
+/** How many extra rings snoozing allows (when snooze is on). */
+export type MaxSnoozes = 1 | 2 | 3 | 5;
+export const MAX_SNOOZES: readonly MaxSnoozes[] = [1, 2, 3, 5];
+
+/**
+ * Snooze is part of ONE alarm (one routine, one morning), never separate
+ * alarms: `minutes` between rings, at most `maxSnoozes` extra rings.
+ */
 export type SnoozePreference = {
   enabled: boolean;
   minutes: SnoozeMinutes;
+  maxSnoozes: MaxSnoozes;
 };
 
 /**
@@ -92,19 +103,21 @@ export type Alarm = {
 
 export type AlarmDraft = Omit<Alarm, 'id' | 'createdAt' | 'updatedAt'>;
 
+/** A complete alarm from the central defaults (`alarm-defaults.ts`), with any overrides. */
 export function createAlarmDraft(overrides: Partial<AlarmDraft> = {}): AlarmDraft {
+  const d = ALARM_DEFAULTS;
   return {
-    hour: 6,
-    minute: 30,
-    weekdays: [1, 2, 3, 4, 5],
-    enabled: true,
-    label: '',
-    mission: { type: 'math', difficulty: 'easy', questionCount: 3 },
-    snooze: { enabled: true, minutes: 5 },
+    hour: d.hour,
+    minute: d.minute,
+    weekdays: [...d.weekdays],
+    enabled: d.enabled,
+    label: d.label,
+    mission: { type: 'math', difficulty: d.difficulty, questionCount: d.questionCount },
+    snooze: { ...d.snooze },
     isPrimary: false,
-    completionMode: 'reward',
-    gentleReminderMinutes: 10,
-    soundId: 'system-default',
+    completionMode: d.completionMode,
+    gentleReminderMinutes: d.gentleReminderMinutes,
+    soundId: d.soundId,
     ...overrides,
   };
 }
@@ -175,7 +188,8 @@ export const COMPLETION_MODE_LABEL: Record<CompletionMode, string> = {
 };
 
 export function describeSnooze(snooze: SnoozePreference): string {
-  return snooze.enabled ? `${snooze.minutes} min` : 'Off';
+  if (!snooze.enabled) return 'No snooze';
+  return `Up to ${snooze.maxSnoozes} ${snooze.maxSnoozes === 1 ? 'snooze' : 'snoozes'} · ${snooze.minutes} min`;
 }
 
 /**

@@ -5,7 +5,6 @@ import {
   cancelOccurrence,
   completeMission,
   completeWithoutMission,
-  completionDeadline,
   createOccurrence,
   dismissOccurrence,
   expireOccurrence,
@@ -13,17 +12,17 @@ import {
   isActive,
   markAlarmFired,
   markMissed,
-  MISSED_AFTER_MS,
   recordSystemStop,
-  shouldExpire,
   startMission,
   type AlarmOccurrence,
   type TransitionResult,
 } from './occurrence';
 import type { MathMissionResult } from '@/features/missions/math/session';
 
+import { shouldExpire } from './completion-policy';
+
 const alarm: Alarm = {
-  ...createAlarmDraft({ label: 'Subuh', snooze: { enabled: true, minutes: 10 } }),
+  ...createAlarmDraft({ label: 'Subuh', snooze: { enabled: true, minutes: 10, maxSnoozes: 3 } }),
   id: 'alarm-1',
   createdAt: 0,
   updatedAt: 0,
@@ -69,7 +68,7 @@ describe('createOccurrence', () => {
   });
 
   it('records snooze as null when snooze is off, and native evidence for native alarms', () => {
-    const noSnooze = { ...alarm, snooze: { enabled: false, minutes: 5 as const } };
+    const noSnooze = { ...alarm, snooze: { enabled: false, minutes: 5 as const, maxSnoozes: 3 as const } };
     expect(createOccurrence({ alarm: noSnooze, scheduledAt: 0, source: 'simulated', now: 0 }).snoozeMinutes).toBeNull();
     expect(createOccurrence({ alarm, scheduledAt: 0, source: 'native', now: 0 }).fireEvidence).toBe('system');
     expect(createOccurrence({ alarm, scheduledAt: 0, source: 'native', now: 0, fireEvidence: 'schedule' }).fireEvidence).toBe(
@@ -173,20 +172,9 @@ describe('dismiss and expiry', () => {
     expect(unwrap(expireOccurrence(inMission, 99_000))).toMatchObject({ status: 'missed', missionStartedAt: 3_000 });
   });
 
-  it('closes reward and challenge mornings an hour after the alarm was due', () => {
-    for (const mode of ['reward', 'challenge'] as const) {
-      const o = { ...started, completionMode: mode };
-      expect(completionDeadline(o)).toBe(1_000 + MISSED_AFTER_MS);
-      expect(shouldExpire(o, 1_000 + MISSED_AFTER_MS)).toBe(false);
-      expect(shouldExpire(o, 1_001 + MISSED_AFTER_MS)).toBe(true);
-    }
-  });
-
-  it('gives gentle mornings until an hour after the follow-up', () => {
+  it('the Gentle follow-up is counted from when the alarm stopped (deadlines: completion-policy.test.ts)', () => {
     const gentle = { ...unwrap(recordSystemStop(started, 4_000)), completionMode: 'gentle' as const, gentleReminderMinutes: 30 };
     expect(followUpAt(gentle)).toBe(4_000 + 30 * 60_000);
-    expect(completionDeadline(gentle)).toBe(4_000 + 30 * 60_000 + MISSED_AFTER_MS);
-    expect(shouldExpire(gentle, 1_001 + MISSED_AFTER_MS)).toBe(false);
   });
 });
 

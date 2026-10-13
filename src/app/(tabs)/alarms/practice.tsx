@@ -1,6 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet } from 'react-native';
 
 import { Button } from '@/components/button';
 import { ChoiceRow } from '@/components/choice-row';
@@ -10,32 +9,25 @@ import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { SwitchRow } from '@/components/switch-row';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing } from '@/constants/theme';
 import { ProfileFitnessMission } from '@/features/accessibility/profile-fitness-mission';
 import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { FaithDevPanel } from '@/features/faith/components/faith-dev-panel';
 import { primaryTradition } from '@/features/faith/faith-settings';
-import { CombinedFaithMissionView, CombinedFaithResultSummary } from '@/features/faith/combined-mission-view';
-import { RecitationMissionView, RecitationResultSummary } from '@/features/faith/recitation/recitation-view';
-import { ReflectionMissionView, ReflectionResultSummary } from '@/features/faith/reflection/reflection-mission-view';
+import { CombinedFaithMissionView } from '@/features/faith/combined-mission-view';
+import { RecitationMissionView } from '@/features/faith/recitation/recitation-view';
+import { ReflectionMissionView } from '@/features/faith/reflection/reflection-mission-view';
 import { REFLECTION_THEME_LABEL, REFLECTION_THEMES, type ReflectionTheme } from '@/features/faith/reflection/types';
 import { FAITH_TRADITIONS, isTradition, TRADITION_LABEL, type FaithTradition } from '@/features/faith/types';
 import { useFaithDev, useFaithSettings } from '@/features/faith/use-faith';
-import { FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
 import { activityForProfile, catalogueFor, EXERCISES } from '@/features/missions/fitness/exercises';
 import { FITNESS_EXERCISES, type FitnessExercise } from '@/features/missions/fitness/types';
-import { MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
-import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
+import { MathMissionView } from '@/features/missions/math/math-mission-view';
+import { MissionResultSummary } from '@/features/missions/mission-result-summary';
+import { QuizMissionView } from '@/features/missions/quiz/quiz-mission-view';
 import { QUIZ_CATEGORIES, QUIZ_CATEGORY_LABEL, QUIZ_CATEGORY_SHORT, type QuizCategory } from '@/features/missions/quiz/types';
+import { MissionResultLayout } from '@/features/missions/result-layout';
 import {
   DIFFICULTY_LABEL,
-  isFitnessResult,
-  isMathResult,
-  isQuizResult,
-  isCombinedFaithResult,
-  isRecitationResult,
-  isReflectionResult,
   MISSION_DIFFICULTIES,
   MISSION_QUESTION_COUNTS,
   type MissionDifficulty,
@@ -201,14 +193,21 @@ export default function PracticeMissionScreen() {
       )}
 
       {result ? (
-        <>
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText type="title">Mission complete</ThemedText>
-            <ResultSummary result={result} />
-          </ThemedView>
-          <Button title="Done" onPress={() => router.back()} />
-          <Button title="Try again" variant="secondary" onPress={restart} />
-        </>
+        <MissionResultLayout
+          title="Mission complete"
+          summary={<MissionResultSummary result={result} />}
+          reward={
+            <ThemedText type="small" themeColor="textSecondary">
+              Practice: no XP earned and no streak change.
+            </ThemedText>
+          }
+          actions={
+            <>
+              <Button title="Done" onPress={() => router.back()} />
+              <Button title="Try again" variant="secondary" onPress={restart} />
+            </>
+          }
+        />
       ) : kind === 'recitation' ? (
         <RecitationMissionView key={missionKey} config={{ tradition }} prepareFirst onComplete={setResult} />
       ) : kind === 'recitation_reflection' ? (
@@ -244,16 +243,6 @@ export default function PracticeMissionScreen() {
   );
 }
 
-function ResultSummary({ result }: { result: MissionResult }) {
-  if (isQuizResult(result)) return <QuizResultSummary result={result} />;
-  if (isFitnessResult(result)) return <FitnessResultSummary result={result} />;
-  if (isRecitationResult(result)) return <RecitationResultSummary result={result} />;
-  if (isReflectionResult(result)) return <ReflectionResultSummary result={result} />;
-  if (isCombinedFaithResult(result)) return <CombinedFaithResultSummary result={result} />;
-  if (isMathResult(result)) return <MathResultSummary result={result} />;
-  return null;
-}
-
 function practiceName(kind: PracticeKind, category: QuizCategory, exercise: FitnessExercise, tradition: FaithTradition) {
   switch (kind) {
     case 'math':
@@ -270,12 +259,3 @@ function practiceName(kind: PracticeKind, category: QuizCategory, exercise: Fitn
       return `${TRADITION_LABEL[tradition]} Recitation + Reflection`;
   }
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: Radius.card,
-    padding: Spacing.four,
-    gap: Spacing.three,
-    alignItems: 'center',
-  },
-});

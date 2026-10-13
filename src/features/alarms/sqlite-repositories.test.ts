@@ -134,11 +134,11 @@ describe('SQLite alarm repository', () => {
     expect((await repo.list()).map((a) => a.id)).toEqual(['alarm-1']);
   });
 
-  it('keeps only one primary alarm', async () => {
+  it('stores several Main Wake-Ups (weekday and weekend); the one-per-day rule is the store’s', async () => {
     const repo = createSqliteAlarmRepository(await database());
-    await repo.save(alarm);
-    await repo.save({ ...alarm, id: 'alarm-2', isPrimary: true });
-    expect((await repo.list()).filter((a) => a.isPrimary).map((a) => a.id)).toEqual(['alarm-2']);
+    await repo.save({ ...alarm, isPrimary: true, weekdays: [1, 2, 3, 4, 5] });
+    await repo.save({ ...alarm, id: 'alarm-2', isPrimary: true, weekdays: [0, 6] });
+    expect((await repo.list()).filter((a) => a.isPrimary).map((a) => a.id).sort()).toEqual(['alarm-1', 'alarm-2']);
   });
 });
 

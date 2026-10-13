@@ -41,6 +41,8 @@ const spec: AlarmSpec = {
   actionLabel: 'Stop & Start Mission',
   actionIcon: 'play.fill',
   soundId: 'system-default',
+  snoozeOffsetsMinutes: [],
+  snoozeLabel: 'Snooze 10 min',
 };
 
 const request = { alarmId: 'native-test', occurrenceId: 'test-1', fireAt: 1_000_000, title: 'Test' };
@@ -61,6 +63,8 @@ describe('native alarm service: saved alarms', () => {
       completionMode: 'challenge',
       actionLabel: 'Stop & Start Mission',
       actionIcon: 'play.fill',
+      snoozeOffsets: [],
+      snoozeLabel: 'Snooze 10 min',
     });
   });
 

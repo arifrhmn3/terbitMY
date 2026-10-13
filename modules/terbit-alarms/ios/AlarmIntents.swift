@@ -41,6 +41,50 @@ struct TerbitOpenMissionIntent: LiveActivityIntent {
   }
 }
 
+/// "Snooze": runs in the background (no JavaScript, works on the lock screen
+/// and with Terbit MY closed). Stops this ring and schedules ring number
+/// `nextIndex` of the same morning as a one-time AlarmKit alarm. It never
+/// opens the app or touches the morning's mission; the next ring offers
+/// Snooze again only while snoozes remain (see `NativeSnooze`).
+@available(iOS 26.0, *)
+struct TerbitSnoozeIntent: LiveActivityIntent {
+  static var title: LocalizedStringResource = "Snooze Terbit MY alarm"
+  static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+  static var supportedModes: IntentModes { .background }
+
+  @Parameter(title: "Alarm ID")
+  var alarmId: String
+  @Parameter(title: "Native alarm ID")
+  var nativeId: String
+  @Parameter(title: "Snooze number")
+  var nextIndex: Int
+  @Parameter(title: "Original ring time")
+  var originAt: Double
+
+  init() {
+    alarmId = ""
+    nativeId = ""
+    nextIndex = 1
+    originAt = 0
+  }
+
+  init(alarmId: String, nativeId: String, nextIndex: Int, originAt: Double) {
+    self.alarmId = alarmId
+    self.nativeId = nativeId
+    self.nextIndex = nextIndex
+    self.originAt = originAt
+  }
+
+  func perform() async throws -> some IntentResult {
+    if let id = UUID(uuidString: nativeId) {
+      // Ends this ring only; a weekly alarm stays scheduled for its next day.
+      try? AlarmManager.shared.stop(id: id)
+    }
+    await NativeSnooze.scheduleNext(alarmId: alarmId, nextIndex: nextIndex, originAt: originAt)
+    return .result()
+  }
+}
+
 /// Runs in the background when the alarm's Stop button is used. It only
 /// records the stop: the system Stop control is never blocked or changed.
 @available(iOS 26.0, *)

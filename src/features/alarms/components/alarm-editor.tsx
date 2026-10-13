@@ -19,6 +19,7 @@ import {
   describeRepeat,
   GENTLE_REMINDER_MINUTES,
   MAX_LABEL_LENGTH,
+  MAX_SNOOZES,
   SNOOZE_MINUTES,
   type AlarmDraft,
   type AlarmMission,
@@ -26,6 +27,8 @@ import {
   missionDifficulty,
 } from '@/features/alarms/alarm';
 import { alarmStore, occurrences } from '@/features/alarms/alarms';
+import { missionControls, practiceParams } from '@/features/alarms/creation';
+import { mainWakeUpIdForDate } from '@/features/alarms/main-wake-up';
 import { faithMissionKinds, primaryTradition, visibleTraditions, type FaithMissionKind } from '@/features/faith/faith-settings';
 import { FAITH_POLICY } from '@/features/faith/policy';
 import { TRADITION_LABEL, type FaithSettings } from '@/features/faith/types';
@@ -43,10 +46,10 @@ import {
   type MissionQuestionCount,
 } from '@/features/missions/types';
 import { useTheme } from '@/hooks/use-theme';
-import { getAlarmService } from '@/services/alarm-scheduler';
-import { getReminderService } from '@/services/notifications';
 
 import { RingingStatus } from './ringing-status';
+import { SchedulePreview } from './schedule-preview';
+import { saveWithMainWakeUp } from './save-alarm';
 import { TimeField } from './time-field';
 import { WeekdayPicker } from './weekday-picker';
 
@@ -54,6 +57,8 @@ type AlarmEditorProps = {
   initial: AlarmDraft;
   /** Set when editing an existing alarm. */
   alarmId?: string;
+  /** After saving (or deleting). Default: go back. */
+  onDone?: () => void;
 };
 
 /** The top-level choice; Recitation and Reflection are both under Faith. */
@@ -81,6 +86,7 @@ const difficultyOptions = MISSION_DIFFICULTIES.map((difficulty) => ({ value: dif
 const countOptions = MISSION_QUESTION_COUNTS.map((count) => ({ value: count, label: `${count} questions` }));
 const gentleOptions = GENTLE_REMINDER_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 const snoozeOptions = SNOOZE_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
+const maxSnoozeOptions = MAX_SNOOZES.map((count) => ({ value: count, label: String(count) }));
 
 
 /**
@@ -138,7 +144,7 @@ const reflectionLengthOptions = MISSION_DIFFICULTIES.map((difficulty) => ({
   label: formatSeconds(FAITH_POLICY.reflection.durationSec[difficulty]),
 }));
 
-export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
+export function AlarmEditor({ initial, alarmId, onDone = () => router.back() }: AlarmEditorProps) {
   const theme = useTheme();
   const [draft, setDraft] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -151,9 +157,10 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   // Fitness alarms show (and save) the activity from the user's Mobility Profile catalogue.
   const mission = missionForProfile(draft.mission, profile);
   const exerciseOptions = catalogueFor(profile).map((exercise) => ({ value: exercise, label: EXERCISES[exercise].short }));
+  // Only the settings that apply to this mission (progressive disclosure).
+  const controls = missionControls(mission);
   const faith = useFaithSettings();
   const faithKinds = faithMissionKinds(faith);
-  const difficulty = missionDifficulty(mission);
   const traditionChoices =
     mission.type === 'recitation' || mission.type === 'recitation_reflection'
       ? [...new Set([...visibleTraditions(faith), mission.tradition])].map((t) => ({ value: t, label: TRADITION_LABEL[t] }))
@@ -183,31 +190,9 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
   async function save() {
     setSaving(true);
     try {
-      const { result } = await alarmStore.save({ ...draft, mission }, alarmId);
-      // Gentle mode follow-ups use local notifications: ask once, when it's first needed.
-      if (draft.completionMode === 'gentle' && draft.enabled) await getReminderService().requestPermission();
-      if (result?.status === 'permission-denied' || result?.status === 'failed') {
-        // Saved in Terbit MY, but the phone couldn't schedule it.
-        Alert.alert(
-          'Alarm saved, but it can’t ring yet',
-          result.message ?? 'Terbit MY doesn’t have permission to set alarms.',
-          [
-            { text: 'OK', onPress: () => router.back() },
-            {
-              text: 'Fix permissions',
-              onPress: async () => {
-                const service = getAlarmService();
-                const status = await service.requestNativeAlarmPermission();
-                if (status.permission !== 'granted') await service.openNativeAlarmSettings();
-                else await alarmStore.syncNative();
-                router.back();
-              },
-            },
-          ],
-        );
-        return;
-      }
-      router.back();
+      // One Main Wake-Up per day: asks first when this alarm would share days with another
+      // Main Wake-Up (or, for a new morning alarm, whether to make it one). Cancelled: keep editing.
+      if (!(await saveWithMainWakeUp({ ...draft, mission }, alarmId, onDone))) setSaving(false);
     } catch (error) {
       setSaving(false);
       Alert.alert('Couldn’t save alarm', error instanceof Error ? error.message : String(error));
@@ -219,7 +204,9 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
       const saved = await alarmStore.find(id);
       if (!saved) return;
       // Simulate with the mode the alarm would really ring with (entitlement-adjusted).
-      const occurrence = await occurrences.trigger(alarmStore.effective(saved), { scheduledAt: Date.now(), source: 'simulated' });
+      const at = Date.now();
+      const forDay = { ...alarmStore.effective(saved), isPrimary: mainWakeUpIdForDate(alarmStore.getState().alarms, at) === saved.id };
+      const occurrence = await occurrences.trigger(forDay, { scheduledAt: at, source: 'simulated' });
       router.push({ pathname: '/alarm/[occurrenceId]', params: { occurrenceId: occurrence.id } });
     } catch (error) {
       Alert.alert('Couldn’t start simulation', error instanceof Error ? error.message : String(error));
@@ -228,14 +215,14 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
 
   function confirmDelete() {
     if (!alarmId) return;
-    Alert.alert('Delete this alarm?', undefined, [
+    Alert.alert('Delete this alarm?', 'It stops ringing and leaves your schedule. Your past mornings, XP and streak stay in Progress.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
           await alarmStore.remove(alarmId);
-          router.back();
+          onDone();
         },
       },
     ]);
@@ -249,31 +236,8 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
         <TimeField hour={draft.hour} minute={draft.minute} onChange={(hour, minute) => update({ hour, minute })} />
       </Section>
 
-      <Section title="Repeat" footer={describeRepeat(draft.weekdays)}>
-        <WeekdayPicker value={draft.weekdays} onChange={(weekdays) => update({ weekdays })} />
-      </Section>
-
-      <Section>
-        <TextInput
-          value={draft.label}
-          onChangeText={(label) => update({ label })}
-          maxLength={MAX_LABEL_LENGTH}
-          placeholder="Label (optional), e.g. Subuh"
-          placeholderTextColor={theme.textSecondary}
-          accessibilityLabel="Alarm label"
-          style={[styles.input, { color: theme.text }]}
-        />
-        <SwitchRow title="Alarm on" value={draft.enabled} onValueChange={(enabled) => update({ enabled })} />
-        <SwitchRow
-          title="Main wake-up alarm"
-          subtitle="Used for your morning streak. Only one alarm can be the main one."
-          value={draft.isPrimary}
-          onValueChange={(isPrimary) => update({ isPrimary })}
-        />
-      </Section>
-
       <Section
-        title="Wake-up mission"
+        title="Mission"
         footer={
           groupOf(mission) === 'faith' && !faithKinds.includes('recitation')
             ? `${MISSION_FOOTER[mission.type]} To add Recitation, choose your faith in Settings → Faith.`
@@ -293,7 +257,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(kind) => update({ mission: missionOfType(kind, mission, faith, profile) })}
           />
         )}
-        {(mission.type === 'recitation' || mission.type === 'recitation_reflection') && traditionChoices.length > 1 && (
+        {(mission.type === 'recitation' || mission.type === 'recitation_reflection') && controls.includes('tradition') && traditionChoices.length > 1 && (
           <ChoiceRow
             title="Tradition"
             options={traditionChoices}
@@ -301,7 +265,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(tradition) => update({ mission: { ...mission, tradition } })}
           />
         )}
-        {(mission.type === 'reflection' || mission.type === 'recitation_reflection') && (
+        {(mission.type === 'reflection' || mission.type === 'recitation_reflection') && controls.includes('reflectionLength') && (
           <ChoiceRow
             title={`${mission.type === 'reflection' ? 'Length' : 'Reflection length'}: ${DIFFICULTY_LABEL[mission.difficulty]}`}
             options={reflectionLengthOptions}
@@ -309,7 +273,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(next) => update({ mission: { ...mission, difficulty: next } })}
           />
         )}
-        {mission.type === 'quiz' && (
+        {mission.type === 'quiz' && controls.includes('topic') && (
           <ChoiceRow
             title={`Topic: ${QUIZ_CATEGORY_LABEL[mission.category]}`}
             options={topicOptions}
@@ -317,7 +281,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(category) => update({ mission: { ...mission, category } })}
           />
         )}
-        {mission.type === 'fitness' && (
+        {mission.type === 'fitness' && controls.includes('exercise') && (
           <ChoiceRow
             title={`${profile === 'non_physical' ? 'Activity' : 'Exercise'}: ${EXERCISES[mission.exercise].label} · ${formatTarget(mission.exercise, mission.difficulty)}`}
             options={exerciseOptions}
@@ -325,7 +289,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(exercise) => update({ mission: { ...mission, exercise } })}
           />
         )}
-        {(mission.type === 'math' || mission.type === 'quiz' || mission.type === 'fitness') && (
+        {(mission.type === 'math' || mission.type === 'quiz' || mission.type === 'fitness') && controls.includes('difficulty') && (
           <ChoiceRow
             title="Difficulty"
             options={difficultyOptions}
@@ -333,7 +297,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             onChange={(next) => update({ mission: { ...mission, difficulty: next } })}
           />
         )}
-        {(mission.type === 'math' || mission.type === 'quiz') && (
+        {(mission.type === 'math' || mission.type === 'quiz') && controls.includes('questionCount') && (
           <ChoiceRow<MissionQuestionCount>
             title="Questions"
             options={countOptions}
@@ -346,17 +310,7 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
             icon={{ ios: 'play.circle', android: 'play_circle', web: 'play_circle' }}
             title="Try this mission"
             subtitle="Practice only. No alarm rings and no XP is earned."
-            href={{
-              pathname: '/alarms/practice',
-              params: {
-                mission: mission.type,
-                category: mission.type === 'quiz' ? mission.category : undefined,
-                exercise: mission.type === 'fitness' ? mission.exercise : undefined,
-                tradition: mission.type === 'recitation' || mission.type === 'recitation_reflection' ? mission.tradition : undefined,
-                difficulty: difficulty ?? undefined,
-                count: mission.type === 'math' || mission.type === 'quiz' ? String(mission.questionCount) : undefined,
-              },
-            }}
+            href={{ pathname: '/alarms/practice', params: practiceParams(mission) }}
           />
         )}
       </Section>
@@ -381,6 +335,29 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
         </Section>
       )}
 
+      <Section title="Repeat" footer={describeRepeat(draft.weekdays)}>
+        <WeekdayPicker value={draft.weekdays} onChange={(weekdays) => update({ weekdays })} />
+      </Section>
+
+      <Section>
+        <TextInput
+          value={draft.label}
+          onChangeText={(label) => update({ label })}
+          maxLength={MAX_LABEL_LENGTH}
+          placeholder="Label (optional), e.g. Subuh"
+          placeholderTextColor={theme.textSecondary}
+          accessibilityLabel="Alarm label"
+          style={[styles.input, { color: theme.text }]}
+        />
+        <SwitchRow title="Alarm on" value={draft.enabled} onValueChange={(enabled) => update({ enabled })} />
+        <SwitchRow
+          title="Main wake-up alarm"
+          subtitle="Used for your morning streak. Only one alarm can be the main one."
+          value={draft.isPrimary}
+          onValueChange={(isPrimary) => update({ isPrimary })}
+        />
+      </Section>
+
       <Section title="Sound">
         <ListRow
           icon={{ ios: 'speaker.wave.2', android: 'volume_up', web: 'volume_up' }}
@@ -389,20 +366,37 @@ export function AlarmEditor({ initial, alarmId }: AlarmEditorProps) {
         />
       </Section>
 
-      <Section title="Snooze">
+      <Section
+        title="Snooze"
+        footer={
+          draft.isPrimary
+            ? 'The alarm shows Snooze until the last allowed ring, which offers the mission instead. Snoozes are part of this one alarm and this one morning, not extra alarms.'
+            : 'Snooze is part of the Main Wake-Up routine. Turn on “Main wake-up alarm” above to use it.'
+        }>
         <SwitchRow
           title="Allow snooze"
           value={draft.snooze.enabled}
           onValueChange={(enabled) => update({ snooze: { ...draft.snooze, enabled } })}
         />
-        {draft.snooze.enabled && (
-          <ChoiceRow
-            options={snoozeOptions}
-            value={draft.snooze.minutes}
-            onChange={(minutes) => update({ snooze: { ...draft.snooze, minutes } })}
-          />
+        {draft.isPrimary && draft.snooze.enabled && (
+          <>
+            <ChoiceRow
+              title="Snooze interval"
+              options={snoozeOptions}
+              value={draft.snooze.minutes}
+              onChange={(minutes) => update({ snooze: { ...draft.snooze, minutes } })}
+            />
+            <ChoiceRow
+              title="Maximum snoozes"
+              options={maxSnoozeOptions}
+              value={draft.snooze.maxSnoozes}
+              onChange={(maxSnoozes) => update({ snooze: { ...draft.snooze, maxSnoozes } })}
+            />
+          </>
         )}
       </Section>
+
+      {draft.isPrimary && <SchedulePreview draft={draft} />}
 
       {/* Developer/testing only: hidden in release builds. */}
       {__DEV__ && alarmId && (

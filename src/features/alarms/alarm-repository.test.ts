@@ -14,7 +14,7 @@ describe('row mapping', () => {
       enabled: false,
       label: 'Subuh',
       mission: { type: 'math', difficulty: 'hard', questionCount: 10 },
-      snooze: { enabled: false, minutes: 15 },
+      snooze: { enabled: false, minutes: 15, maxSnoozes: 5 },
       isPrimary: true,
     });
     expect(rowToAlarm(alarmToRow(original))).toEqual(original);
@@ -26,11 +26,12 @@ describe('row mapping', () => {
   });
 
   it('falls back safely when stored data is damaged', () => {
-    const row = { ...alarmToRow(alarm()), mission: '{not json', weekdays: '1,9,x,3', snooze_minutes: 7 };
+    const row = { ...alarmToRow(alarm()), mission: '{not json', weekdays: '1,9,x,3', snooze_minutes: 7, snooze_max: 99 };
     const restored = rowToAlarm(row);
     expect(restored.mission).toEqual(createAlarmDraft().mission);
     expect(restored.weekdays).toEqual([1, 3]);
     expect(restored.snooze.minutes).toBe(5);
+    expect(restored.snooze.maxSnoozes).toBe(3); // the central default
   });
 });
 
@@ -49,10 +50,10 @@ describe('memory repository', () => {
     expect((await repo.list()).map((a) => a.id)).toEqual(['late']);
   });
 
-  it('keeps only one primary alarm', async () => {
-    const repo = createMemoryAlarmRepository([alarm({ id: 'a', isPrimary: true })]);
-    await repo.save(alarm({ id: 'b', isPrimary: true }));
+  it('stores Main Wake-Ups as given (the one-per-day rule is applied by the alarm store)', async () => {
+    const repo = createMemoryAlarmRepository([alarm({ id: 'a', isPrimary: true, weekdays: [1, 2, 3, 4, 5] })]);
+    await repo.save(alarm({ id: 'b', isPrimary: true, weekdays: [0, 6] }));
     const primaries = (await repo.list()).filter((a) => a.isPrimary).map((a) => a.id);
-    expect(primaries).toEqual(['b']);
+    expect(primaries.sort()).toEqual(['a', 'b']);
   });
 });

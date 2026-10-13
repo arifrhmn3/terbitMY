@@ -114,7 +114,11 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
 **Native hand-off** (`alarm-handoff.ts`, `use-alarm-handoff.ts`). When the app opens or returns to the foreground: native fire events become occurrences (safe to repeat), fired one-off alarms are turned off, the native schedule is reconciled, and the newest open native morning opens the alarm screen. Android's "Start mission" opens `terbitmy://alarm-fired?…` straight into the mission.
 
 - `src/features/alarms/occurrence.ts`: pure state rules. Finished occurrences can never change.
-- `src/features/alarms/occurrence-manager.ts`: trigger, start mission, complete, dismiss, mark missed (active for over an hour), cancel (alarm deleted).
+- `src/features/alarms/occurrence-manager.ts`: trigger, start mission, complete, dismiss, mark missed (past its completion window), cancel (alarm deleted). Opening a morning closes it first if its window has passed; starting or finishing a mission after the window is refused.
+- `src/features/alarms/completion-policy.ts`: THE completion windows (`missionCompletionDeadline`, `shouldExpire`, `missionResumeState`, `canResumeMission`):
+  - Reward: 2 hours;
+  - Challenge: 1 hour;
+  - Gentle: the end of the alarm's local day.
 - Duplicate protection on two levels. The database has `UNIQUE (alarm_id, scheduled_at)`, plus a partial unique index allowing only one active occurrence per alarm. Every status change is a compare-and-set (`UPDATE … WHERE status = <expected>`), so an occurrence completes at most once. Future XP must be awarded per occurrence ID, which makes double rewards impossible.
 - `/alarm/[occurrenceId]` is the shared full-screen ringing screen. "Recent mornings" (`/alarms/history`) lists the latest 30 occurrences.
 
@@ -139,6 +143,30 @@ Beta behaviour changes by editing `MODE_POLICIES` (or passing a different policy
   - Recitation text via `FaithContentProvider` (`recitation/content.ts`), cached exactly in `faith_content_cache` (migration 9, checksum). `RecitationLibrary.forMission` never touches the network (cache → local fallback); `prepare` prefetches; `open` serves the Recitation archive (`recitation/archive.ts`; Recitation only).
   - Reflection music via `ReflectionMusicProvider` (bundled/cached → download → stream → fallback), files in `src/services/file-cache`, playback in `src/services/audio` (expo-audio: silent-mode playback, exclusive audio focus, no background audio).
   - `createFaithServices` wires it all; `faith.ts` / `faith.web.ts` pass the platform pieces; `useFaithPrefetch` (root layout) keeps today and tomorrow on the phone.
+
+## Today, alarm creation and results (Phase 3.5)
+
+- **Saved alarms vs occurrences.** Saved alarms (configuration) decide what is scheduled: Today's rows, Next alarm, the weekly schedule and Manage. Occurrences (snapshots of what happened) decide history: Progress, Recent mornings, XP and streaks. Today attaches today's occurrence to its saved alarm's row for state only, so deleting an alarm never leaves a ghost row and never deletes history. `alarmStore.remove` cancels the native alarm and snoozes; `onRemove` closes the open morning and its Gentle reminder.
+- **Today row action** (`todayAlarmAction` in `today.ts`) resumes the mission only when `canResumeMission`, otherwise edits. The weekly schedule (`today/weekly-schedule.ts`, screen `today/week`) is built from active alarms only.
+- **Today** (`features/today`): `buildToday` is a pure function of the saved alarms and today's occurrences. It gives the schedule with statuses, the next alarm (`nextRingAt`) and the morning status (Main Wake-Up only). `useToday` adds the streak, XP and rank snapshot. `showToday()` is the shared way back to Today.
+- **Creation** (`features/alarms/creation.ts`):
+  - The steps are data (`CREATION_STEPS`), so a routine step (`RoutineContext`: morning / day / night) can be inserted in Phase 4.
+  - `categoriesFor` and `missionChoices` follow the Mobility Profile and Faith settings. `draftFromCreation` applies `ALARM_DEFAULTS` (`alarm-defaults.ts`, which `createAlarmDraft` also reads).
+  - `missionControls` drives the editor's progressive disclosure.
+  - `saveAlarm` is the one save routine.
+- **Morning and Main Wake-Up** (`features/alarms/morning.ts`): `MORNING_WINDOW` (prototype 03:00–11:00) and `routineContextFor`, which an explicit routine will replace later. `mainWakeUpDecision` / `applyMainWakeUpChoice` handle the question asked when a new morning alarm is saved (`saveNewAlarm`). The Main Wake-Up is never a default. A one-off morning alarm is a one-time alarm (`weekdays: []`), which already turns itself off after ringing.
+- **Snooze** (`features/alarms/snooze.ts`, Main Wake-Up only): `snoozeSchedule` gives every ring of ONE alarm (interval × `maxSnoozes`, wrapping past midnight). The Preview shows it, and `snoozeOffsetsFor` sends its offsets to the native alarm.
+  - iOS (`NativeSnooze.swift`, `TerbitSnoozeIntent`): the alarm's one custom button is Snooze while snoozes remain. The intent stops the ring and schedules the next one as a one-time AlarmKit alarm (record kind `snooze`, with `snoozeIndex` and `originAt`), with no JavaScript involved. The last ring gets the mission button instead, which enforces the maximum.
+  - JavaScript: snooze rings never become fire events. `alarmKitFireEvents` ignores Snooze taps as stops, so they stay one morning. `handOff.syncSnoozes` records `snoozeCount` on that morning, cancels rings no longer wanted, and keeps the next ring for Today.
+  - Edit, disable, delete and replace re-schedule or cancel natively, which cancels pending rings.
+- **Main Wake-Up per day** (`features/alarms/main-wake-up.ts`). The business rules live in one file:
+  - `resolvedMainWakeUp(alarms, date, recorded?)` gives 0 or 1 alarm: a one-off on that date wins (also after it rang and turned itself off), otherwise the repeating Main Wake-Up for that weekday. It is used for Today, the weekly schedule, the `isMainWakeUp` snapshot recorded when an alarm rings (so streaks), simulate, and snooze ownership (`snoozeNoLongerWanted`).
+  - `mainWakeUpOverlaps` and `resolveMainWakeUpOverlaps` (`{update, remove}`): partial overlaps subtract days, full overlaps delete. The alarm store applies them on save via `remove`.
+  - `legacyMainWakeUpFixes` runs on every load: it reconciles older overlapping data without deleting anything.
+  - Helpers: `oneOffRingAt`, `isExpiredOneOff`, `isActiveAlarm`, `ringsOnDate`, `nextRingAt`.
+  - A one-off's date comes from its `updatedAt`, which `disableAfterRinging` keeps unchanged. The question asked before saving is in `morning.ts` (`mainWakeUpQuestion`), with its wording in `main-wake-up-prompt.ts`.
+- **Navigation back to Today:** inside a tab, `showToday()`; from the full-screen alarm screen, `returnToToday()` (a single `router.dismissTo('/today')`; `dismissAll` + `navigate` could push the tabs on top of the modal).
+- **Results** (`features/missions/result-layout.tsx`, `mission-result-summary.tsx`, `progress/result-progress.ts`): one layout for alarm and practice results, with rank changes computed from `rankFor` before and after the gained XP.
 
 ## Settings, permissions and accessibility (Phase 3D)
 

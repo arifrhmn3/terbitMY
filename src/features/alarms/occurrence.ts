@@ -14,7 +14,8 @@ import type { Alarm, AlarmMission, CompletionMode } from './alarm';
  * The phone's own Stop control can always end the alarm sound (it can't and
  * won't be bypassed). Stopping the *alarm* is recorded separately
  * (`alarmStoppedAt`) and doesn't end the *morning*: in every mode the mission
- * can still be completed afterwards, until the completion deadline. How the
+ * can still be completed afterwards, until the completion deadline
+ * (`completion-policy.ts`). How the
  * morning is judged lives in `accountability.ts`.
  */
 export type OccurrenceStatus =
@@ -71,6 +72,11 @@ export type AlarmOccurrence = {
   isMainWakeUp: boolean;
   mission: AlarmMission;
   snoozeMinutes: number | null;
+  /**
+   * How many times this morning's alarm was snoozed. Snooze rings are part of
+   * this one occurrence (same mission, one morning); they never create their own.
+   */
+  snoozeCount: number;
   completionMode: CompletionMode;
   gentleReminderMinutes: number;
   /** When the alarm went off. */
@@ -86,9 +92,6 @@ export type AlarmOccurrence = {
   createdAt: number;
   updatedAt: number;
 };
-
-/** Active occurrences are closed this long after the alarm was due (Gentle mode allows longer). */
-export const MISSED_AFTER_MS = 60 * 60 * 1000;
 
 export type TransitionError = 'already-finished' | 'invalid-transition' | 'mission-required' | 'no-mission' | 'wrong-mission';
 
@@ -122,6 +125,7 @@ export function createOccurrence(params: {
     isMainWakeUp: alarm.isPrimary,
     mission: alarm.mission,
     snoozeMinutes: alarm.snooze.enabled ? alarm.snooze.minutes : null,
+    snoozeCount: 0,
     completionMode: alarm.completionMode,
     gentleReminderMinutes: alarm.gentleReminderMinutes,
     startedAt: null,
@@ -212,6 +216,16 @@ export function completeMission(
   );
 }
 
+/**
+ * The native alarm reported `count` snoozes for this morning so far. Only ever
+ * goes up (the same report can arrive more than once); nothing else changes:
+ * not the status, the mission or the morning.
+ */
+export function recordSnoozes(occurrence: AlarmOccurrence, count: number, now: number): TransitionResult {
+  if (!Number.isInteger(count) || count <= occurrence.snoozeCount) return { ok: true, occurrence };
+  return { ok: true, occurrence: { ...occurrence, snoozeCount: count, updatedAt: now } };
+}
+
 /** For alarms with no mission: the user turned the alarm off in Terbit MY. */
 export function completeWithoutMission(occurrence: AlarmOccurrence, now: number): TransitionResult {
   if (occurrence.mission.type !== 'none') {
@@ -263,18 +277,8 @@ export function followUpAt(occurrence: AlarmOccurrence): number {
   return from + occurrence.gentleReminderMinutes * 60 * 1000;
 }
 
-/** After this, an unfinished morning is closed. Gentle mode leaves an hour after the follow-up. */
-export function completionDeadline(occurrence: AlarmOccurrence): number {
-  const base = occurrence.scheduledAt + MISSED_AFTER_MS;
-  return occurrence.completionMode === 'gentle' ? Math.max(base, followUpAt(occurrence) + MISSED_AFTER_MS) : base;
-}
-
-export function shouldExpire(occurrence: AlarmOccurrence, now: number): boolean {
-  return isActive(occurrence) && now > completionDeadline(occurrence);
-}
-
 /**
- * Closes a morning whose deadline passed: `dismissed` (system) if the phone's
+ * Closes a morning whose deadline (`completion-policy.ts`) passed: `dismissed` (system) if the phone's
  * Stop was used and the mission never finished, otherwise `missed`.
  */
 export function expireOccurrence(occurrence: AlarmOccurrence, now: number): TransitionResult {

@@ -6,37 +6,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/button';
 import { Notice } from '@/components/notice';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { DisplayTextMaxScale } from '@/constants/text-scale';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { evaluateMorning, MODE_POLICIES } from '@/features/alarms/accountability';
 import { describeMission, formatAlarmTime } from '@/features/alarms/alarm';
 import { handOff, occurrences } from '@/features/alarms/alarms';
 import { followUpAt, isActive, type AlarmOccurrence } from '@/features/alarms/occurrence';
 import { OccurrenceError } from '@/features/alarms/occurrence-manager';
-import { CombinedFaithMissionView, CombinedFaithResultSummary } from '@/features/faith/combined-mission-view';
-import { RecitationMissionView, RecitationResultSummary } from '@/features/faith/recitation/recitation-view';
-import { ReflectionMissionView, ReflectionResultSummary } from '@/features/faith/reflection/reflection-mission-view';
+import { CombinedFaithMissionView } from '@/features/faith/combined-mission-view';
+import { RecitationMissionView } from '@/features/faith/recitation/recitation-view';
+import { ReflectionMissionView } from '@/features/faith/reflection/reflection-mission-view';
 import { missionForProfile } from '@/features/accessibility/accessibility-settings';
 import { ProfileFitnessMission } from '@/features/accessibility/profile-fitness-mission';
 import { useAccessibilitySettings } from '@/features/settings/use-preferences';
-import { FitnessResultSummary } from '@/features/missions/fitness/fitness-mission-view';
-import { formatDuration, MathMissionView, MathResultSummary } from '@/features/missions/math/math-mission-view';
-import { QuizMissionView, QuizResultSummary } from '@/features/missions/quiz/quiz-mission-view';
-import {
-  isCombinedFaithResult,
-  isFitnessResult,
-  isMathResult,
-  isQuizResult,
-  isRecitationResult,
-  isReflectionResult,
-  type MissionResult,
-} from '@/features/missions/types';
+import { formatDuration, MathMissionView } from '@/features/missions/math/math-mission-view';
+import { MissionResultSummary } from '@/features/missions/mission-result-summary';
+import { QuizMissionView } from '@/features/missions/quiz/quiz-mission-view';
+import { MissionResultLayout } from '@/features/missions/result-layout';
+import type { MissionResult } from '@/features/missions/types';
 import { useTheme } from '@/hooks/use-theme';
-import { xpEntryTitle } from '@/features/progress/format';
+import { plural, xpEntryTitle } from '@/features/progress/format';
 import { CATEGORY_LABEL, PROGRESSION_POLICY } from '@/features/progress/policy';
 import { progress } from '@/features/progress/progress';
 import type { AchievementUnlock, XpEntry } from '@/features/progress/progression';
+import { rankChanges, type RankChange } from '@/features/progress/result-progress';
+import { returnToToday } from '@/features/today/navigation';
 import { getReminderService } from '@/services/notifications';
 
 function useNow(intervalMs = 1000) {
@@ -119,6 +113,8 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
       setBusy(false);
       // Finishing or giving up cancels a Gentle reminder; anything still open keeps one.
       handOff.syncReminders().catch(() => {});
+      // Finishing the morning also cancels a snooze ring that hasn't rung yet.
+      handOff.syncSnoozes().catch(() => {});
     }
   }
 
@@ -144,7 +140,7 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
   if (occurrence === undefined) {
     content = <ThemedText themeColor="textSecondary">Loading…</ThemedText>;
   } else if (occurrence === null) {
-    content = <Finished title="Alarm not found" description="This alarm occurrence doesn’t exist." />;
+    content = <Finished title="Alarm not found" description="This alarm occurrence doesn’t exist." occurrence={null} />;
   } else {
     switch (occurrence.status) {
       case 'scheduled':
@@ -182,7 +178,8 @@ export function AlarmRinging({ occurrenceId }: { occurrenceId: string }) {
         content = (
           <Finished
             title={evaluateMorning(occurrence).summary}
-            description="Recorded in Recent mornings. Only a completed mission counts for rewards and streaks."
+            description="Recorded in Progress → Recent mornings. Only a completed mission counts for rewards and streaks."
+            occurrence={occurrence}
           />
         );
         break;
@@ -331,65 +328,75 @@ function Mission(props: {
   );
 }
 
+/** After a real alarm, return to Today; a simulation goes back to where it was started. */
+function finish(occurrence: AlarmOccurrence | null) {
+  if (occurrence && occurrence.source !== 'simulated') returnToToday();
+  else close();
+}
+
+function finishTitle(occurrence: AlarmOccurrence | null) {
+  return occurrence && occurrence.source !== 'simulated' ? 'Back to Today' : 'Done';
+}
+
+type Awards = { xp: XpEntry[]; achievements: AchievementUnlock[]; ranks: RankChange[]; streak: number | null };
+
+/** The shared result layout for a completed alarm mission: summary, reward, progress, then back to Today. */
 function MorningComplete({ occurrence }: { occurrence: AlarmOccurrence }) {
   const result = occurrence.result?.kind === 'mission_completed' ? occurrence.result.mission : null;
   const finishedAt = occurrence.endedAt;
   const tookMs = finishedAt !== null && occurrence.startedAt !== null ? finishedAt - occurrence.startedAt : null;
-  const eligible = evaluateMorning(occurrence).rewardEligible;
-  const [awards, setAwards] = useState<{ xp: XpEntry[]; achievements: AchievementUnlock[] } | null>(null);
+  const evaluation = evaluateMorning(occurrence);
+  const eligible = evaluation.rewardEligible;
+  const countsForStreak = occurrence.isMainWakeUp && evaluation.streakEligible;
+  const [awards, setAwards] = useState<Awards | null>(null);
 
-  // Awards this morning's XP (idempotent: reopening this screen never awards it twice).
+  // Awards this mission's XP (idempotent: reopening this screen never awards it twice), then reads the new ranks and streak.
   useEffect(() => {
     if (!eligible) return;
     let current = true;
-    progress
-      .awardsForOccurrence(occurrence.id)
-      .then((a) => current && setAwards(a))
-      .catch(() => {});
+    (async () => {
+      const { xp, achievements } = await progress.awardsForOccurrence(occurrence.id);
+      const summary = await progress.summary();
+      if (!current) return;
+      setAwards({
+        xp,
+        achievements,
+        ranks: rankChanges(summary, xp, PROGRESSION_POLICY),
+        streak: countsForStreak ? summary.morning.streak.current : null,
+      });
+    })().catch(() => {});
     return () => {
       current = false;
     };
-  }, [eligible, occurrence.id]);
+  }, [eligible, occurrence.id, countsForStreak]);
 
   return (
-    <>
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText type="title">Morning complete</ThemedText>
-        {finishedAt !== null && <ThemedText>You were up at {clock(new Date(finishedAt))}.</ThemedText>}
-        {result && isMathResult(result) && <MathResultSummary result={result} />}
-        {result && isFitnessResult(result) && <FitnessResultSummary result={result} />}
-        {result && isRecitationResult(result) && <RecitationResultSummary result={result} />}
-        {result && isReflectionResult(result) && <ReflectionResultSummary result={result} />}
-        {result && isCombinedFaithResult(result) && <CombinedFaithResultSummary result={result} />}
-        {tookMs !== null && (
-          <ThemedText themeColor="textSecondary">From alarm to done: {formatDuration(tookMs)}</ThemedText>
-        )}
-        {eligible ? (
-          <RewardLines awards={awards} mainWakeUp={occurrence.isMainWakeUp} />
+    <MissionResultLayout
+      title="Mission complete"
+      lead={finishedAt !== null ? `You were up at ${clock(new Date(finishedAt))}.` : undefined}
+      summary={
+        <>
+          {result && <MissionResultSummary result={result} />}
+          {tookMs !== null && <ThemedText themeColor="textSecondary">From alarm to done: {formatDuration(tookMs)}</ThemedText>}
+        </>
+      }
+      reward={
+        eligible ? (
+          <RewardLines awards={awards} />
         ) : (
           <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-            This morning doesn’t qualify for rewards (no mission was set).
+            No reward: this alarm had no mission.
           </ThemedText>
-        )}
-      </ThemedView>
-      {result && isQuizResult(result) && (
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <QuizResultSummary result={result} />
-        </ThemedView>
-      )}
-      <Button title="Done" onPress={close} />
-    </>
+        )
+      }
+      progress={eligible ? <ProgressLines awards={awards} mainWakeUp={occurrence.isMainWakeUp} /> : undefined}
+      actions={<Button title={finishTitle(occurrence)} onPress={() => finish(occurrence)} />}
+    />
   );
 }
 
-/** XP earned (mission, difficulty, Challenge bonus), achievements unlocked, and what it counts toward. */
-function RewardLines({
-  awards,
-  mainWakeUp,
-}: {
-  awards: { xp: XpEntry[]; achievements: AchievementUnlock[] } | null;
-  mainWakeUp: boolean;
-}) {
+/** XP gained, its discipline, and each part (mission, difficulty, Challenge bonus). */
+function RewardLines({ awards }: { awards: Awards | null }) {
   if (!awards) {
     return (
       <ThemedText type="small" themeColor="textSecondary">
@@ -409,31 +416,50 @@ function RewardLines({
           {xpEntryTitle(e, PROGRESSION_POLICY)}: +{e.amount} XP
         </ThemedText>
       ))}
-      {awards.achievements.map((u) => (
-        <ThemedText key={u.id} type="smallBold">
+    </>
+  );
+}
+
+/** Rank changes, achievements, and whether this counts as the morning (Main Wake-Up only). */
+function ProgressLines({ awards, mainWakeUp }: { awards: Awards | null; mainWakeUp: boolean }) {
+  let morningLine = 'Counts toward All alarms (only your Main Wake-Up Alarm counts toward the morning streak).';
+  if (mainWakeUp) {
+    morningLine =
+      awards?.streak != null
+        ? `Morning complete · Current streak ${plural(awards.streak, 'day')}.`
+        : 'Your Main Wake-Up Alarm: this counts toward your morning streak.';
+  }
+  return (
+    <>
+      {awards?.ranks.map((r) => (
+        <ThemedText key={r.track} type="smallBold" style={styles.center}>
+          {r.label} rank up: Rank {r.from} → Rank {r.to}
+        </ThemedText>
+      ))}
+      {awards?.achievements.map((u) => (
+        <ThemedText key={u.id} type="smallBold" style={styles.center}>
           🏅 Achievement unlocked: {PROGRESSION_POLICY.achievements.find((a) => a.id === u.id)?.title ?? u.id}
         </ThemedText>
       ))}
       <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-        {mainWakeUp
-          ? 'Your Main Wake-Up Alarm: this counts toward your morning streak.'
-          : 'Counts toward All alarms (only your Main Wake-Up Alarm counts toward the morning streak).'}
+        {morningLine}
       </ThemedText>
     </>
   );
 }
 
-function Finished({ title, description }: { title: string; description: string }) {
+function Finished(props: { title: string; description: string; occurrence: AlarmOccurrence | null }) {
+  const { title, description, occurrence } = props;
   return (
-    <>
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText type="title">{title}</ThemedText>
+    <MissionResultLayout
+      title={title}
+      summary={
         <ThemedText themeColor="textSecondary" style={styles.center}>
           {description}
         </ThemedText>
-      </ThemedView>
-      <Button title="Done" onPress={close} />
-    </>
+      }
+      actions={<Button title={finishTitle(occurrence)} onPress={() => finish(occurrence)} />}
+    />
   );
 }
 
@@ -476,12 +502,6 @@ const styles = StyleSheet.create({
     lineHeight: 84,
     fontWeight: 700,
     fontVariant: ['tabular-nums'],
-  },
-  card: {
-    borderRadius: Radius.card,
-    padding: Spacing.four,
-    gap: Spacing.two,
-    alignItems: 'center',
   },
   center: {
     textAlign: 'center',

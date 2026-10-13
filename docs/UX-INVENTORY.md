@@ -1,218 +1,219 @@
-# UX inventory (Phase 3D)
+# UX inventory
 
-A map of every screen and journey as built at the end of Phase 3, with known usability issues. **It isn't a redesign.** It's the input for the dedicated UX/UI architecture phase.
+A map of every screen and journey, with known usability issues. **It isn't a redesign.** It's the input for the dedicated UX/UI architecture phase.
 
-Status: 12 Oct 2026, end of Phase 3 (3D verified on iPhone).
+Status: 12 Oct 2026. Phase 3D was verified on iPhone; **Phase 3.5 (Core UX Consolidation) is built and awaiting its iPhone test.** Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
+
+## Tab roles
+
+| Tab | Question it answers |
+|---|---|
+| **Today** | What am I doing today? |
+| **Alarms** | What do I want Terbit to hold me accountable for? |
+| **Progress** | How am I doing over time? |
+| **Settings** | How should Terbit behave for me? |
+| Circles | (Placeholder, Phase 5) |
 
 ## Navigation map
 
 ```
 / (launch)                          checks for a rung alarm → alarm screen, else /today
 ├─ (tabs)
-│  ├─ today/                         Today            (placeholder content)
-│  ├─ alarms/                        Alarms
-│  │   ├─ [id]                       alarm editor (new / edit)
-│  │   ├─ history                    Recent mornings
-│  │   ├─ practice                   practice any mission (no XP)
-│  │   └─ faith/                     Faith hub
-│  │       ├─ day                    one day's Daily Recitation (reading)
-│  │       └─ archive                Recitation archive (30 days)
-│  ├─ circles/                       Circles          (placeholder, Phase 5)
+│  ├─ today/                         Today: morning status, next alarm, today's schedule, daily practice, snapshot
+│  │   └─ alarm/[id]                 edit an alarm from Today (stays in Today)
+│  ├─ alarms/                        create: "What do you want to be accountable for?"
+│  │   ├─ create/[category]          step 2: the category's missions
+│  │   ├─ create/time                step 3: time → Save Alarm or Customise
+│  │   ├─ [id]                       Customise (new) / edit (existing)
+│  │   ├─ manage                     Manage alarms (list, on/off, edit)
+│  │   ├─ missions                   Practice hub (same catalogues as creation)
+│  │   ├─ practice                   practise one mission (no XP)
+│  │   └─ faith/                     Faith hub: day (Daily Recitation), archive
+│  ├─ circles/                       Circles (placeholder, Phase 5)
 │  ├─ progress/                      Progress
-│  └─ settings/                      Settings index
-│      ├─ account                    Account & backup
-│      ├─ faith                      Faith
-│      ├─ notifications              Reminders
-│      ├─ accessibility              Missions, motion & text
-│      ├─ permissions                Permissions
-│      ├─ privacy                    Your data
-│      └─ developer                  Developer tools (development builds only)
+│  │   └─ history                    Recent mornings
+│  └─ settings/                      Settings index and sub-screens (Phase 3D)
 ├─ alarm/[occurrenceId]              alarm screen (full-screen modal): alarm → mission → result
 └─ alarm-fired                       Android hand-off link (not used on iOS)
 ```
 
-Five tabs: **Today, Alarms, Circles, Progress, Settings.** Two of them (Today and Circles) are still placeholders.
-
 ## Screens
 
-### Today (`today/index`)
-- **Purpose:** the daily "what now" screen.
-- **Entry:** the launch route, or the Today tab.
-- **Key actions:** none yet. The rows are static.
-- **Issues:**
-  - **"Next alarm: Not set" and "Morning mission: None yet" are hard-coded,** so they're wrong when alarms exist. This is the most visible gap.
-  - There's no accountability status for this morning: done, open, or Gentle reminder pending.
-- **Consolidation:** make Today the hub for journey C. Show the next alarm and its mission, this morning's status with "finish mission", today's Faith practice, and a streak summary. Today should read data; Alarms and Progress keep the detail.
+### Today (`today/index`) ✅ rebuilt in 3.5
+- **Purpose:** the daily home. It's worked out from the saved alarms and today's mornings (`features/today/today.ts`).
+- **Shows:**
+  - **Morning card:** Morning ahead (with the Main Wake-Up time), mission waiting (with Finish mission), Morning complete with the streak, not completed, no Main Wake-Up today, or none set.
+  - **Next alarm:** from the real schedule.
+  - **Today's schedule:** in time order, each with its status (upcoming, mission waiting, completed, missed, not completed, earlier today).
+  - **Daily practice:** today's Recitation only if a tradition is set; Reflection only if a faith preference is set; always "Practise a mission".
+  - **Progress snapshot:** streak, today's XP and rank.
+- **Key actions:** tap an alarm to edit it (stays in Today); tap a waiting morning to finish its mission.
+- **Remaining:**
+  - Practice and Faith links open in the Alarms tab's stack.
+  - The schedule rows are plain list rows: no visual timeline yet.
 
-### Alarms (`alarms/index`)
-- **Purpose:** the list of alarms, plus entry points to history, practice and Faith.
-- **Key actions:** toggle an alarm, add an alarm, open Recent mornings, practise a mission, open Faith.
-- **Issues:**
-  - The tab mixes three jobs: managing alarms, browsing missions/practice, and Faith content.
-  - The "Wake-up missions" section reads like settings but opens Practice.
-  - A "coming soon" card for snooze is still shown.
-- **Duplication:** Faith is reached from both Alarms → Faith and Settings → Faith. Those are content and settings, which is correct, but the two names look alike.
-- **Consolidation:** possibly a "Missions" or "Practice" area, with Faith daily content moved to Today.
+### Alarms (`alarms/index`) ✅ rebuilt in 3.5
+- **Purpose:** create accountability alarms, mission first.
+- **Shows:** categories (Education, Fitness or "Wake-up activity", Faith), "Alarm without a mission", Manage alarms, Practice.
+- **Removed:** the saved-alarm list (now in Manage alarms and on Today), Recent mornings (now in Progress), the mission rows (now in Practice), and the "coming soon" card.
 
-### Alarm editor (`alarms/[id]`)
-- **Purpose:** create or edit an alarm.
-- **Order today:** status → time → repeat → label → main wake-up → mission (type, then options) → "Try this mission" → accountability mode (+ Gentle delay) → sound → Delete. Development builds also have "Simulate alarm".
-- **Issues:**
-  - It's a long single page. The mission options change shape by type: Maths, Quiz, Fitness, Faith (with three sub-choices), None.
-  - The completion mode is labelled "beta" and sits below the mission, though it changes how the alarm behaves.
+### Creation flow (`alarms/create/*`) ✅ new in 3.5
+- **Steps:** category → mission/activity (only that category's catalogue; Fitness follows the Mobility Profile; Faith follows the Faith settings) → time → **Save Alarm** (central defaults) or **Customise**.
+- **Defaults:** `ALARM_DEFAULTS` (`features/alarms/alarm-defaults.ts`): Reward mode, Easy, 3 questions, Monday–Friday, snooze every 10 minutes up to 3 times, system sound. Never the Main Wake-Up by default.
+- **Main Wake-Up:** saving a new alarm in the Morning window (prototype 03:00–11:00, `morning.ts`) asks one of two questions:
+  - with no Main Wake-Up yet: "Make this your Main Wake-Up?" (Use as Main Wake-Up / Not now);
+  - with one already: "You already have a Main Wake-Up at …" (Replace Main Wake-Up / Keep existing Main Wake-Up, which turns this alarm into a one-off morning alarm).
+- **Routine-ready:** the steps are data (`CREATION_STEPS`, `features/alarms/creation.ts`). Phase 4 can insert a Morning / Throughout the Day / Night step in front (`RoutineContext`) without rewriting the flow. Nothing about routines is shown yet.
+- **Remaining:** the category and mission steps are plain lists, not visual pickers.
+
+### Alarm editor / Customise (`alarms/[id]`, `today/alarm/[id]`) ✅ reordered in 3.5
+- **Order:** time → mission (only its own settings, via `missionControls`) → accountability mode (+ Gentle delay) → repeat → label / on / Main Wake-Up → sound → snooze (Main Wake-Up only: interval, maximum snoozes) → **Preview schedule** → Save.
+- **Snooze on the alarm (iOS):** while snoozes remain, the alarm's custom button is Snooze; the last ring offers the mission. **Remaining issue:** on earlier rings, starting the mission means tapping Stop and opening Terbit (AlarmKit allows only one custom button). Development builds also have "Simulate alarm".
+- **After saving:** a new alarm goes to Today; an edit goes back to where it came from.
+- **Remaining:**
+  - It's still one long page, with no collapsible sections.
   - Premium modes show a lock with no explanation in place.
-- **Consolidation:** a stepped flow (journey B), or collapsible mission settings. Mission choice could be a visual picker instead of a 5-way segmented control.
+  - The mission type can still be changed here with a 5-way segmented control.
 
-### Alarm screen (`alarm/[occurrenceId]`)
-- **Purpose:** the morning itself: alarm → mission → result.
-- **Entry:** AlarmKit's "Stop & Open Terbit" / "Stop & Start Mission", the launch hand-off, a notification, or Simulate.
-- **Key actions:** start the mission, Later (Gentle), skip / give up, then Done.
-- **Issues:**
-  - Result screens differ per mission: quiz review is a separate card; Faith combined shows two summaries.
-  - The XP breakdown is a list of lines.
-- **Consolidation:** one shared result layout (what you did, XP, streak, achievement) with a mission-specific detail slot.
+### Manage alarms (`alarms/manage`) ✅ new in 3.5
+Every saved alarm, grouped by mission (Education, Fitness or "Wake-up activity", Faith, No mission), then by time within each group. On and off alarms are both shown; tap to edit or delete. "New alarm" starts the creation flow.
+
+### Alarm screen and results (`alarm/[occurrenceId]`) ✅ shared result layout in 3.5
+- **Result layout** (`MissionResultLayout`), used by alarms and Practice:
+  1. **Success:** "Mission complete".
+  2. **Mission summary:** mission-specific, via `MissionResultSummary`.
+  3. **Reward:** XP, its discipline, and each part (mission, difficulty, Challenge bonus).
+  4. **Progress:** rank-ups, achievements, and the morning streak (Main Wake-Up only).
+  5. **Action:** after a real alarm, "Back to Today" (goes to Today); a simulation shows "Done" and goes back.
+- **Remaining:**
+  - The quiz review sits inside the summary and can be long.
+  - The XP breakdown is still a list of lines.
 
 ### Missions
 Each mission has its own view (`features/missions/*`, `features/faith/*`).
 - **Maths:** questions with a retry after each wrong answer.
 - **Quiz:** answer, see feedback and the explanation, then Next.
 - **Fitness:**
-  - Rep taps or a timer.
-  - The activities shown come from the Mobility Profile catalogue (Settings → Accessibility): Standard, Reduced mobility, or Non-physical (breathing, number focus, hold and release, grounding).
+  - Rep taps, a timer, holds or number focus, from the Mobility Profile catalogue.
   - The "get ready" countdown is 3 s, or 10 s with Extended pacing.
 - **Faith:** Recitation pages; Reflection guided session; Recitation + Reflection in two steps.
 
-**Issues:**
-- Headers and progress indicators differ per mission (caption line, progress bar, counters).
-- Abandoning is always the alarm screen's link below the mission, which is easy to miss.
+**Remaining:**
+- Headers and progress indicators still differ per mission.
+- Abandoning is a small link below the mission.
 
-### Practice (`alarms/practice`)
-- **Purpose:** try any mission without an alarm or XP.
-- **Entry:** Alarms "Wake-up missions" rows, the editor's "Try this mission", and the Faith hub (Reflection).
-- **Issues:** development builds add a large developer section at the top of this user screen (mission switcher, Faith test panel, short sessions). It's useful, but it makes the development build feel different from the real app.
+### Practice (`alarms/missions`, `alarms/practice`)
+- The Practice hub lists the same catalogues as creation.
+- **Remaining:** development builds add a large developer section to the practice screen.
 
-### Recent mornings (`alarms/history`)
-- **Purpose:** per-morning outcome and details.
-- **Issues:**
-  - It sits under Alarms, but it's really progress history.
-  - The details are long single lines.
-- **Consolidation:** merge it into Progress as "History".
+### Recent mornings (`progress/history`) ✅ moved to Progress in 3.5
+Same screen and data as before (a navigation move, not a data migration). It's reached from Progress → Mornings → Recent mornings.
 
 ### Faith hub, Recitation day, Recitation archive (`alarms/faith/*`)
-- **Purpose:** today's Daily Recitation (for visible traditions), Reflection, and the Recitation archive.
-- **Issues:**
-  - The hub lives under Alarms but is daily content.
-  - Reflection opens Practice, which shows "Practice mode" wording for something that's a normal daily practice.
-  - The tradition choice is a segmented control (it's a list with large text).
-- **Consolidation:** Faith as a section of Today, or its own tab if engagement justifies it.
+- **Remaining:** final Faith content placement is deferred.
+  - Today links to today's Recitation and Reflection, but the content still lives in the Alarms stack.
+  - Reflection still opens Practice with "Practice mode" wording.
 
-### Progress (`progress/index`)
-- **Purpose:** morning streak, all-alarm stats, XP by discipline, ranks, achievements, recent XP.
-- **Issues:**
-  - It's a long list with no visual hierarchy.
-  - "Sleep" placeholders are shown.
-  - It doesn't link to the mornings behind the numbers (that's Recent mornings, under Alarms).
-- **Consolidation:** a summary header, then tabs or sections for Streak, Disciplines, Achievements and History.
+### Progress (`progress/index`) 🟡 partly improved in 3.5
+- **Shows:** mornings (streak, longest streak, successful mornings, Recent mornings), all alarms, XP by discipline, ranks, achievements, recent XP. The Sleep placeholder was removed.
+- **Remaining:** it's still a long list with no visual hierarchy or summary header.
 
 ### Circles (`circles/index`)
-Placeholder rows that don't do anything yet (Phase 5).
+Placeholder rows (Phase 5).
 
-### Settings (rebuilt in Phase 3D)
-The index groups are: Account; Alarms & missions (Faith); Notifications (Reminders); Accessibility; Privacy & data (Permissions, Your data); Developer (development builds only); About. Every row shows its current value or status.
-- **Account:** guest/local, email sign-in, display name, backup status, sign out, delete account.
-- **Faith:** primary faith (private), Explore other traditions, Recitation display.
-- **Reminders:**
-  - Shows that alarms always ring, as alarm-critical behaviour.
-  - Follow-ups by mode: Gentle follow-ups are part of Gentle mode (no switch); Reward and Challenge send none. Shows the notification permission status.
-  - Planned optional notifications are listed, not switchable.
-- **Missions, motion & text:** Mobility Profile, mission pacing, and read-only "Follows iPhone setting" rows for Reduce Motion and text size, with the iPhone Settings path. These aren’t permissions, so there’s no button.
-- **Permissions:**
-  - Alarms and notifications, each with its status and "Allow" (only if never asked) or "Open iPhone Settings".
-  - Audio needs no permission.
-  - Microphone and camera are not used.
-- **Your data:** what stays on the phone, the optional private backup, Faith privacy, no camera or microphone, and that export is planned.
-- **Developer tools:** native alarm tests, plan/entitlements, progress diagnostics and seeding, sync diagnostics.
-
-**Remaining issues:**
-- "Alarms & missions" has only Faith. There are no alarm defaults yet, and every alarm sets its own mission and mode.
-- Single-row groups make the index longer than its content.
+### Settings (Phase 3D)
+- **Index groups:** Account; Alarms & missions (Faith); Notifications (Reminders); Accessibility; Privacy & data (Permissions, Your data); Developer (development builds only); About.
+- **Remaining:**
+  - "Alarms & missions" has only Faith. Alarm defaults are a central policy, not a user setting.
+  - Single-row groups make the index longer than its content.
 
 ## Core journeys
 
-### A. Wake-up: alarm → mission → result → progress
+### A. Wake-up: alarm → mission → result → progress ✅
 1. AlarmKit rings. The user taps "Stop & Open Terbit" (Reward/Gentle) or "Stop & Start Mission" (Challenge).
-2. Terbit opens the alarm screen for that morning (launch hand-off). In Challenge it goes straight into the mission.
-3. Mission → "Morning complete" with what was done, XP, achievements and the morning/all-alarms note.
-4. Done returns to the app. Progress is updated, but the user has to go to the Progress tab to see it.
+2. Terbit opens the alarm screen for that morning (launch hand-off).
+3. The mission runs, then the shared result shows the summary, XP, rank and achievements, and streak impact.
+4. **Back to Today:** Today shows the finished morning, the streak and today's XP.
 
-**Friction:**
-- Nothing on Today reflects the finished morning.
-- The result screen layout differs per mission.
-- The Gentle "Later" path depends on a reminder the user may have turned off. This is now explained on the screen.
+### B. Create alarm: category → mission → time → Save / Customise ✅
+- Alarms → category → mission → time → **Save Alarm** saves with the defaults, then Today shows the alarm.
+- Or **Customise:** the full editor, starting from the same draft.
 
-### B. Create alarm: time → mode → mission → mission settings → save
-**Actual order:** time → repeat → label → main wake-up → mission → mission settings → mode → sound → Save.
+**Remaining:** saving a Gentle alarm asks for notification permission straight away (contextual, but abrupt).
 
-**Friction:**
-- Mode comes after the mission, though it's the bigger decision.
-- The page is long.
-- Saving with a Gentle mode asks for notification permission straight away (contextual, but abrupt).
-- If the alarm can't be scheduled, the "Fix permissions" alert is the only guidance. The Permissions screen now shows status too.
-
-### C. Daily app check: Today → accountability status → upcoming alarms/missions → Progress
-**Not supported yet.** Today is static. Status is spread across Alarms (list), Recent mornings (outcomes) and Progress (stats). This is the biggest consolidation opportunity.
+### C. Daily app check: Today → status → upcoming → Progress ✅
+Today shows the morning status, next alarm, today's schedule and statuses, daily practice, and the streak and XP snapshot, with links into Progress.
 
 ### D. Faith: preference → Daily Recitation / Reflection → mission → archive
-Settings → Faith (preference) → Alarms → Faith (today's Recitation, Reflection via Practice) → the alarm editor's Faith mission (Recitation / Reflection / Both) → Alarms → Faith → Recitation archive.
+Settings → Faith (preference); Today → today's Recitation / Reflection; Alarms → Faith (Recitation / Reflection / Both); Alarms → Practice → Faith → Recitation archive.
 
-**Friction:**
-- Faith content and settings are under different tabs.
-- Reflection practice is labelled "Practice".
-- The archive is two levels deep.
+**Remaining:** Faith content still lives in the Alarms stack, and the archive is deep.
 
 ### E. Account: guest → optional sign-in → sync
-Settings → Account & backup → email code → signed in, with backup status shown. Settings → Your data explains what is backed up.
+Settings → Account & backup → email code → signed in.
 
-**Friction:**
-- There's no onboarding yet (Phase 6).
+**Remaining:**
+- No onboarding yet (Phase 6).
 - Sign-in is only discoverable from Settings.
-- Restore to a new phone isn't built (backup only).
+- Restore to a new phone isn't built.
 
-## Duplication found (and what Phase 3D did)
+## Duplication found (and what was done)
 
-| Duplication | Phase 3D |
+| Duplication | Resolution |
 |---|---|
-| Developer panels spread over Alarms, Progress and Account | Moved to Settings → Developer tools (development builds only). Contextual tools stay where they act: "Simulate alarm" in the editor, the Faith test panel in Practice |
-| Placeholder "coming soon" settings pages (Notifications, Privacy & Permissions, Accessibility) | Replaced by working screens |
-| Faith: content (Alarms → Faith) and settings (Settings → Faith) | Kept separate: content vs settings. The naming could be clearer |
-| Fitness accessibility: alarm-level `adaptation` field vs user need | One user-level Mobility Profile with its own catalogue per profile; the editor, Practice and alarm list show only that catalogue |
-| A Gentle follow-up on/off setting duplicated the choice of mode | Removed: follow-ups are what Gentle mode is; choose Reward or Challenge instead |
-| Recent mornings (Alarms) vs Progress | Not changed. Candidate to merge |
+| Developer panels spread over Alarms, Progress and Account | 3D: Settings → Developer tools |
+| Placeholder settings pages | 3D: replaced by working screens |
+| Fitness accessibility per alarm vs a user need | 3D: one Mobility Profile with its own catalogues |
+| A Gentle follow-up switch duplicated the choice of mode | 3D: removed |
+| Recent mornings (Alarms) vs Progress | 3.5: moved into Progress |
+| Saved-alarm list on Alarms vs creation | 3.5: creation is primary; the list is Manage alarms, and today's alarms are on Today |
+| Result code copied in the alarm screen and Practice | 3.5: one `MissionResultLayout` + `MissionResultSummary` |
+| Defaults spread between `createAlarmDraft`, the editor screen and the first-alarm rule | 3.5: `ALARM_DEFAULTS` |
+| Faith content (Alarms → Faith) and settings (Settings → Faith) | Kept separate. Final placement is deferred |
 
-## Accessibility review (Phase 3D)
+## Accessibility review (Phase 3D, still applies)
+- **Large text:** rows stack their value; 3+ option choices become lists; weekday buttons grow; display numbers are capped at 1.5×. New 3.5 screens use the same rows, and Save Alarm / Customise wrap side by side or stack.
+- **Reduce Motion:** screens fade instead of sliding.
+- **Still to review:**
+  - VoiceOver order on mission screens;
+  - dark-mode contrast of secondary text;
+  - haptic and visual alarm cues;
+  - larger weekday touch targets.
 
-**Text size** was reviewed on the alarm editor, the mission screens, Recitation, Reflection, results, Progress and Settings:
-- **Rows:** a value that sat beside the title now moves under it at large sizes, so long values like an email no longer squeeze the title.
-- **Choices:** segmented choices with 3 or more options become a list at large sizes, so labels are no longer cut off.
-- **Weekday buttons** grow instead of clipping.
-- **Very large display numbers** (alarm clock, rep and timer counters, the maths question) are capped at 1.5× so they never overflow. All other text scales freely, including Recitation text and Reflection prompts.
+## Main Wake-Up rule (3.5)
+**One Main Wake-Up per calendar day.** Several alarms may be Main Wake-Ups (for example Mon–Fri 06:30 and Sat–Sun 08:00) if their days don't overlap.
+- **Overlaps:** turning one on, or a new morning alarm, asks before taking over days.
+  - **Partial:** "Replace Wednesday's Main Wake-Up" leaves the other alarm with its other days (several partial overlaps: each loses only its own overlapping days).
+  - **Full:** the old alarm is **deleted**: its native alarm and any pending snooze rings are cancelled. Its past mornings, XP and streak stay in Progress. The prompt says so before you confirm.
+  - **No overlap:** both stay; nothing is asked.
+- **One-off override:** a one-off can be the Main Wake-Up for its date only ("Use 07:30 as this Wednesday's Main Wake-Up?"). The repeating alarm still rings that day but doesn't count as the morning.
+- **Today and snooze:** Today shows one Main Wake-Up per date. Each Main Wake-Up keeps its own snooze settings; a replaced alarm's pending snooze is cancelled.
+- **One resolver:** `resolvedMainWakeUp(date)` (`main-wake-up.ts`) decides the date's Main Wake-Up for Today, the weekly schedule, the morning snapshot recorded when an alarm rings (and so streaks), simulate, and snooze ownership.
+- **Older builds:** overlapping Main Wake-Ups saved by earlier builds are fixed when alarms load, without deleting anything. The most recently saved alarm keeps the shared days. An older one loses only those days, or, if none would be left, stays saved (same days, same on/off) as an ordinary alarm. An alarm that an earlier 3.5 build turned off during a replacement stays turned off in Manage; delete it there if you no longer want it.
 
-**Motion:** the app has almost no animation. With iOS Reduce Motion on, screen transitions (including the alarm screen) fade instead of sliding. Progress bars aren't animated and stay visible.
-
-**Still to review in the UX phase:**
-- VoiceOver order on mission screens.
-- Contrast of secondary text in dark mode.
-- Haptic and visual alarm cues.
-- Larger touch targets on the weekday picker.
+## Today, the weekly schedule and history (3.5)
+- **Today shows active saved alarms, not history.** Rows come from saved, turned-on alarms that ring today. Today's mornings only add state to them: Upcoming · Mission waiting · tap to finish · Completed · Not completed · Missed. A deleted or turned-off alarm leaves Today straight away, even if it rang this morning; its morning stays in Progress → Recent mornings.
+- **Tapping a row** (`todayAlarmAction`) resumes the mission only if the alarm rang, still exists, has a mission, the mission isn't done, and its completion window is open. Otherwise the alarm editor opens.
+- **Completion windows** (`completion-policy.ts`):
+  - Reward: 2 hours after the alarm.
+  - Gentle: until midnight that day (the follow-up reminder is separate).
+  - Challenge: 1 hour.
+  - Reward and Challenge add any time spent snoozing.
+- **Next alarm** ignores deleted, turned-off and already-rung one-off alarms.
+- **Weekly schedule** (Today → View weekly schedule, `today/week`): the next 7 days of active alarms only. Repeating alarms appear on each weekday and upcoming one-offs on their date, in time order. Each day has at most one Main Wake-Up, and tapping an alarm opens it for editing. Days are already split into sections, so Morning / Day / Night can be added later.
+- **Words** (`today/labels.ts`, `MAIN_WAKE_UP_TAG`, `ONE_OFF_TAG`): Main Wake-Up, One-off (also in Manage alarms).
 
 ## Deferred to the UX/UI phase
-- A real Today screen (journey C).
-- One shared result layout.
-- A stepped alarm creation flow.
-- Moving Faith content to where it's used daily.
-- Merging History into Progress.
-- Settings grouping once more settings exist (alarm defaults, sounds).
-- Onboarding (Phase 6).
-- A visual design system.
-- Naming and category for non-physical activities. They sit under the "Fitness" mission and earn Fitness XP so accessibility isn't penalised. The UX phase should decide whether this becomes a neutral name (for example "Movement & focus" or "Wellbeing") or a separate discipline.
-- Mobility Profile in first-run onboarding (the options are already defined once, in `MOBILITY_PROFILE_OPTIONS`).
+- **Onboarding and personalisation:** weekday and weekend wake times, snooze preference, Faith, Mobility Profile, Education and Fitness interests, accountability preferences.
+- **Routine selection:** Morning / Throughout the Day / Night in alarm creation.
+- **Final visual/UI redesign** and **final Faith content placement.**
+- **Non-physical activity naming:** these activities currently earn Fitness XP; a neutral name is still to be decided.
+- **Camera-verified Fitness missions** (on-device pose detection; never requested today).
+- **Weekly schedule sections:** Morning / Throughout the Day / Night sections in the weekly view (the structure is ready; `sectionOf` in `weekly-schedule.ts`).
+- **Skipping one ring (AlarmKit limitation):** a one-off Main Wake-Up override doesn't silence the usual repeating alarm that date. AlarmKit can't skip a single day of a repeating alarm, so it still rings physically, but it isn't the Main Wake-Up and doesn't count as the morning. An option to silence it needs calendar-based scheduling later.
+- Final Faith content placement (Today, its own area, or a tab).
+- Final tab and navigation architecture (Circles placeholder, cross-tab links from Today).
+- Morning / Throughout the Day / Night routine selection (Phase 4; the creation flow is ready for it).
+- Onboarding (Phase 6), including the Mobility Profile question (`MOBILITY_PROFILE_OPTIONS`).
+- The final visual system: a timeline on Today, visual mission pickers, Progress hierarchy, result styling.
+- Naming and category for non-physical activities. They earn Fitness XP so accessibility isn't penalised; a neutral name such as "Wellbeing", or a separate discipline, is still to decide.
