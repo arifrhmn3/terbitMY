@@ -15,7 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 /** Optional account: guest/local use, email sign-in, profile, sync status, sign out, delete account. */
 export default function AccountScreen() {
-  const { status, user, profile } = useAccount();
+  const { status, user, profile, sessionEnded } = useAccount();
   const sync = useSyncStatus();
   const label = syncStatusLabel(sync);
 
@@ -38,11 +38,19 @@ export default function AccountScreen() {
       {status === 'guest' && (
         <>
           <Section>
-            <ListRow
-              icon={{ ios: 'iphone', android: 'smartphone', web: 'smartphone' }}
-              title="Using Terbit MY locally"
-              subtitle="No account needed. Your data is saved on this phone."
-            />
+            {sessionEnded ? (
+              <ListRow
+                icon={{ ios: 'person.crop.circle.badge.exclamationmark', android: 'person_alert', web: 'person_alert' }}
+                title="Sign-in required"
+                subtitle="You were signed out on this phone. Sign in again to resume backup. Everything on this phone is kept."
+              />
+            ) : (
+              <ListRow
+                icon={{ ios: 'iphone', android: 'smartphone', web: 'smartphone' }}
+                title="Continue without an account"
+                subtitle="No account needed. Alarms, missions, XP, Progress and your Night Routine all work on this phone."
+              />
+            )}
           </Section>
           <SignInForm />
         </>

@@ -12,6 +12,11 @@ export type AccountState = {
   status: AccountStatus;
   user: CloudUser | null;
   profile: CloudProfile | null;
+  /**
+   * The sign-in ended without the user signing out (e.g. Supabase rejected an
+   * old session): show "Sign-in required". Local data is untouched.
+   */
+  sessionEnded: boolean;
 };
 
 /** The phone's time zone name (e.g. "Asia/Kuala_Lumpur"), if the platform reports it. */
@@ -36,9 +41,11 @@ export function createAccountStore(deps: {
   timeZone?: () => string | null;
 }) {
   const { cloud, onSignedIn, onSignedOut, timeZone = deviceTimeZone } = deps;
-  let state: AccountState = { status: cloud ? 'loading' : 'unavailable', user: null, profile: null };
+  let state: AccountState = { status: cloud ? 'loading' : 'unavailable', user: null, profile: null, sessionEnded: false };
   const listeners = new Set<() => void>();
   let started = false;
+  /** True while the user's own sign-out or account deletion is in progress. */
+  let leaving = false;
 
   function set(next: Partial<AccountState>) {
     state = { ...state, ...next };
@@ -69,13 +76,13 @@ export function createAccountStore(deps: {
   function applyUser(user: CloudUser | null) {
     const was = state.user?.id ?? null;
     if (user) {
-      set({ status: 'signed_in', user, profile: was === user.id ? state.profile : null });
+      set({ status: 'signed_in', user, profile: was === user.id ? state.profile : null, sessionEnded: false });
       if (was !== user.id) {
         loadProfile(user);
         onSignedIn?.(user);
       }
     } else {
-      set({ status: 'guest', user: null, profile: null });
+      set({ status: 'guest', user: null, profile: null, sessionEnded: !leaving && (was !== null || state.sessionEnded) });
       if (was) onSignedOut?.();
     }
   }
@@ -106,8 +113,13 @@ export function createAccountStore(deps: {
     /** Ends the session on this phone. Alarms, history, XP and streaks stay on the phone. */
     async signOut() {
       if (!cloud) return;
-      await cloud.auth.signOut();
-      applyUser(null);
+      leaving = true;
+      try {
+        await cloud.auth.signOut();
+        applyUser(null);
+      } finally {
+        leaving = false;
+      }
     },
     async setDisplayName(name: string) {
       if (!cloud || !state.user) throw new Error('Not signed in.');
@@ -122,9 +134,14 @@ export function createAccountStore(deps: {
      */
     async deleteAccount() {
       if (!cloud || !state.user) throw new Error('Not signed in.');
-      await cloud.store.deleteAccount();
-      await cloud.auth.signOut().catch(() => {});
-      applyUser(null);
+      leaving = true;
+      try {
+        await cloud.store.deleteAccount();
+        await cloud.auth.signOut().catch(() => {});
+        applyUser(null);
+      } finally {
+        leaving = false;
+      }
     },
   };
 }

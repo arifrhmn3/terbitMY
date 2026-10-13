@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 13 October 2026 (Phase 4 complete)_
+_Last updated: 13 October 2026 (Phase 5A complete on the repository side)_
 
 ## Current phase
 
@@ -11,6 +11,8 @@ _Last updated: 13 October 2026 (Phase 4 complete)_
 **Phase 3 (3A Education, 3B Fitness, 3C Faith, 3D Settings & Accessibility, 3.5 Core UX Consolidation) is complete, verified on iPhone and merged into `main` (13 Oct 2026).**
 
 **Phase 4 (Bedtime & Restrictions: the Night Routine) is complete, verified on iPhone in the `development-screen-time` build and merged into `main` (13 Oct 2026).**
+
+**Phase 5A (Live Accounts & Sync Verification) is complete on the repository side and merged into `main` (13 Oct 2026). Live email sign-in testing is intentionally deferred to beta, because the public name and domain aren't chosen yet (see "Beta requirements"). Circles has not started.**
 
 ## Phase 2A: local Progress Engine
 
@@ -263,6 +265,32 @@ Not the final visual redesign. Details: [docs/UX-INVENTORY.md](docs/UX-INVENTORY
 - **Naming decision:** whether non-physical activities keep earning Fitness XP, or get a neutral name such as "Wellbeing".
 - **Camera-verified Fitness missions** (on-device pose detection). Fitness is self-reported today; the camera is never requested.
 
+## Phase 5A: Live Accounts & Sync Verification
+
+Branch `phase-5/accounts-live-verification`, merged into `main`. ✅ **Complete on the repository side (13 Oct 2026).** The account, sync, session, offline and RLS architecture is built, unit-tested and probed against the live project. Details: [docs/CLOUD.md](docs/CLOUD.md) → "Phase 5A".
+
+**Owner decision (13 Oct 2026): live email verification is deferred to beta, intentionally.** The public name and domain aren't final, so no domain is bought, no custom SMTP or branded templates are set up, and no end-to-end OTP email test is done now. This isn't a blocker. Every deferred item is listed under "Beta requirements" → "Accounts & email live verification".
+
+| Item | Status |
+|---|---|
+| Audit of Phase 2B: email one-time code, profile, RLS, sync scope (profile, alarms, occurrences, XP, achievements; Night Routine phone-only), backup-only (no restore) | ✅ Done |
+| Live project probe: anonymous access refused on every table and function; both migrations applied; no Night Routine or sync state in the cloud | ✅ Done (13 Oct) |
+| Offline with an expired token: stays signed in (read from the saved session) instead of looking like a guest; start-up event no longer signs the user out | ✅ Fixed · unit-tested |
+| "Sign-in required" when Supabase ends the session (not after a deliberate sign-out) | ✅ Unit-tested |
+| Sync status: Sync pending, Synced · Last synced (survives restarts), Offline · N changes waiting, Sign-in required, Sync failed; no raw errors (developer panel keeps them) | ✅ Unit-tested |
+| Sign-in messages in plain words (offline, rate limit, address not authorised, wrong code) | ✅ Unit-tested |
+| Account screen: "Continue without an account" / "Sign in / Create account (optional)" | ✅ Built |
+| Lifecycle test: guest data → sign in → sync twice → restart → sign out → guest use → sign in → offline change → reconnect; no duplicate alarm, Main Wake-Up, occurrence, XP or achievement | ✅ Unit-tested |
+| No secrets in committed files; `.env.local` ignored | ✅ Unit-tested |
+| Live sign-in, guest → account, sync, sign-out, offline on iPhone | ⏸ Deferred to beta (owner decision) |
+| Two-account live RLS check (`supabase/tests/rls_check.sql`) | ⏸ Deferred to beta (anonymous access already refused live) |
+
+**What is verified without live email:** anonymous access is refused on every live table and function, and both migrations are applied (live probe). Sign-in, profile, guest → account, idempotent sync, sign-out, offline, expired-session and "Sign-in required" behaviour are unit-tested against an in-memory cloud with the same rules as the schema. Guests never call the cloud, so the shipped app works fully without accounts.
+
+**Changes needing action:** none. No new packages, no native code, no SQLite or Supabase migration. The installed development build is enough (JavaScript only).
+
+**Known limits (documented, not in 5A):** restoring onto a new phone isn't built (backup only); a second account signing in on the same phone also receives this phone's data; custom SMTP and branded email wait for the final name and domain (beta).
+
 ## Phase 4: Bedtime & Restrictions (Night Routine)
 
 Branch `phase-4/bedtime-restrictions`, merged into `main`. ✅ **Complete and verified on iPhone (13 Oct 2026)** in the `development-screen-time` build. Verified on the iPhone:
@@ -339,6 +367,16 @@ The Night Routine works in any build. App restrictions need the `development-scr
   - For a quiet wind-down, Terbit MY recommends an iPhone Focus (e.g. Sleep). See docs/ARCHITECTURE.md.
 
 ## Beta requirements (must be done before public beta)
+
+- **Accounts & email live verification** (deferred by owner decision, 13 Oct 2026; Phase 2B/5A architecture is built and unit-tested). Until all of these are done, accounts aren't verified end to end:
+  1. **Final name and domain** chosen and bought.
+  2. **Custom SMTP** (Authentication → Emails → SMTP Settings) with a sender address on that domain.
+  3. **Branded auth email templates** (Confirm signup and Magic Link), each showing the 6-digit `{{ .Token }}` code.
+  4. **Live OTP email delivery**, including to an address outside the Supabase project team.
+  5. **Real iPhone sign-in with production-style email**, then the full account checklist: guest → account (existing alarms, history, XP, achievements appear once in the Table Editor), sync twice and restart (no duplicates), sign out (local data stays), sign back in (no duplicates), airplane mode → reconnect (Offline → Synced), delete account (cloud rows gone, local data kept).
+  6. **Two-account live RLS check:** `supabase/tests/rls_check.sql` with two real accounts.
+  7. **New-device / cloud restore**, once restore is built (the cloud is backup-only today).
+  Steps and details: [docs/CLOUD.md](docs/CLOUD.md) → "Beta-stage verification".
 
 - **Faith Content Sources and Review Approval.** Choose trusted sources per tradition (with licences covering display, caching and offline fallback) and qualified reviewers; ship only `approved` content; remove all development fixtures. See [docs/FAITH-CONTENT.md](docs/FAITH-CONTENT.md).
 

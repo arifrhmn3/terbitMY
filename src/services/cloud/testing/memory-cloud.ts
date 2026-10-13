@@ -14,7 +14,8 @@ import {
  * TEST ONLY. An in-memory cloud that behaves like the Supabase schema:
  * rows are scoped to the signed-in user (like Row Level Security), alarms and
  * occurrences keep the newest `updated_at`, the XP ledger and achievements
- * insert once. `online = false` makes every call fail as offline.
+ * insert once. `online = false` makes every call fail as offline; `failNext`
+ * fails the next calls with `failKind` (a server error or a rejected sign-in).
  */
 export function createMemoryCloud() {
   let session: CloudUser | null = null;
@@ -28,14 +29,14 @@ export function createMemoryCloud() {
     xp: new Map<string, CloudXpRow & { user_id: string }>(),
     achievements: new Map<string, CloudAchievementRow & { user_id: string }>(),
   };
-  const state = { online: true, calls: 0, failNext: 0 };
+  const state: { online: boolean; calls: number; failNext: number; failKind: 'server' | 'auth' } = { online: true, calls: 0, failNext: 0, failKind: 'server' };
 
   function guard(): string {
     state.calls += 1;
     if (!state.online) throw new CloudError('Network request failed', 'offline');
     if (state.failNext > 0) {
       state.failNext -= 1;
-      throw new CloudError('Server error', 'server');
+      throw new CloudError(state.failKind === 'auth' ? 'JWT expired' : 'Server error', state.failKind);
     }
     if (!session) throw new CloudError('Not signed in', 'auth');
     return session.id;

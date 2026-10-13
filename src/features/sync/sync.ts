@@ -26,6 +26,7 @@ export const syncEngine = createSyncEngine({
     fingerprints: async (...args) => createSqliteSyncStateRepository(await getDatabase()).fingerprints(...args),
     mark: async (...args) => createSqliteSyncStateRepository(await getDatabase()).mark(...args),
     forget: async (...args) => createSqliteSyncStateRepository(await getDatabase()).forget(...args),
+    lastSyncedAt: async (userId) => createSqliteSyncStateRepository(await getDatabase()).lastSyncedAt!(userId),
   },
   currentUser: async () => (cloud ? cloud.auth.currentUser() : null),
 });
@@ -60,7 +61,7 @@ export function startCloudSync() {
   started = true;
   syncEngine.subscribe((s) => {
     if (s.state === 'synced' || s.state === 'local') failures = 0;
-    if (s.state === 'offline' || s.state === 'error') {
+    if (s.state === 'offline' || s.state === 'error' || s.state === 'signin_required') {
       requestSync(RETRY_MS[Math.min(failures, RETRY_MS.length - 1)]);
       failures += 1;
     }
@@ -71,10 +72,14 @@ export function startCloudSync() {
       requestSync(0);
     }
   });
-  alarmStore.subscribe(() => requestSync());
-  progress.subscribe(() => requestSync());
-  faith.settings.subscribe(() => requestSync());
+  const changed = () => {
+    syncEngine.markChanged();
+    requestSync();
+  };
+  alarmStore.subscribe(changed);
+  progress.subscribe(changed);
+  faith.settings.subscribe(changed);
   // Alarm hand-off runs record fired, stopped and dismissed mornings.
-  handOff.subscribe(() => requestSync());
+  handOff.subscribe(changed);
   requestSync(0);
 }

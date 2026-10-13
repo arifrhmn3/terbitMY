@@ -53,14 +53,16 @@ services/cloud  AuthService + CloudStore interfaces
 - **There's no separate queue that could be lost.** A record is pending until its current content has been accepted by the cloud. Offline or failed runs leave it pending, and it's retried after 30 s, 1 min, 2 min, 5 min, then every 15 min, plus whenever the app returns to the front.
 - **Order:** alarms, then alarm deletions (tombstones), then occurrences, XP and achievements, in chunks of 200. Each chunk is marked synced only after the cloud accepts it.
 - **Idempotent:** re-sending anything is harmless (stable IDs, newest-wins or insert-once), so events are never duplicated.
-- **Status shown to the user:**
-  - Local only;
+- **Status shown to the user** (`features/sync/status-label.ts`; plain words, never a raw error):
+  - Local only (guest);
+  - Sync pending (a change is waiting for the next run);
   - Syncing…;
-  - Synced;
-  - Offline;
-  - Sync problem.
+  - Synced · Last synced 14:05 (from the phone's `sync_state`, so it survives restarts; it isn't bumped when there was nothing to send);
+  - Offline · "N changes will back up when you're online";
+  - Sign-in required (the cloud rejected the sign-in; retried; or Supabase ended the session);
+  - Sync failed (anything else; retried with back-off).
 
-  Development builds also show the user ID, pending count, last sync time and last error.
+  Development builds also show the user ID, pending count, last sync time and the technical last error (Settings → Developer tools).
 
 ### Conflict policy
 
@@ -69,6 +71,42 @@ services/cloud  AuthService + CloudStore interfaces
 - **XP ledger and achievements:** insert once by stable key, never changed or duplicated.
 - **Changes are found by content fingerprint, not by `updated_at` alone.** So changes that don't touch `updated_at` are still sent, for example another alarm losing its Main Wake-Up flag.
 - **Not in this phase:** the cloud is a backup. Pulling cloud data onto a phone (restore / cross-device sync) comes later and will use the same rules.
+
+## Phase 5A: live accounts and sync verification
+
+### Audit of Phase 2B (13 Oct 2026)
+- **Auth:** email one-time code only (`signInWithOtp` with `shouldCreateUser`, then `verifyOtp` type `email`). No magic-link handling, deep links or passwords. This is the right choice for mobile: no redirect URLs, works in any email app.
+- **Live project** (anonymous probe with the public key, nothing written):
+  - every table and the three functions refuse anonymous access (`42501 permission denied`);
+  - `profiles.faith_preference` exists, so both migrations are applied;
+  - `night_routines` and `sync_state` don't exist in the cloud (phone only, by design);
+  - Email sign-in is on, sign-ups are allowed, and "Confirm email" is on, so a **new** user gets the **Confirm signup** email and a returning user the **Magic Link** email. Both templates must show `{{ .Token }}` (setup step 3.2).
+- **Sync scope (confirmed in code):** profile (time zone, display name, private Faith preference), alarms, occurrences, XP ledger, achievements. Nothing else. The Night Routine, Screen Time selection, settings and sync state stay on the phone; a test checks this.
+- **Backup only:** the phone is the source of truth and nothing is downloaded. "Signing back in" on the same phone needs no restore: local data was never removed, and only changed records are sent. **Restoring onto a new phone or after reinstalling isn't built** (a later sub-phase, before beta).
+
+### Email for development (no domain, no custom SMTP)
+- **Not used for a live test now:** the owner deferred live email testing to beta (see "Beta-stage verification"). For a quick optional check before then, Supabase's built-in email works with these limits:
+  - it only delivers to **members of the Supabase organisation's team** (anyone else gets "Email address not authorized", shown in the app as "This email address can't receive sign-in codes yet");
+  - **about 2 emails per hour** (shown as "Please wait a few minutes…");
+  - not for production, no delivery guarantee.
+- So test with the project owner's email (a team member). For the two-account RLS check, create the second user in Authentication → Users → **Add user** (no email needed), or invite a second address to the team.
+- Custom SMTP, a sender domain and branded templates stay deferred until the name and domain are final. Nothing in the app depends on the domain.
+
+### Session behaviour
+- Saved on the phone (expo-sqlite localStorage, Supabase's default key), restored at start-up without the network.
+- Access tokens are refreshed while the app is in front.
+- **Offline with an expired access token** (for example, opening Terbit MY the next morning in airplane mode), Supabase keeps the session but reports none. Terbit MY then reads the saved session, so the user stays signed in and sync shows Offline instead of looking like a guest (fixed in 5A).
+- If Supabase really ends the session (refresh token rejected), the app becomes a guest with **"Sign-in required"**. Local data is untouched.
+- Sign out ends this phone's session only (`scope: 'local'`, works offline) and keeps all local data.
+
+### What Circles (Phase 5B+) can rely on
+- A stable user ID: `auth.users.id`, which is also `profiles.id`.
+- A profile row for every account (sign-up trigger, plus the app's upsert).
+- The session persists across restarts and offline.
+- Cloud calls work with RLS (`auth.uid()`), and backup sync is idempotent.
+- Guest mode still works; Circles must handle "no account".
+- **Not ready for social use as-is:** `profiles` is owner-only and holds the PRIVATE `faith_preference`. Circles must add a **separate, allow-listed** shareable identity (minimum: a display name, already on the profile, exposed through a view or table that never includes `faith_preference`, `timezone` or `avatar_url` unless chosen). No usernames, bios, avatars or followers until Circles needs them.
+- **One person per phone:** if a different account signs in on the same phone, this phone's data is backed up to that account too (known limit above). Circles should show which account is signed in.
 
 ## Account deletion
 
@@ -112,7 +150,19 @@ For EAS cloud builds, add the same two variables as EAS environment variables (`
 - Public values are in `.env.local`.
 - A live probe confirmed that all tables and functions exist and that anonymous access is refused.
 
-**Deferred to beta.** Terbit MY is a working name, so no permanent domain or email sender exists yet. Before beta testers are invited:
+**Phase 5A (13 Oct 2026):** complete on the repository side. The architecture is unit-tested, and a live probe confirmed that anonymous access is refused and both migrations are applied.
+
+**Beta-stage verification: deferred by owner decision (13 Oct 2026), required before beta.** Terbit MY is a working name, so no domain is bought and no custom email sender exists. Real email delivery and live sign-in testing wait until then. This was a deliberate choice, not a blocker. Before beta testers are invited, do all of these (the detailed steps follow):
+
+1. **Final name and domain** chosen and bought.
+2. **Custom SMTP** (Authentication → Emails → SMTP Settings) with a sender address on that domain.
+3. **Branded auth email templates** (Confirm signup and Magic Link), each showing the 6-digit `{{ .Token }}` code.
+4. **Live OTP email delivery**, including to an address outside the Supabase project team.
+5. **Real iPhone sign-in with production-style email**, then the full account checklist: guest → account (existing alarms, history, XP, achievements appear once in the Table Editor), sync twice and restart (no duplicates), sign out (local data stays), sign back in (no duplicates), airplane mode → reconnect (Offline → Synced), delete account (cloud rows gone, local data kept).
+6. **Two-account live RLS check:** `supabase/tests/rls_check.sql` with two real accounts.
+7. **New-device / cloud restore**, once restore is built (the cloud is backup-only today).
+
+Detailed steps:
 1. Set up a custom SMTP provider, a sender domain and a branded sender address (step 6 above). Confirm the email templates show the `{{ .Token }}` code.
 2. Check real OTP delivery to an address outside the Supabase project team.
 3. On iPhone, test guest → account: sign in, then confirm existing alarms, occurrences, XP and achievements appear in the Table Editor.
