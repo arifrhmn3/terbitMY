@@ -17,6 +17,8 @@ import {
   type PermissionStatus,
 } from '@/features/permissions/permissions';
 import { usePermissionStatuses } from '@/features/permissions/use-permissions';
+import { AUTHORIZATION_INFO } from '@/features/night/labels';
+import { useNightRoutine } from '@/features/night/night';
 import { systemPermissions } from '@/services/permissions';
 
 const ICON = {
@@ -34,6 +36,7 @@ const ICON = {
  */
 export default function PermissionsScreen() {
   const { statuses, refresh } = usePermissionStatuses();
+  const night = useNightRoutine();
 
   async function request(id: PermissionId) {
     if (id === 'alarms') {
@@ -58,6 +61,15 @@ export default function PermissionsScreen() {
           onOpenSettings={() => void systemPermissions.openSettings()}
         />
       ))}
+      {/* Screen Time is Apple's Family Controls authorization, not a phone permission: its own page. */}
+      <Section footer="Used only to restrict the apps you choose during your Night Routine. Asked for only when you set that up.">
+        <ListRow
+          icon={{ ios: 'hourglass', android: 'hourglass_empty', web: 'hourglass_empty' }}
+          title="Screen Time access"
+          value={AUTHORIZATION_INFO[night.authorization].label}
+          href="/settings/screen-time"
+        />
+      </Section>
     </Screen>
   );
 }

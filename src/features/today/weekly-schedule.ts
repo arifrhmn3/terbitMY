@@ -2,6 +2,8 @@ import type { Alarm, AlarmMission, CompletionMode, Weekday } from '@/features/al
 import { DAY_NAME, isActiveAlarm, mainWakeUpIdForDate, ringsOnDate } from '@/features/alarms/main-wake-up';
 import { isOneOff } from '@/features/alarms/morning';
 import type { AlarmOccurrence } from '@/features/alarms/occurrence';
+import type { NightRoutine } from '@/features/night/night-routine';
+import { appliesOnEvening, nightWindow } from '@/features/night/night-timeline';
 import { localDayKey, type DayKey } from '@/features/progress/day';
 
 /**
@@ -30,12 +32,22 @@ export type WeeklyItem = {
 export type WeeklySectionId = 'all';
 export type WeeklySection = { id: WeeklySectionId; title: string | null; items: WeeklyItem[] };
 
+/** That evening's Night Routine, in one line (never repeated per alarm). */
+export type WeeklyNight = {
+  windDownAt: number;
+  bedtimeAt: number;
+  /** Null when no apps are restricted. */
+  restrictions: { from: number; until: number } | null;
+};
+
 export type WeeklyDay = {
   date: DayKey;
   weekday: Weekday;
   /** "Today", "Tomorrow", or the weekday name. */
   title: string;
   sections: WeeklySection[];
+  /** The Night Routine starting that evening, or null. */
+  night: WeeklyNight | null;
 };
 
 /** Which section an alarm belongs to (one for now; see above). */
@@ -48,9 +60,11 @@ export function buildWeeklySchedule(params: {
   now: number;
   /** Today's recorded mornings: a one-off Main Wake-Up that already rang still owns today. */
   occurrences?: readonly AlarmOccurrence[];
+  /** The Night Routine, if any (shown once per evening it applies to). */
+  night?: NightRoutine | null;
   days?: number;
 }): WeeklyDay[] {
-  const { alarms, now, occurrences = [], days = 7 } = params;
+  const { alarms, now, occurrences = [], night = null, days = 7 } = params;
   const start = new Date(now);
   const active = alarms.filter((a) => isActiveAlarm(a, now));
   const result: WeeklyDay[] = [];
@@ -90,7 +104,16 @@ export function buildWeeklySchedule(params: {
       weekday,
       title: offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : DAY_NAME[weekday],
       sections,
+      night: night && appliesOnEvening(night, date) ? weeklyNight(nightWindow(night, alarms, date.getTime())) : null,
     });
   }
   return result;
+}
+
+function weeklyNight(w: ReturnType<typeof nightWindow>): WeeklyNight {
+  return {
+    windDownAt: w.windDownAt,
+    bedtimeAt: w.bedtimeAt,
+    restrictions: w.restricts ? { from: w.restrictionStartAt, until: w.restrictionEndAt } : null,
+  };
 }

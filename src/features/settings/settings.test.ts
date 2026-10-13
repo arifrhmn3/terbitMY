@@ -29,8 +29,9 @@ describe('Settings index', () => {
     expect(new Set(allRows.map((r) => r.title)).size).toBe(allRows.length);
   });
 
-  it('is grouped Account → Alarms & missions → Notifications → Accessibility → Privacy & data → Developer', () => {
-    expect(SETTINGS_GROUPS.map((g) => g.id)).toEqual(['account', 'alarms_missions', 'notifications', 'accessibility', 'privacy', 'developer']);
+  it('is grouped Account → Alarms & missions → Night & Screen Time → Notifications → Accessibility → Privacy & data → Developer', () => {
+    expect(SETTINGS_GROUPS.map((g) => g.id)).toEqual(['account', 'alarms_missions', 'night', 'notifications', 'accessibility', 'privacy', 'developer']);
+    expect(allRows.find((r) => r.page === 'screen-time')?.href).toBe('/settings/screen-time');
     expect(allRows.find((r) => r.page === 'account')?.href).toBe('/settings/account');
     expect(allRows.find((r) => r.page === 'faith')?.href).toBe('/settings/faith');
   });

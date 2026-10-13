@@ -17,7 +17,9 @@ import { plural } from '@/features/progress/format';
 import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { describeScheduleItem, TODAY_STATUS_LABEL } from '@/features/today/labels';
 import type { MorningStatus, TodayItem } from '@/features/today/today';
+import type { TonightView } from '@/features/today/tonight';
 import { useToday } from '@/features/today/use-today';
+import { describeRestriction, NIGHT_ACTIVITY_LABEL, NIGHT_ACTIVITY_ROUTE, tonightRow, tonightTitle } from '@/features/night/labels';
 import { getGreeting } from '@/lib/day-part';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -44,7 +46,7 @@ function whenText(at: number, now: Date): string {
  * Worked out from the saved alarms and today's mornings on this phone.
  */
 export default function TodayScreen() {
-  const { plan, snapshot } = useToday();
+  const { plan, snapshot, tonight } = useToday();
   const { value: access } = useAccessibilitySettings();
   const faith = useFaithSettings();
   const now = new Date();
@@ -59,6 +61,9 @@ export default function TodayScreen() {
         </ThemedText>
         <ThemedText type="title">{getGreeting(now)}</ThemedText>
       </View>
+
+      {/* During wind-down and the night, Tonight comes first. */}
+      {tonight?.kind === 'night' && tonight.prominent && <TonightSection view={tonight} />}
 
       {plan && <MorningCard morning={plan.morning} streak={snapshot?.streak ?? null} now={now} />}
 
@@ -93,6 +98,8 @@ export default function TodayScreen() {
           href="/today/week"
         />
       </Section>
+
+      {tonight && !(tonight.kind === 'night' && tonight.prominent) && <TonightSection view={tonight} />}
 
       <Section title="Daily practice">
         {tradition && (
@@ -206,6 +213,68 @@ function ScheduleRow({ item, profile }: { item: TodayItem; profile: MobilityProf
       subtitle={describeScheduleItem(item, profile)}
       href={href}
     />
+  );
+}
+
+/**
+ * Tonight (Night Routine): a short plan, not settings. Tapping opens the
+ * Night Routine; during wind-down the calming activity is offered.
+ */
+function TonightSection({ view }: { view: TonightView }) {
+  if (view.kind === 'no_routine') {
+    return (
+      <Section title="Tonight">
+        <ListRow
+          icon={{ ios: 'moon.stars', android: 'bedtime', web: 'bedtime' }}
+          title="Set up a Night Routine"
+          subtitle="Restrict distracting apps from wind-down, wake with your Main Wake-Up"
+          href="/alarms/night"
+        />
+      </Section>
+    );
+  }
+  if (view.kind === 'not_tonight') {
+    return (
+      <Section title="Tonight">
+        <ListRow
+          icon={{ ios: 'moon', android: 'bedtime', web: 'bedtime' }}
+          title="No Night Routine tonight"
+          subtitle={view.nextWindDownAt ? `Next wind-down: ${new Date(view.nextWindDownAt).toLocaleDateString(undefined, { weekday: 'long' })}` : undefined}
+          href="/alarms/night"
+        />
+      </Section>
+    );
+  }
+  const status = describeRestriction(view.restriction);
+  return (
+    <Section title={tonightTitle(view.restriction, view.phase)} footer={status ?? undefined}>
+      {view.items.map((item) => {
+        const row = tonightRow(item);
+        return (
+          <ListRow
+            key={item.kind}
+            icon={
+              item.kind === 'main_wake_up' || item.kind === 'no_main_wake_up'
+                ? { ios: 'sunrise', android: 'wb_twilight', web: 'wb_twilight' }
+                : item.kind === 'restrictions_end' || (item.kind === 'wind_down' && item.restrictsApps)
+                  ? { ios: 'hourglass', android: 'hourglass_empty', web: 'hourglass_empty' }
+                  : { ios: 'moon', android: 'bedtime', web: 'bedtime' }
+            }
+            title={row.time}
+            subtitle={row.title}
+            href={item.kind === 'main_wake_up' ? { pathname: '/today/alarm/[id]', params: { id: item.alarmId } } : '/alarms/night'}
+          />
+        );
+      })}
+      {view.activity && (
+        <ListRow
+          icon={{ ios: 'leaf', android: 'spa', web: 'spa' }}
+          title={`Wind down: ${NIGHT_ACTIVITY_LABEL[view.activity]}`}
+          subtitle="Optional · no XP"
+          href={{ pathname: '/alarms/practice', params: NIGHT_ACTIVITY_ROUTE[view.activity] }}
+        />
+      )}
+    </Section>
   );
 }
 

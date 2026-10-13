@@ -13,6 +13,13 @@ import type { AlarmOccurrence } from '@/features/alarms/occurrence';
 import { useAccessibilitySettings } from '@/features/settings/use-preferences';
 import { describeScheduleItem } from '@/features/today/labels';
 import { buildWeeklySchedule } from '@/features/today/weekly-schedule';
+import { weeklyNightSummary } from '@/features/night/labels';
+import { useNightRoutine } from '@/features/night/night';
+
+const clock = (at: number) => {
+  const d = new Date(at);
+  return formatAlarmTime({ hour: d.getHours(), minute: d.getMinutes() });
+};
 
 /**
  * The next seven days of ACTIVE alarms (deleted, turned-off and already-rung
@@ -21,6 +28,7 @@ import { buildWeeklySchedule } from '@/features/today/weekly-schedule';
  */
 export default function WeeklyScheduleScreen() {
   const { status, alarms } = useAlarms();
+  const night = useNightRoutine();
   const { value: access } = useAccessibilitySettings();
   const [today, setToday] = useState<AlarmOccurrence[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -37,7 +45,7 @@ export default function WeeklyScheduleScreen() {
     }, []),
   );
 
-  const days = status === 'ready' ? buildWeeklySchedule({ alarms, now, occurrences: today }) : [];
+  const days = status === 'ready' ? buildWeeklySchedule({ alarms, now, occurrences: today, night: night.routine }) : [];
 
   return (
     <Screen>
@@ -63,6 +71,14 @@ export default function WeeklyScheduleScreen() {
                 href={{ pathname: '/today/alarm/[id]', params: { id: item.alarmId } }}
               />
             )),
+          )}
+          {day.night && (
+            <ListRow
+              icon={{ ios: 'moon.stars', android: 'bedtime', web: 'bedtime' }}
+              title={`${clock(day.night.windDownAt)} · Night Routine`}
+              subtitle={weeklyNightSummary(day.night)}
+              href="/alarms/night"
+            />
           )}
         </Section>
       ))}
