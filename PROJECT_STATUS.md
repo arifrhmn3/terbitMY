@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 14 October 2026 (Phase 5B Circles Foundation complete and merged)_
+_Last updated: 14 October 2026 (Phase 6A Personalisation & Onboarding complete, physically verified on iPhone and merged into `main`)_
 
 ## Current phase
 
@@ -17,6 +17,8 @@ _Last updated: 14 October 2026 (Phase 5B Circles Foundation complete and merged)
 **Phase 5A (Live Accounts & Sync Verification) is complete on the repository side and merged into `main` (13 Oct 2026). Live email sign-in testing is intentionally deferred to beta, because the public name and domain aren't chosen yet (see "Beta requirements").**
 
 **Phase 5B (Circles Foundation) is complete and merged into `main` (14 Oct 2026).** Private, invite-only Circles: a separate shareable display name, create, join by code, member list, leave, rename, delete, owner/member roles, RLS. Membership only: no feed, check-ins, reactions or notifications (5C/5D). The migration is live, and both live SQL checks pass ("All Circles security checks passed", "ALL CHECKS MATCH THE REPOSITORY"). The signed-out Circles state is verified on iPhone. Live sign-in and signed-in Circles testing stay deferred to beta (owner decision; "Beta requirements" → item 8).
+
+**Phase 6A (Personalisation & Onboarding) is complete, physically verified on iPhone and merged into `main` (14 Oct 2026)** from `phase-6/personalisation-onboarding`. Phases 5C/5D and the rest of Phase 6 (6B onwards) are not started; **6B UI/UX Design Review is next.**
 
 ## Phase 2A: local Progress Engine
 
@@ -495,6 +497,92 @@ The Night Routine works in any build. App restrictions need the `development-scr
 - **Notifications:** Apple's Screen Time APIs (FamilyControls, ManagedSettings, DeviceActivity) give Terbit MY no way to silence, suppress or change other apps' notifications.
   - Shielded apps' notifications may be suppressed in practice, but Apple doesn't document it, so Terbit MY doesn't promise it.
   - For a quiet wind-down, Terbit MY recommends an iPhone Focus (e.g. Sleep). See docs/ARCHITECTURE.md.
+
+## Phase 6A: Personalisation & Onboarding
+
+Branch `phase-6/personalisation-onboarding`, merged into `main`. ✅ **Complete and physically verified on iPhone (14 Oct 2026).** Purpose: "Tell us what you want to achieve, and we'll build an accountability routine around you", not "set up another alarm clock". Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) → "Personalisation & onboarding"; screens: [docs/UX-INVENTORY.md](docs/UX-INVENTORY.md) → "Personalisation".
+
+| Item | Status |
+|---|---|
+| Seven steps in the fixed order (about you → goals → mode → time of day → wake-up + snooze → wind-down + bedtime → weekly routine), one full-screen modal `/personalise`, light progress bar | ✅ Unit-tested |
+| About you: gender (Woman / Man / Non-binary / Prefer not to say; changes nothing else), Faith (existing 6 choices, private), Mobility Profile (existing 3, plain language) | ✅ Unit-tested |
+| Goals per category ("What do you want Terbit to help you achieve?"), any category can be "Not now"; deterministic goal → existing mission policy, Easy; Fitness follows Mobility; Faith follows the preference (reflection language without a tradition) | ✅ Unit-tested |
+| Mode per goal, always Gentle → Reward → Challenge (now also in the alarm editor and Settings → Reminders); Challenge 🔒 when not in the plan (Terbit+ later; no purchase) | ✅ Unit-tested |
+| Morning / Afternoon / Night per goal; the first Morning goal is the Main Wake-Up mission, others are ordinary alarms after it; never an extra Main Wake-Up | ✅ Unit-tested |
+| Weekday + weekend Main Wake-Up (same / different / none), snooze 5/10/15 min × 1/2/3/5 (default 10 × 3) | ✅ Unit-tested, including the central resolver |
+| Wind-down and bedtime **targets** saved as personalisation info for everyone; a Night Routine is created or updated only with the explicit "Add / Update my Night Routine" switch (off by default; an existing routine is otherwise preserved). Targets and the Available Sleep Window show in the preview even without a Night Routine | ✅ Unit-tested |
+| Terbit+ readiness: every generated item is tagged with why it would need Terbit+ (Challenge, extra alarms beyond the one basic Main Wake-Up, Medium/Hard, premium content, Night Routine), driven by the access policy. Data only: no tags, limits or paywall shown in 6A | ✅ Unit-tested |
+| Review: "Your Terbit plan", weekly schedule grouped by days, "What will change", Use this routine / Adjust | ✅ Built |
+| Accepting writes real alarms and the Night Routine through the normal stores; reruns update the same alarms (no duplicate alarms, Main Wake-Ups, Night Routine or goal alarms); cancelling changes nothing | ✅ Unit-tested |
+| Existing installs never forced (classed once as "existing"); fresh installs offered once at launch; Settings → Personalise Terbit | ✅ Unit-tested |
+| Skip per step (warning once per step) and Close (skip everything), with safe defaults; the app is fully usable without it | ✅ Unit-tested |
+| Local-only, guest, offline; nothing new synced; nothing visible in Circles | ✅ Unit-tested (source checks) |
+
+**iPhone bug fixed before testing (14 Oct 2026): "Build my Terbit routine" opened a blank, untappable screen.** The screen's own code, data and stores were reproduced as working (rendered with the real stores, real SQLite and existing-user data in a real navigator: no errors). The one native difference was that `/personalise` was the only screen that switched ON a native header (with custom Close/Skip header buttons) inside a full-screen modal; the proven alarm modal has no native header. Fix: the modal now draws its own top bar (Close always, Skip on questions) inside the safe area, like the alarm screen; it has explicit loading ("Preparing your routine…") and error views (Start again / Close), an 8-second open limit, a route error boundary, a clean fallback when a saved session can't be read, and Close returns to where it was opened (Settings). Regression tests render the real screens (`personalise-screen.test.tsx`).
+
+**New storage (no SQL migration):** three JSON values in `app_settings`, phone only:
+- `personalisation.state`: audience (new/existing), status, auto-offered, completed at/version, generated alarm ids by slot;
+- `personalisation.profile`: gender, goals (goal, mode, part of day, time) and sleep targets (wind-down, bedtime);
+- `personalisation.draft`: the unfinished session (deleted when finished or closed).
+
+**Cloud:** nothing new. Gender, goals, sleep targets and personalisation state are never backed up. Faith keeps its existing private-profile backup when signed in. The Night Routine stays local-only. Alarms created by personalisation are ordinary alarms, so they're backed up like any alarm when signed in (unchanged behaviour).
+
+**Changes needing action:** none. No new packages, no native code, no migration: **the installed development build is enough** (JavaScript only).
+
+**Not in 6A:** Bahasa Melayu; Terbit+ purchase/paywall (Challenge, Night Routine and Medium/Hard difficulty are only *ready* for gating in 6E); full notifications; Terbitan; final visual redesign (6B UI Preview loop); Sleep Focus automation (still the documented future idea: recommend Sleep Focus at the same time as wind-down; later App Shortcuts help).
+
+**Decisions:**
+- Mode per goal (not one global mode), on one screen with a segmented control beside each goal, so it stays short.
+- Gender is a radio list, not a segmented control (four labels are too cramped on an iPhone).
+- Weekend "same time" makes one every-day Main Wake-Up; "different" makes two that never share a day; "no alarm" leaves weekends free.
+- Afternoon and Night goal alarms ring every day; fine-tuning is in the Alarms tab.
+- Sleep targets are separate from the Night Routine (planned Terbit+): continuing through the wind-down step saves targets only; the Night Routine changes only with the explicit switch.
+- Planned Free routine: Gentle/Reward, Easy, limited missions, one basic alarm (the weekday Main Wake-Up), no Night Routine. Terbit+: the full routine. 6A still generates and saves the full routine for everyone; three entitlement keys (`multiple_alarms`, `all_difficulties`, `night_routine`) were added for 6E, and nothing checks them yet.
+- If the launch check is slower than the usual wait, Today opens and the one-time offer isn't made (Settings still offers it).
+
+**Physical iPhone test passed (14 Oct 2026):** Settings → Personalise Terbit and "Build my Terbit routine" open correctly (no blank screen or navigation trap); the full flow About you → Goals → Modes → Morning/Afternoon/Night → Wake-up/Snooze → Sleep targets → Weekly schedule works; Gentle → Reward → Challenge order is correct; Skip and Close work; sleep targets stay separate from the Night Routine, which changes only when explicitly selected; the generated schedule is understandable and usable; existing alarms and configuration aren't silently overwritten; reruns update generated items without duplicates; the flow feels straightforward and not too long; existing app functionality is intact.
+
+**Preserved future items (not started):**
+- **Phase 6B: UI/UX Design Review** using the UI Preview iteration loop (next; screens listed in docs/UX-INVENTORY.md → "Phase 6B UI Preview: screens to review").
+- Bahasa Melayu / localisation.
+- Notifications, including the Gentle/Reward timing rules.
+- Terbitan: the midday Circle report.
+- Terbit+ entitlement and paywall implementation (6A's generated routine is already tagged for it).
+- Available Sleep Window / sleep-progress polish.
+- Beta infrastructure, and the deferred live account and Circles testing ("Beta requirements").
+- Production Faith content sources and APIs.
+- Islam Hadith mission.
+- Broader Education content expansion.
+- Daily Crossword.
+- Daily Book Recommendation / bite-size book summaries.
+- Progressive learning tracks.
+- Source-backed, current learning content.
+- Final release polish.
+- Deferred physical Chair Sit-to-Stand camera check (unit-tested; not in the Phase 4.5 physical run).
+
+### iPhone test plan (Phase 6A) ✅ passed 14 Oct 2026
+Use the existing development build (`npx expo start`, then open it in the Terbit MY dev build).
+1. **Existing install (your phone):** open the app. It must open Today as usual (no onboarding). Alarms, history, XP, streak and Night Routine are unchanged.
+2. Settings → Alarms & missions → **Personalise Terbit** → Build my Terbit routine.
+3. **About you:** prefilled with your current Faith and Mobility. Pick a gender. Continue.
+4. **Goals:** pick Education and Fitness; leave Faith on "Not now". Go Back, change Mobility, and check the Fitness options change.
+5. **Modes:** the order is Gentle, Reward, Challenge. On the Free plan, Challenge shows 🔒 and explains Terbit+. Set Education → Gentle, Fitness → Reward.
+6. **Times:** Fitness → Morning, Education → Afternoon; open the suggested time (12:30) and change it.
+7. **Skip test:** tap Skip on Wake-up → the warning appears → Continue setup. Tap Skip again → no warning (it skips).
+8. Go Back to **Wake-up:** weekdays 06:30, weekends Different 08:00, snooze 10 min × 3.
+9. **Wind-down:** 22:30 / 23:00. Try a wind-down after bedtime: Continue is blocked with a message. Leave **"Add a Night Routine"** (or "Update my Night Routine" if you have one) **off** for now.
+10. **Review:** Mon–Fri and Sat–Sun groups; the Main Wake-Up shows Fitness · Reward and "10 min snooze × 3"; Education every day; "Your sleep targets" with wind-down target, bedtime target, **Night Routine: Not included**, and the Available Sleep Window (Sun–Thu 7h 30m, Fri–Sat 9h). "What will change" has no Night Routine line. "What will change" lists what happens to your current Main Wake-Up(s).
+11. **Adjust** → Wake-up and snooze → change weekdays to 06:45 → "Back to my routine" → the review updates.
+12. **Interrupt:** force-close the app on the review, reopen, Settings → Personalise Terbit → "Continue where you left off" → same answers.
+13. **Use this routine** → confirm. Today shows the new alarms; the Alarms tab shows them as normal alarms; the weekly schedule shows one Main Wake-Up per day. **Alarms → Night Routine is exactly as before** (same times and apps; or still not set up).
+13a. **Night Routine opt-in:** Personalise again → on the wind-down step turn on "Update my Night Routine" (or "Add a Night Routine") → the review shows "Night Routine: Uses these times" and a Night Routine line under "What will change" → Use this routine → the Night Routine has the new wind-down and bedtime and keeps your chosen apps.
+13b. Personalise once more: the switch starts **off** again, and the wind-down/bedtime are prefilled from your saved targets.
+14. Let a Main Wake-Up ring (set it a few minutes ahead via Adjust): snooze works, the mission is Fitness, and XP and the morning streak work as before.
+15. **Rerun:** Personalise again with the same answers → Use this routine → no duplicate alarms. Then remove the Education goal → its alarm is removed; your own alarms stay.
+16. **Close:** start again, tap Close → warning → Skip personalisation → nothing changed.
+17. Circles (signed out) still shows the sign-in message; goals, gender and sleep appear nowhere in Circles.
+18. Optional fresh-install check (only on a spare device, or after deleting the app, which erases its data): the first launch opens personalisation once; Close → Today; relaunch → not shown again.
+
 
 ## Beta requirements (must be done before public beta)
 

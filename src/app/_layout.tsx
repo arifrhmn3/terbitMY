@@ -24,6 +24,8 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false, animation: screenAnimation(reduceMotion) }}>
         {/* The alarm screen covers everything and can't be swiped away. */}
         <Stack.Screen name="alarm/[occurrenceId]" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+        {/* Personalisation: closed only through Close (which explains what skipping means). */}
+        <Stack.Screen name="personalise" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack>
     </ThemeProvider>
   );

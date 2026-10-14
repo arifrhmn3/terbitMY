@@ -16,7 +16,11 @@ export type FeatureKey =
   | 'advanced_missions'
   | 'advanced_analytics'
   | 'social_share_templates'
-  | 'multiple_accountability_circles';
+  | 'multiple_accountability_circles'
+  // Prepared in 6A for the generated routine (nothing checks these yet; gating comes in 6E)
+  | 'multiple_alarms'
+  | 'all_difficulties'
+  | 'night_routine';
 
 export const FEATURE_KEYS: readonly FeatureKey[] = [
   'reward_mode',
@@ -30,6 +34,9 @@ export const FEATURE_KEYS: readonly FeatureKey[] = [
   'advanced_analytics',
   'social_share_templates',
   'multiple_accountability_circles',
+  'multiple_alarms',
+  'all_difficulties',
+  'night_routine',
 ];
 
 export const FEATURE_LABEL: Record<FeatureKey, string> = {
@@ -44,4 +51,7 @@ export const FEATURE_LABEL: Record<FeatureKey, string> = {
   advanced_analytics: 'Advanced analytics',
   social_share_templates: 'Branded share cards',
   multiple_accountability_circles: 'Multiple accountability circles',
+  multiple_alarms: 'More than one alarm in your routine',
+  all_difficulties: 'Medium and Hard missions',
+  night_routine: 'Night Routine',
 };

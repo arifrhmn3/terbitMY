@@ -2,7 +2,7 @@
 
 A map of every screen and journey, with known usability issues. **It isn't a redesign.** It's the input for the dedicated UX/UI architecture phase.
 
-Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase 4 (Night Routine and Screen Time)** are verified on iPhone. **Phase 5B (Circles Foundation)** is complete (14 Oct 2026): the signed-out state is verified on iPhone; the signed-in screens are tested in beta (owner decision). Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
+Status: 14 Oct 2026. **Phase 6A (Personalisation & onboarding)** is complete, physically verified on iPhone and merged into `main`; its screens are the first for the 6B UI Preview review. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase 4 (Night Routine and Screen Time)** are verified on iPhone. **Phase 5B (Circles Foundation)** is complete (14 Oct 2026): the signed-out state is verified on iPhone; the signed-in screens are tested in beta (owner decision). Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
 
 ## Tab roles
 
@@ -17,7 +17,7 @@ Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase
 ## Navigation map
 
 ```
-/ (launch)                          checks for a rung alarm → alarm screen, else /today
+/ (launch)                          checks for a rung alarm → alarm screen; else (fresh install, once) /personalise; else /today
 ├─ (tabs)
 │  ├─ today/                         Today: morning status, next alarm, today's schedule, daily practice, snapshot
 │  │   └─ alarm/[id]                 edit an alarm from Today (stays in Today)
@@ -36,8 +36,9 @@ Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase
 │  │   └─ name                       your name in Circles
 │  ├─ progress/                      Progress
 │  │   └─ history                    Recent mornings
-│  └─ settings/                      Settings index and sub-screens (Phase 3D)
+│  └─ settings/                      Settings index and sub-screens (Phase 3D); personalise → opens /personalise
 ├─ alarm/[occurrenceId]              alarm screen (full-screen modal): alarm → mission → result
+├─ personalise                       "Build my Terbit routine" (full-screen modal, Phase 6A)
 └─ alarm-fired                       Android hand-off link (not used on iOS)
 ```
 
@@ -152,10 +153,16 @@ Same screen and data as before (a navigation move, not a data migration). It's r
 - **Known gaps (later):** no ownership transfer or member removal; no deep-link invite; no avatar; Circles have no activity yet (5C).
 
 ### Settings (Phase 3D)
-- **Index groups:** Account; Alarms & missions (Faith); Notifications (Reminders); Accessibility; Privacy & data (Permissions, Your data); Developer (development builds only); About.
+- **Index groups:** Account; Alarms & missions (Personalise Terbit, Faith); Notifications (Reminders); Accessibility; Privacy & data (Permissions, Your data); Developer (development builds only); About.
 - **Remaining:**
   - "Alarms & missions" has only Faith. Alarm defaults are a central policy, not a user setting.
   - Single-row groups make the index longer than its content.
+
+### Personalisation (`personalise`, Phase 6A) ✅ verified on iPhone
+- **Seven short steps, fixed order:** About you (gender, Faith, Mobility) → Your goals (one per category or "Not now") → How should Terbit keep you accountable? (the three modes explained, then Gentle / Reward / Challenge beside each goal) → When should Terbit hold you to it? (Morning / Afternoon / Night per goal; suggested or exact time) → Your wake-up (weekday time; weekends same / different / no alarm; snooze on/off, 5/10/15 min, 1/2/3/5×) → Your wind-down (wind-down target, bedtime target, and an optional "Add a Night Routine" / "Update my Night Routine" switch, off by default) → Your Terbit routine.
+- **Top bar (drawn by the screen, no native header, like the alarm screen):** Close (leave personalisation, with a warning; always present, also while loading or after an error) and Skip (this step; warned once per step). Loading and error views never leave the screen blank. A thin progress bar, no step counter. Continue / Back at the bottom; from Adjust, Continue reads "Back to my routine".
+- **Review:** "Your Terbit plan" (goal · mode · part of day), the week grouped by identical days (e.g. Mon–Fri, Sat–Sun), "Your sleep targets" (wind-down target, bedtime target, Night Routine: Uses these times / Not included, Available Sleep Window), "What will change" for anyone with an existing setup, then **Use this routine** (primary) / **Adjust** (secondary, opens one section).
+- **Settings → Personalise Terbit:** status, Build / Continue / Personalise again, privacy note.
 
 ## Core journeys
 
@@ -179,6 +186,9 @@ Settings → Faith (preference); Today → today's Recitation / Reflection; Alar
 
 **Remaining:** Faith content still lives in the Alarms stack, and the archive is deep.
 
+### F. Personalise: answers → proposed weekly routine → Use this routine 🟡
+Fresh install: offered once at launch (skippable). Existing install: Settings → Personalise Terbit. Nothing changes until "Use this routine"; reruns update the same alarms.
+
 ### E. Account: guest → optional sign-in → sync
 Settings → Account & backup → email code → signed in.
 - **Guest:** "Continue without an account" (everything works on the phone), then "Sign in / Create account (optional)": email → "Email me a code" → 6-digit code → Sign in.
@@ -187,7 +197,6 @@ Settings → Account & backup → email code → signed in.
 - **Not yet verified live (beta):** real email delivery, branded email and real-iPhone sign-in wait for the final name and domain (PROJECT_STATUS.md → Beta requirements). The signed-in screens are unit-tested only.
 
 **Remaining:**
-- No onboarding yet (Phase 6).
 - Sign-in is only discoverable from Settings.
 - Restore to a new phone isn't built.
 
@@ -266,8 +275,20 @@ Settings → Account & backup → email code → signed in.
   - *Trade-off:* deliberate (two steps, clearly worded) but never punitive. There are no timers or penalties, and access can always be removed in iPhone Settings → Screen Time.
 - **Settings:** Night & Screen Time → Screen Time access (status, allow, recovery). Permissions links there; Your data explains it.
 
+## Phase 6B UI Preview: screens to review (from 6A)
+Built with the existing components only (Section, ListRow, ChoiceRow, TimeField, Button); no temporary styling to undo. For the design-review loop:
+1. **About you:** three radio lists on one screen is long; consider cards or a two-step reveal.
+2. **Your goals:** 3 × 4–5 options plus "Not now": consider compact chips and one category expanded at a time.
+3. **Modes:** the explanation card + one segmented control per goal; the 🔒 Challenge state and Terbit+ wording.
+4. **Times:** segmented Morning / Afternoon / Night, the suggested-time row and inline wheel.
+5. **Wake-up:** two wheels plus snooze controls on one screen.
+6. **Wind-down:** two wheels, the optional Night Routine switch, the Sleep Focus note.
+7. **Review:** the most important screen: weekly grouping, Main Wake-Up emphasis, Available Sleep Window, "What will change" wording, Use this routine / Adjust.
+8. **Progress bar and header buttons** (Close / Skip) and the Settings → Personalise Terbit screen.
+9. **First-launch moment:** whether a short welcome card should come before About you.
+10. **Terbit+ labels (for 6E):** where "Terbit+" should appear beside Challenge, extra alarms, Night Routine and premium content (the preview data already carries the reasons).
+
 ## Deferred to the UX/UI phase
-- **Onboarding and personalisation:** weekday and weekend wake times, snooze preference, Faith, Mobility Profile, Education and Fitness interests, accountability preferences.
 - **Routine selection:** Morning / Throughout the Day / Night in alarm creation.
 - **Final visual/UI redesign** and **final Faith content placement.**
 - **Non-physical activity naming:** these activities currently earn Fitness XP; a neutral name is still to be decided.
@@ -279,6 +300,5 @@ Settings → Account & backup → email code → signed in.
 - Final Faith content placement (Today, its own area, or a tab).
 - Final tab and navigation architecture (cross-tab links from Today).
 - Morning / Throughout the Day / Night routine selection (not built in Phase 4, which added the Night Routine only; the creation flow is ready for it).
-- Onboarding (Phase 6), including the Mobility Profile question (`MOBILITY_PROFILE_OPTIONS`).
 - The final visual system: a timeline on Today, visual mission pickers, Progress hierarchy, result styling.
 - Naming and category for non-physical activities. They earn Fitness XP so accessibility isn't penalised; a neutral name such as "Wellbeing", or a separate discipline, is still to decide.
