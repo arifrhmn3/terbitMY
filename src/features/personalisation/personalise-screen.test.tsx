@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- the app is loaded fresh for every test (jest.resetModules), so modules are required inside the tests. */
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ComponentType } from 'react';
@@ -46,7 +46,14 @@ type Mods = {
 };
 
 let mods: Mods;
-// Each test loads the real app modules fresh; on a cold Jest cache that alone can take longer than the 5 s default.
+// Each test loads the real app modules fresh. The first load compiles the whole app (about 20 s right after
+// npm ci, longer while other suites run), so it's done once here with its own limit; tests then load from Jest's cache.
+beforeAll(() => {
+  require('@/app/personalise');
+  require('@/app/(tabs)/settings/personalise');
+  require('expo-router/build/react-navigation/native');
+  require('expo-router/build/react-navigation/native-stack');
+}, 300_000);
 jest.setTimeout(30_000);
 
 let errors: string[];
