@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 13 October 2026 (Phase 4.5 complete)_
+_Last updated: 14 October 2026 (Phase 5B Circles Foundation complete and merged)_
 
 ## Current phase
 
@@ -14,7 +14,9 @@ _Last updated: 13 October 2026 (Phase 4.5 complete)_
 
 **Phase 4.5 (Camera-Verified Fitness Missions: push-ups, squats, jumping jacks, chair sit-to-stand) is complete, physically verified on iPhone in the `development-screen-time` build and merged into `main` (13 Oct 2026).**
 
-**Phase 5A (Live Accounts & Sync Verification) is complete on the repository side and merged into `main` (13 Oct 2026). Live email sign-in testing is intentionally deferred to beta, because the public name and domain aren't chosen yet (see "Beta requirements"). Circles has not started.**
+**Phase 5A (Live Accounts & Sync Verification) is complete on the repository side and merged into `main` (13 Oct 2026). Live email sign-in testing is intentionally deferred to beta, because the public name and domain aren't chosen yet (see "Beta requirements").**
+
+**Phase 5B (Circles Foundation) is complete and merged into `main` (14 Oct 2026).** Private, invite-only Circles: a separate shareable display name, create, join by code, member list, leave, rename, delete, owner/member roles, RLS. Membership only: no feed, check-ins, reactions or notifications (5C/5D). The migration is live, and both live SQL checks pass ("All Circles security checks passed", "ALL CHECKS MATCH THE REPOSITORY"). The signed-out Circles state is verified on iPhone. Live sign-in and signed-in Circles testing stay deferred to beta (owner decision; "Beta requirements" → item 8).
 
 ## Phase 2A: local Progress Engine
 
@@ -385,6 +387,40 @@ Branch `phase-5/accounts-live-verification`, merged into `main`. ✅ **Complete 
 
 **Known limits (documented, not in 5A):** restoring onto a new phone isn't built (backup only); a second account signing in on the same phone also receives this phone's data; custom SMTP and branded email wait for the final name and domain (beta).
 
+## Phase 5B: Circles Foundation
+
+Branch `phase-5/circles-foundation` (from `main` at `8ff1b5a`), merged into `main`. ✅ **Complete (14 Oct 2026):** the migration is live, both live SQL checks pass, and the signed-out state is verified on iPhone. Signed-in, account-dependent tests are deferred to beta by owner decision. Details: [docs/CLOUD.md](docs/CLOUD.md) → "Circles (Phase 5B)", [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) → "Circles".
+
+Scope: membership infrastructure only. **Not in 5B:** feed, check-ins, Main Wake-Up sharing, reactions (5C); push notifications (5D); chat, leaderboards, streak competitions, public discovery, contacts. Nothing about alarms, missions, XP, streaks, camera, Night Routine or Faith is shared.
+
+| Item | Status |
+|---|---|
+| Migration `supabase/migrations/20261013120000_circles_foundation.sql`: `circle_identities`, `circles`, `circle_members`, `circle_invites`, `circle_join_failures`; constraints, indexes, RLS, column-level grants, 5 client functions | ✅ Applied on the live project · live schema check `supabase/tests/circles_live_verify.sql`: **"ALL CHECKS MATCH THE REPOSITORY"** (14 Oct; 2B/5A tables, policies, functions and sign-up trigger unchanged) |
+| Shareable identity separate from the private profile (display name only; never `profiles`, Faith, time zone or email) | ✅ Unit-tested + SQL-checked |
+| Create (creator = the one owner row), multiple Circles, duplicate names allowed, rename, delete (dissolve) | ✅ Unit-tested + SQL-checked |
+| Join by 8-character invite code (40 random bits, 7-day expiry, one current code per Circle, new code replaces the old); preview shows the name only; joining twice is not a duplicate; 50-member cap | ✅ Unit-tested + SQL-checked |
+| Basic brute-force protection: 10 wrong codes per 15 minutes per user, then refused | ✅ SQL-checked |
+| Owner/member rules: members leave; the owner can't leave (deletes instead; transfer later) | ✅ Unit-tested + SQL-checked |
+| Security check `supabase/tests/circles_rls_check.sql`: signed out, non-member, member, owner, Faith privacy, cascades, with 3 throwaway users and no email; everything rolled back | ✅ Passes against a local Postgres (PGlite) with Supabase-like roles; 6 deliberately broken rules were each caught · ✅ **passes on the live project** ("All Circles security checks passed", 14 Oct) |
+| Circles tab: signed out, unavailable, loading, first-time name prompt, list, empty, offline, error; Create; Join; Detail (members, role, invite + share sheet, rename, delete, leave); edit name | ✅ Built · signed-out state ✅ verified on iPhone (14 Oct: sign-in message, link to Settings → Account; alarms, missions, Progress, Night Routine and camera verification unaffected); signed-in screens ⏸ beta |
+| Offline: last known list and members cached on the phone (cleared at sign-out); never fetched at start-up; alarms and everything else unaffected | ✅ Unit-tested |
+| Plain-language errors (developer builds add the technical detail in brackets) | ✅ Unit-tested |
+| Live account-dependent Circles tests (sign-in, create, join, members, leave/delete, offline cache, two accounts) | ⏸ Deferred to beta with the live-email checks (owner decision); the rules are covered now by unit tests and the SQL security check. List: "Beta requirements" → item 8 |
+
+**Closing 5B (owner decision, 14 Oct 2026): live email sign-in is NOT required.**
+- **Done before merge (14 Oct 2026):**
+  1. Migration applied to the live project: ✅
+  2. `supabase/tests/circles_rls_check.sql` on the live project: ✅ "All Circles security checks passed".
+  3. `supabase/tests/circles_live_verify.sql` (read-only) on the live project: ✅ "ALL CHECKS MATCH THE REPOSITORY". The migration is applied once and matches the repository; the 2B/5A tables, policies, functions and sign-up trigger are unchanged.
+  4. Anonymous access denied: ✅ live probe (every Circles and backup table and function).
+  5. Full repository checks: ✅ (`npm ci`, `npm run check`, Expo Doctor, iOS export).
+  6. iPhone, no account: ✅ Circles tab while signed out.
+- **Deferred to beta:** every live, account-dependent Circles test (Beta requirements → item 8).
+
+**Changes needing action:** none (the SQL setup is done; steps kept in [docs/CLOUD.md](docs/CLOUD.md) → "Circles (Phase 5B)" → Setup). No new packages and no native code: **the installed development build is enough** (JavaScript only). The share sheet uses React Native's built-in `Share`.
+
+**Decisions:** the owner can't leave a Circle (they delete it instead), because silently making someone else owner or deleting a group on "Leave" would surprise members; ownership transfer is a later addition. Deleting an account deletes the Circles it owns (database cascade). The Circles display name is separate from the private account display name and isn't copied from it.
+
 ## Phase 4: Bedtime & Restrictions (Night Routine)
 
 Branch `phase-4/bedtime-restrictions`, merged into `main`. ✅ **Complete and verified on iPhone (13 Oct 2026)** in the `development-screen-time` build. Verified on the iPhone:
@@ -470,6 +506,17 @@ The Night Routine works in any build. App restrictions need the `development-scr
   5. **Real iPhone sign-in with production-style email**, then the full account checklist: guest → account (existing alarms, history, XP, achievements appear once in the Table Editor), sync twice and restart (no duplicates), sign out (local data stays), sign back in (no duplicates), airplane mode → reconnect (Offline → Synced), delete account (cloud rows gone, local data kept).
   6. **Two-account live RLS check:** `supabase/tests/rls_check.sql` with two real accounts.
   7. **New-device / cloud restore**, once restore is built (the cloud is backup-only today).
+  8. **Circles, live and account-dependent (Phase 5B; deferred by owner decision, 14 Oct 2026).** The rules are already covered by unit tests and `supabase/tests/circles_rls_check.sql`; these are the end-to-end checks with real accounts:
+     1. live OTP delivery for both test accounts;
+     2. real iPhone sign-in with a real account;
+     3. setting a Circles display name through the live app;
+     4. creating, renaming and sharing a live Circle (you're the owner; invite code and expiry shown; Share invite; New code; Rename);
+     5. joining with an invite code on a second account (preview shows the name only; join; joining again makes no duplicate; wrong code → "That invite code isn't valid");
+     6. two accounts on two phones (or one phone, switching accounts);
+     7. live member-list privacy: both Circles names and the owner badge, and no email, Faith, time zone or progress;
+     8. leave (member) and delete (owner) flows, and the owner can't leave;
+     9. the authenticated offline Circles cache (Airplane mode: last list shown, actions say "You're offline");
+     10. the Circles cache cleared at sign-out.
   Steps and details: [docs/CLOUD.md](docs/CLOUD.md) → "Beta-stage verification".
 
 - **Faith Content Sources and Review Approval.** Choose trusted sources per tradition (with licences covering display, caching and offline fallback) and qualified reviewers; ship only `approved` content; remove all development fixtures. See [docs/FAITH-CONTENT.md](docs/FAITH-CONTENT.md).

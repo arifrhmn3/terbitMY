@@ -69,7 +69,7 @@ export default function AccountScreen() {
           </Section>
           {/* Keyed so the field resets when the saved name changes. */}
           <DisplayName key={profile?.displayName ?? ''} current={profile?.displayName ?? ''} />
-          <Section footer="Signing out keeps everything on this phone. Deleting your account removes your cloud backup and profile; this phone’s data stays unless you delete the app.">
+          <Section footer="Signing out keeps everything on this phone. Deleting your account removes your cloud backup, profile and Circles membership, and deletes the Circles you own; this phone’s data stays unless you delete the app.">
             <ListRow
               icon={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }}
               title="Sign out"
@@ -86,7 +86,7 @@ export default function AccountScreen() {
               onPress={() =>
                 Alert.alert(
                   'Delete your account?',
-                  'This permanently deletes your profile and cloud backup (alarms, history, XP, achievements). Data on this phone is kept.',
+                  'This permanently deletes your profile and cloud backup (alarms, history, XP, achievements), removes you from your Circles and deletes the Circles you own. Data on this phone is kept.',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
@@ -115,7 +115,7 @@ function DisplayName({ current }: { current: string }) {
   const [busy, setBusy] = useState(false);
 
   return (
-    <Section title="Display name" footer="Private for now. Shown to others only in future features you choose to use.">
+    <Section title="Display name" footer="Private: only you see it. Circles use a separate name you choose in Circles.">
       <TextInput
         value={name}
         onChangeText={setName}

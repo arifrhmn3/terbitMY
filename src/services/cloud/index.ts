@@ -5,6 +5,13 @@ import type { Cloud } from './types';
 export type {
   AuthEvent,
   AuthService,
+  CircleDetail,
+  CircleIdentity,
+  CircleInvite,
+  CircleMember,
+  CircleRole,
+  CirclesApi,
+  CircleSummary,
   Cloud,
   CloudAchievementRow,
   CloudAlarmRow,
