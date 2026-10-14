@@ -11,9 +11,9 @@ import { join } from 'node:path';
 const root = join(__dirname, '..', '..', '..');
 const file = readdirSync(join(root, 'supabase', 'migrations')).find((f) => f.endsWith('_circles_foundation.sql'))!;
 const raw = readFileSync(join(root, 'supabase', 'migrations', file), 'utf8');
-/** The SQL without comments (so comments may explain things freely). */
+/** The SQL without comments (so comments may explain things freely). Handles Windows (CRLF) checkouts too. */
 const sql = raw
-  .split('\n')
+  .split(/\r?\n/)
   .map((line) => line.replace(/--.*$/, ''))
   .join('\n')
   .toLowerCase();
@@ -28,7 +28,7 @@ describe('Circles schema (Phase 5B)', () => {
   it('keeps the shareable identity to an allow-list: user id, display name, timestamps', () => {
     const body = sql.split('create table public.circle_identities (')[1].split(');')[0];
     const columns = body
-      .split('\n')
+      .split(/\r?\n/)
       .map((l) => l.trim().match(/^(\w+)\s+(uuid|text|timestamptz)/)?.[1])
       .filter(Boolean);
     expect(columns).toEqual(['user_id', 'display_name', 'created_at', 'updated_at']);
@@ -107,7 +107,7 @@ describe('Circles schema (Phase 5B)', () => {
   it('the live verification script is read-only and was generated from this exact migration', () => {
     const verify = readFileSync(join(root, 'supabase', 'tests', 'circles_live_verify.sql'), 'utf8');
     const statements = verify
-      .split('\n')
+      .split(/\r?\n/)
       .map((line) => line.replace(/--.*$/, ''))
       .join('\n')
       .replace(/'[^']*'/g, "''") // quoted text such as privilege names isn't SQL
