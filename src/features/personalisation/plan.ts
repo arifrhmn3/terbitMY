@@ -32,7 +32,7 @@ import type { DayPart, PersonalisationAnswers, SleepAnswer } from './types';
  *    explicitly chose to add or update one.
  *
  * Which items need Terbit+ later is worked out separately from this output
- * (`plan-entitlements.ts`), so gating in 6E needs no change here.
+ * (`plan-entitlements.ts`), so gating in 6F needs no change here.
  */
 export const SCHEDULE_POLICY = {
   afternoonSuggestion: { hour: 12, minute: 30 } as ClockTime,

@@ -5,7 +5,7 @@ Phase 3C. This page covers the Recitation and Reflection / Meditation missions, 
 ## Faith preference (private)
 
 - Choices: Islam, Christianity, Buddhism, Hinduism, Non-religious / Guided Reflection, Prefer not to say. It can be left unset, which behaves like "Prefer not to say".
-- It's set in **Settings → Faith**, and works for guests: no account is needed. Onboarding will also ask for it later (Phase 6).
+- It's set in **Settings → Faith**, and works for guests: no account is needed. Personalisation (Phase 6A) also asks for it. Production sources and the Hadith mission are Phase 6D-A in docs/ROADMAP.md.
 - It's stored on the phone (`app_settings`, key `faith.settings`). If the user signs in, it's backed up to their **private** profile (`profiles.faith_preference`, owner-only RLS).
 - **Private.** It's never shown in Circles, to friends, on public profiles, in social features, or sent to analytics. `features/faith/privacy.ts` allow-lists the only profile fields that may ever be shared, and faith isn't one of them. Tests check this, and also check that the SQL has no public view or anonymous grant.
 - **Explore other faith traditions** (default OFF) is a separate setting. When it's on, the user can browse other traditions' Recitations. Browsing never changes their primary preference.

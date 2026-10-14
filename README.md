@@ -24,7 +24,7 @@ New to this? Start with **[docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)**.
 | [docs/PRD.md](docs/PRD.md) | Product requirements |
 | [docs/FEASIBILITY.md](docs/FEASIBILITY.md) | What iOS and Android allow (alarms, Screen Time, Play policy) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Project structure and technical design |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Build phases and what is needed from you in each |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | **The canonical roadmap:** phases, current status and what comes next |
 | [docs/DEV-BUILD.md](docs/DEV-BUILD.md) | Moving from Expo Go to a development build |
 
 ## Project layout

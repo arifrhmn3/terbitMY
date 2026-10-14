@@ -9,7 +9,7 @@ import type { PlannedAlarm, PlanSlot, RoutinePlan } from './plan';
 /**
  * TERBIT+ READINESS FOR GENERATED ROUTINES (planned packaging; nothing is
  * gated in 6A and there is no paywall). The generator always builds the
- * full routine; this file only says which parts would need Terbit+, so 6E
+ * full routine; this file only says which parts would need Terbit+, so 6F
  * can label or limit them without changing the schedule engine.
  *
  *   FREE:     Gentle and Reward · Easy · basic missions · ONE basic alarm
@@ -63,7 +63,7 @@ export function planPlusReasons(plan: RoutinePlan, policy: AccessPolicy = ACCESS
   return { alarms, night, free: night.length === 0 && Object.values(alarms).every((r) => r!.length === 0) };
 }
 
-/** The reasons this user doesn't have access to yet (what a 6E preview would mark "Terbit+"). */
+/** The reasons this user doesn't have access to yet (what a 6F preview would mark "Terbit+"). */
 export function lockedReasons(reasons: readonly PlusReason[], has: FeatureCheck): PlusReason[] {
   return reasons.filter((r) => !has(PLUS_FEATURE[r]));
 }

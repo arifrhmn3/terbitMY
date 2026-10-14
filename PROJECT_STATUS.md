@@ -1,10 +1,12 @@
 # Project Status
 
-_Last updated: 14 October 2026 (Phase 6A Personalisation & Onboarding complete, physically verified on iPhone and merged into `main`)_
+_Last updated: 14 October 2026 (roadmap realigned after Phase 6A; Phase 6B not started)_
+
+**The canonical roadmap is [docs/ROADMAP.md](docs/ROADMAP.md).** This file records results and test history; for what comes next and in what order, ROADMAP.md wins.
 
 ## Current phase
 
-**Phase 1 (iOS prototype) is closed: complete, physically verified on iPhone (11 October 2026) and merged into `main`.** Android work is deferred to the dedicated Android parity phase (see "Android status" below). See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Phase 1 (iOS prototype) is closed: complete, physically verified on iPhone (11 October 2026) and merged into `main`.** Android work is deferred to **Phase 7 (Android parity & Android beta)** (see "Android status" below). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 **Phase 2A (local Progress Engine) is complete and verified on iPhone. Phase 2B (Accounts & Cloud Foundation) is complete on the repository side (12 Oct 2026): the Supabase project, schema and RLS are live; live sign-in and cloud-sync testing are deferred to the beta stage (see "Deferred to beta" below).**
 
@@ -16,9 +18,9 @@ _Last updated: 14 October 2026 (Phase 6A Personalisation & Onboarding complete, 
 
 **Phase 5A (Live Accounts & Sync Verification) is complete on the repository side and merged into `main` (13 Oct 2026). Live email sign-in testing is intentionally deferred to beta, because the public name and domain aren't chosen yet (see "Beta requirements").**
 
-**Phase 5B (Circles Foundation) is complete and merged into `main` (14 Oct 2026).** Private, invite-only Circles: a separate shareable display name, create, join by code, member list, leave, rename, delete, owner/member roles, RLS. Membership only: no feed, check-ins, reactions or notifications (5C/5D). The migration is live, and both live SQL checks pass ("All Circles security checks passed", "ALL CHECKS MATCH THE REPOSITORY"). The signed-out Circles state is verified on iPhone. Live sign-in and signed-in Circles testing stay deferred to beta (owner decision; "Beta requirements" → item 8).
+**Phase 5B (Circles Foundation) is complete and merged into `main` (14 Oct 2026).** Private, invite-only Circles: a separate shareable display name, create, join by code, member list, leave, rename, delete, owner/member roles, RLS. Membership only: no feed, check-ins, reactions or notifications (the old 5C/5D plans are superseded and absorbed into Phase 6: Terbitan and notifications are 6E). The migration is live, and both live SQL checks pass ("All Circles security checks passed", "ALL CHECKS MATCH THE REPOSITORY"). The signed-out Circles state is verified on iPhone. Live sign-in and signed-in Circles testing stay deferred to beta (owner decision; "Beta requirements" → item 8).
 
-**Phase 6A (Personalisation & Onboarding) is complete, physically verified on iPhone and merged into `main` (14 Oct 2026)** from `phase-6/personalisation-onboarding`. Phases 5C/5D and the rest of Phase 6 (6B onwards) are not started; **6B UI/UX Design Review is next.**
+**Phase 6A (Personalisation & Onboarding) is complete, physically verified on iPhone and merged into `main` (14 Oct 2026)** from `phase-6/personalisation-onboarding`. **6B UI/UX Design Review is next and not started.** 6C–6I are not started; Phase 7 (Android parity & Android beta) is deferred until iOS beta / release-readiness is stable. The old 5C/5D plans are superseded (see docs/ROADMAP.md).
 
 ## Phase 2A: local Progress Engine
 
@@ -68,11 +70,11 @@ Provisional policy (all in `src/features/progress/policy.ts`): maths mission 10 
 | `AlarmService` interface (shared TypeScript; Swift and Kotlin behind it) | ✅ |
 | Alarm occurrences, duplicate protection | ✅ Unit-tested, including real SQLite |
 | Native alarm proof of concept (one-time test alarm) | ✅ Verified on iPhone and Android |
-| **Saved alarms scheduled natively** (create/edit → schedule, disable/delete → cancel, weekday repeats) | ✅ Verified on iPhone · Android: built + unit-tested, device test in the parity phase |
+| **Saved alarms scheduled natively** (create/edit → schedule, disable/delete → cancel, weekday repeats) | ✅ Verified on iPhone · Android: built + unit-tested, device test in Phase 7 |
 | **Genuine alarm → occurrence → configured mission → Recent mornings** | ✅ Verified on iPhone |
 | **Accountability modes per alarm:** Reward / Gentle / Challenge, with `evaluateMorning`, `isRewardEligible`, `isStreakEligible` | ✅ Verified on iPhone |
 | **One-tap "Stop & Open Terbit" / "Stop & Start Mission"** (iOS AlarmKit App Intents, per-mode icon) | ✅ Verified on iPhone. It opens straight into the configured mission **both when Terbit MY was closed and when it was in the background**. History: the button first didn't appear (fixed with the iOS 26.1 alert API); then it opened Today first (fixed with the native `onAlarmAction` event and the launch route); then it failed from the background (fixed: the Alarms tab `/alarms` was mistaken for the alarm screen, and navigation now waits until the app is active). |
-| **Gentle reminders** (iOS local notification, 5/10/15 min) | ✅ Verified on iPhone · Android: in the parity phase |
+| **Gentle reminders** (iOS local notification, 5/10/15 min) | ✅ Verified on iPhone · Android: in Phase 7 |
 | **Entitlement layer** (`isFeatureAvailable`, `useEntitlement`, `FeatureGate`; local mock only) | ✅ Verified on iPhone: Free / Trial / Premium states visible, and Challenge follows the provisional rules. See docs/MONETISATION.md |
 | Alarm sound catalog (basic/premium) and share-card architecture | ✅ Prepared (no library, no sharing UI) |
 | Simulated flow ("Simulate alarm now"), developer "Native alarm test", "Test plan (developer)" | ✅ Developer builds only (`__DEV__`); not shown in release builds |
@@ -83,7 +85,7 @@ Final checks (11 Oct): `npm run check` passes (lint, typecheck and 242 unit test
 - ✅ **Basic native alarm functionality was physically proven on Android** earlier in Phase 1 (milestone 1, on the owner's HONOR phone).
 - ⚠️ **Later Android-native changes have not all been recompiled.** The Kotlin code changed in `fc8a5a6` and `59f24b9`, after the last Android build that was installed. Shared TypeScript still typechecks, and the Android JavaScript bundle exports.
 - ⏸️ **Deferred on purpose:** Android compatibility, native compilation (EAS Android builds), physical testing and full feature parity. The priority is speed in finishing the iOS prototype, so phases no longer end with an Android build check.
-- ➡️ All of this is handled in the **dedicated Android parity phase (A)**, after the iOS prototype is feature-complete. Expect some Kotlin compile fixes there.
+- ➡️ All of this is handled in **Phase 7 (Android parity & Android beta)**, once iOS beta / release-readiness is stable. Expect some Kotlin compile fixes there.
 
 ### Accountability model (agreed product behaviour)
 
@@ -104,7 +106,7 @@ Outcomes kept separate:
 Rules live in `MODE_POLICIES` (`src/features/alarms/accountability.ts`), so beta behaviour can change without a database change. Phase 2 must use `isRewardEligible()` / `isStreakEligible()`.
 
 ### Development strategy: iOS-first prototype
-New features are built and tested on the physical iPhone first. Android stays supported: the Android code already written is kept, and shared logic stays platform-neutral. But new native features aren't duplicated in Kotlin until the behaviour is validated, and there's no Android build per feature or per phase. Android compilation, testing and parity all happen in a dedicated Android parity phase once the iOS prototype is feature-complete (policy updated 11 Oct 2026). See docs/ROADMAP.md.
+New features are built and tested on the physical iPhone first. Android stays supported: the Android code already written is kept, and shared logic stays platform-neutral. But new native features aren't duplicated in Kotlin until the behaviour is validated, and there's no Android build per feature or per phase. Android compilation, testing and parity all happen in Phase 7 (Android parity & Android beta), once iOS beta / release-readiness is stable (policy updated 11 Oct 2026; Phase 7 set 14 Oct 2026). See docs/ROADMAP.md.
 
 ### Beta product assumptions (provisional, not permanent)
 These are the current working assumptions for beta. They're deliberately configurable, so changing them doesn't need a database or screen change.
@@ -115,7 +117,7 @@ These are the current working assumptions for beta. They're deliberately configu
 | Reward | Free | `ACCESS_POLICY` → `FREEMIUM_POLICY` in `src/features/entitlements/policy.ts` |
 | Gentle | Free | same |
 | Challenge | Premium (falls back to Reward without access) | same |
-| Trial | Full access for the configured trial period (`trialDays`, currently 7) | same; Model B (`TRIAL_POLICY`, trial on first launch) is prepared |
+| Trial | Full access for the configured trial period (`trialDays`, currently 7) | same; Model B (`TRIAL_POLICY`, trial on first launch) is prepared. Intended direction (6F): a 3-day trial; see docs/ROADMAP.md |
 | Rewards and streaks | Only a completed mission qualifies, in every mode | `MODE_POLICIES` |
 | Completion window | Reward 2 hours after the alarm; Challenge 1 hour (both plus snooze time); Gentle until the end of that day. Gentle follow-up 5/10/15 minutes (separate) | `completion-policy.ts` |
 | Billing | **None.** No paywall or pricing. Entitlement is a local mock, switchable only in developer builds | `src/services/entitlements` |
@@ -284,7 +286,7 @@ Branch `phase-4.5/camera-fitness-verification`, merged into `main`. ✅ **Comple
 - **Start and guidance:** automatic Ready → countdown → Go (no tap); live positioning, movement and slow-down guidance.
 - **Supported:** push-ups, squats, jumping jacks, chair sit-to-stand.
 - **Future candidates:** wall push, step-out movement, walk in place, seated marching. Timed and static activities (stretches) and the whole Non-physical profile stay non-camera.
-- **Deferred:** the Android camera implementation (phase A) and any Challenge-mode camera requirement (future work).
+- **Deferred:** the Android camera implementation (Phase 7) and any Challenge-mode camera requirement (future work).
 
 **Verified on the iPhone:**
 - The camera permission flow works, and `TerbitPose` loads.
@@ -393,7 +395,7 @@ Branch `phase-5/accounts-live-verification`, merged into `main`. ✅ **Complete 
 
 Branch `phase-5/circles-foundation` (from `main` at `8ff1b5a`), merged into `main`. ✅ **Complete (14 Oct 2026):** the migration is live, both live SQL checks pass, and the signed-out state is verified on iPhone. Signed-in, account-dependent tests are deferred to beta by owner decision. Details: [docs/CLOUD.md](docs/CLOUD.md) → "Circles (Phase 5B)", [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) → "Circles".
 
-Scope: membership infrastructure only. **Not in 5B:** feed, check-ins, Main Wake-Up sharing, reactions (5C); push notifications (5D); chat, leaderboards, streak competitions, public discovery, contacts. Nothing about alarms, missions, XP, streaks, camera, Night Routine or Faith is shared.
+Scope: membership infrastructure only. **Not in 5B:** feed, check-ins, Main Wake-Up sharing, reactions (old 5C); push notifications (old 5D); both now superseded, see docs/ROADMAP.md; chat, leaderboards, streak competitions, public discovery, contacts. Nothing about alarms, missions, XP, streaks, camera, Night Routine or Faith is shared.
 
 | Item | Status |
 |---|---|
@@ -465,7 +467,7 @@ The Night Routine works in any build. App restrictions need the `development-scr
   - Only `development-screen-time` sets `TERBIT_SCREEN_TIME=1`. It adds the entitlement, the App Group and the extension.
   - The normal `development` profile is unchanged and has no Screen Time. Those builds report "Not in this build", and the Night Routine still works.
 - **Screen Time build:** `npx eas-cli@latest build --profile development-screen-time --platform ios`. The first build finished on 13 Oct 2026 and was used for the iPhone verification. EAS holds the credentials for both targets.
-- **Production / TestFlight** builds will also need the switch (a later step, before beta).
+- **Production / TestFlight** builds will also need the switch (Phase 6H, before beta).
 
 **Changes needing action:**
 - New native code: the TerbitScreenTime module is compiled into every build. The extension is added only in `development-screen-time` builds. **A new iOS development build is required** to get the module.
@@ -483,9 +485,9 @@ The Night Routine works in any build. App restrictions need the `development-scr
 - Sleep Focus setup helper via App Shortcuts / Shortcuts (the user sets it up once; Terbit MY never claims to turn on a Focus itself).
 - Available Sleep Window analytics (the helper exists; no charts or sleep scoring yet).
 - Possible Apple Health sleep integration (the only route to actual sleep data).
-- Onboarding and personalisation (Phase 6).
+- Onboarding and personalisation (done in Phase 6A).
 - More camera-verified activities (Phase 4.5 covers push-ups, squats, jumping jacks and chair sit-to-stand): wall push, step-out, walk in place, seated marching.
-- Android parity (phase A).
+- Android parity (Phase 7).
 - Final UI redesign.
 - Circles (Phase 5).
 
@@ -529,7 +531,7 @@ Branch `phase-6/personalisation-onboarding`, merged into `main`. ✅ **Complete 
 
 **Changes needing action:** none. No new packages, no native code, no migration: **the installed development build is enough** (JavaScript only).
 
-**Not in 6A:** Bahasa Melayu; Terbit+ purchase/paywall (Challenge, Night Routine and Medium/Hard difficulty are only *ready* for gating in 6E); full notifications; Terbitan; final visual redesign (6B UI Preview loop); Sleep Focus automation (still the documented future idea: recommend Sleep Focus at the same time as wind-down; later App Shortcuts help).
+**Not in 6A:** Bahasa Melayu; Terbit+ purchase/paywall (Challenge, Night Routine and Medium/Hard difficulty are only *ready* for gating in 6F); full notifications; Terbitan; final visual redesign (6B UI Preview loop); Sleep Focus automation (still the documented future idea: recommend Sleep Focus at the same time as wind-down; later App Shortcuts help).
 
 **Decisions:**
 - Mode per goal (not one global mode), on one screen with a segmented control beside each goal, so it stays short.
@@ -537,28 +539,21 @@ Branch `phase-6/personalisation-onboarding`, merged into `main`. ✅ **Complete 
 - Weekend "same time" makes one every-day Main Wake-Up; "different" makes two that never share a day; "no alarm" leaves weekends free.
 - Afternoon and Night goal alarms ring every day; fine-tuning is in the Alarms tab.
 - Sleep targets are separate from the Night Routine (planned Terbit+): continuing through the wind-down step saves targets only; the Night Routine changes only with the explicit switch.
-- Planned Free routine: Gentle/Reward, Easy, limited missions, one basic alarm (the weekday Main Wake-Up), no Night Routine. Terbit+: the full routine. 6A still generates and saves the full routine for everyone; three entitlement keys (`multiple_alarms`, `all_difficulties`, `night_routine`) were added for 6E, and nothing checks them yet.
+- Planned Free routine: Gentle/Reward, Easy, limited missions, one basic alarm (the weekday Main Wake-Up), no Night Routine. Terbit+: the full routine. 6A still generates and saves the full routine for everyone; three entitlement keys (`multiple_alarms`, `all_difficulties`, `night_routine`) were added for 6F (Terbit+), and nothing checks them yet.
 - If the launch check is slower than the usual wait, Today opens and the one-time offer isn't made (Settings still offers it).
 
 **Physical iPhone test passed (14 Oct 2026):** Settings → Personalise Terbit and "Build my Terbit routine" open correctly (no blank screen or navigation trap); the full flow About you → Goals → Modes → Morning/Afternoon/Night → Wake-up/Snooze → Sleep targets → Weekly schedule works; Gentle → Reward → Challenge order is correct; Skip and Close work; sleep targets stay separate from the Night Routine, which changes only when explicitly selected; the generated schedule is understandable and usable; existing alarms and configuration aren't silently overwritten; reruns update generated items without duplicates; the flow feels straightforward and not too long; existing app functionality is intact.
 
-**Preserved future items (not started):**
-- **Phase 6B: UI/UX Design Review** using the UI Preview iteration loop (next; screens listed in docs/UX-INVENTORY.md → "Phase 6B UI Preview: screens to review").
-- Bahasa Melayu / localisation.
-- Notifications, including the Gentle/Reward timing rules.
-- Terbitan: the midday Circle report.
-- Terbit+ entitlement and paywall implementation (6A's generated routine is already tagged for it).
-- Available Sleep Window / sleep-progress polish.
-- Beta infrastructure, and the deferred live account and Circles testing ("Beta requirements").
-- Production Faith content sources and APIs.
-- Islam Hadith mission.
-- Broader Education content expansion.
-- Daily Crossword.
-- Daily Book Recommendation / bite-size book summaries.
-- Progressive learning tracks.
-- Source-backed, current learning content.
-- Final release polish.
-- Deferred physical Chair Sit-to-Stand camera check (unit-tested; not in the Phase 4.5 physical run).
+**Preserved future items (not started).** Each now has a home in the canonical roadmap ([docs/ROADMAP.md](docs/ROADMAP.md)):
+- UI/UX Design Review with the UI Preview loop → **6B** (next).
+- Bahasa Melayu / localisation → **6C**.
+- Production Faith sources and APIs, Islam Hadith mission → **6D-A**.
+- Education expansion, Daily Crossword, Daily Book Recommendation, progressive learning tracks, source-backed current content → **6D-B**.
+- Notifications (Gentle/Reward timing rules) and Terbitan, the midday Circle report → **6E**.
+- Terbit+ entitlement and paywall (6A's generated routine is already tagged for it) → **6F**.
+- Available Sleep Window / sleep-progress polish → **6G**.
+- Beta infrastructure, deferred live account and Circles testing, physical Chair Sit-to-Stand check → **6H**.
+- Final release polish → **6I**.
 
 ### iPhone test plan (Phase 6A) ✅ passed 14 Oct 2026
 Use the existing development build (`npx expo start`, then open it in the Terbit MY dev build).

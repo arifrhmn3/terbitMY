@@ -18,7 +18,7 @@ export type PreviewItem = {
   detail: string;
   snooze: string | null;
   isMainWakeUp: boolean;
-  /** Why this item would need Terbit+ (data for 6E; not shown as a paywall in 6A). */
+  /** Why this item would need Terbit+ (data for 6F; not shown as a paywall in 6A). */
   plus: PlusReason[];
 };
 export type PreviewGroup = { days: string; items: PreviewItem[] };

@@ -74,6 +74,6 @@ This runs lint (code style), typecheck (catches type mistakes) and the unit test
 | Phase 1 | **Expo account**: https://expo.dev/signup | Free |
 | Phase 1 | **Apple Developer Program**: https://developer.apple.com/programs/ | US$99 / year |
 | Phase 2 | **Supabase**: https://supabase.com | Free tier |
-| Phase 6 | **Google Play Console**: https://play.google.com/console | US$25 once |
+| Phase 7 | **Google Play Console**: https://play.google.com/console | US$25 once |
 
 You won't need a Mac. EAS Build builds the iPhone version in the cloud.

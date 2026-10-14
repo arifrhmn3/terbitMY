@@ -34,7 +34,7 @@ Priority: **P0** is the minimum viable product, **P1** comes soon after launch, 
 | F3 | Fitness missions | P1 | Rep counting with the camera (pose detection on the device) plus a non-camera alternative (shake or step count) |
 | F4 | Faith missions | P1 | Read or recite a chosen passage, then a reflection prompt; content pack is downloaded once and kept offline; voice check is optional |
 | F5 | XP, streaks and ranks | P0 | Points for missions completed and bedtimes kept; streak freezes; rank ladder |
-| F6 | Private circles | P1 | Invite-only groups of 2–12 people; member chooses what to share; check-in feed; reactions |
+| F6 | Private circles | P1 | Invite-only groups of 2–12 people; member chooses what to share; a daily midday Circle report (Terbitan) instead of a real-time feed (see ROADMAP.md → 6E) |
 | F7 | Night-time app restrictions | P1 | Bedtime window that shields chosen apps (iOS Screen Time API; Android as feasibility allows) |
 | F8 | Bedtime routine and analytics | P1 | Wind-down checklist and reminders; weekly charts of bedtime and wake-up consistency |
 | F9 | Settings | P0 | Account, notifications, privacy and permissions, accessibility, data export and deletion |
@@ -48,9 +48,9 @@ Priority: **P0** is the minimum viable product, **P1** comes soon after launch, 
 - **Platforms:** iOS first (iOS 17+, with best alarm behaviour on iOS 26+); Android 10+.
 
 ## 7. Out of scope (for now)
-Wearables, smart-home integrations, a public social feed, paid subscriptions, a web app beyond a preview build.
+Wearables, smart-home integrations, a public or real-time social feed, a web app beyond a preview build. (Paid subscriptions are now planned as Terbit+, ROADMAP.md → 6F.)
 
 ## 8. Open questions
 1. Final name and bundle identifier. The placeholder is `com.terbitmy.app`; it must be fixed before the first store build.
 2. Faith content: which texts, which translations, and who reviews them.
-3. Monetisation, if any, after the MVP.
+3. Monetisation: direction set (Terbit+, ROADMAP.md → 6F); pricing and trial to be verified against App Store rules.
