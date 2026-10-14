@@ -46,6 +46,9 @@ type Mods = {
 };
 
 let mods: Mods;
+// Each test loads the real app modules fresh; on a cold Jest cache that alone can take longer than the 5 s default.
+jest.setTimeout(30_000);
+
 let errors: string[];
 const mounted: ReactTestRenderer[] = [];
 
