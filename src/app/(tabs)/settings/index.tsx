@@ -29,6 +29,7 @@ export default function SettingsScreen() {
         : status === 'loading'
           ? 'Loading…'
           : 'Using Terbit MY on this phone · optional sign-in',
+    personalise: 'Your goals, modes and a suggested routine',
     faith: `${faithSettings.primary ? FAITH_PREFERENCE_LABEL[faithSettings.primary] : 'Not chosen'} · Recitation and Reflection`,
     'screen-time': `For night app restrictions · ${AUTHORIZATION_INFO[night.authorization].label}`,
     notifications: 'Alarms, Gentle mode follow-ups and wind-down reminders',

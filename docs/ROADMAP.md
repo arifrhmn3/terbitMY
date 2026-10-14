@@ -17,4 +17,26 @@ Each phase ends with a working app, passing checks, and a Git commit or pull req
 | **5C. Check-ins & feed** | Opt-in check-ins ("completed my Main Wake-Up" and similar), a Circle feed, reactions, sharing controls | — |
 | **5D. Push notifications** | Circle notifications through a Supabase Edge Function | — |
 | **A. Android feature parity** *(after the iOS prototype is feature-complete)* | First an Android EAS build to recompile the Kotlin changed since Phase 1 milestone 1, plus compile fixes; then native Android implementations of features built iOS-first (behind the same service interfaces), Gentle reminders, Android-specific UX checks, physical-device test pass | A physical Android phone |
-| **6. Polish & release** *(includes the beta-stage account & email verification from 5A; see PROJECT_STATUS.md → Beta requirements)* | Bahasa Melayu localisation, onboarding, analytics review, store listings, privacy labels, Play declarations (exact alarm, full-screen intent), TestFlight & Play internal testing | Store accounts, screenshots approval; **Production Reflection Music Catalogue and Licensing Approval** and **Faith Content Sources and Review Approval** (before public beta) |
+| **6A. Personalisation & onboarding** ✅ *(complete, physically verified on iPhone and merged into `main`, 14 Oct 2026)* | "Build my Terbit routine": about you (gender, Faith, Mobility) → goals (Education, Fitness, Faith) → mode per goal (Gentle → Reward → Challenge) → Morning / Afternoon / Night → weekday/weekend Main Wake-Up + snooze → wind-down + bedtime → proposed weekly routine (Use this routine / Adjust). Deterministic goal → mission policy; real alarms and Night Routine through the normal stores; idempotent reruns; every step skippable; offered once on fresh installs, never forced on existing ones; Settings → Personalise Terbit; local-only answers. **Not in 6A:** Bahasa Melayu, Terbit+ purchase, notifications, final UI redesign (6B UI Preview loop) | — |
+| **6B. UI/UX Design Review** *(next)* | Design review of the app (starting with the 6A personalisation screens) using the UI Preview iteration loop; see UX-INVENTORY.md → "Phase 6B UI Preview: screens to review" | Design feedback on each preview round |
+| **6. Polish & release** *(includes the beta-stage account & email verification from 5A; see PROJECT_STATUS.md → Beta requirements)* | Bahasa Melayu localisation, onboarding visual polish (built in 6A), analytics review, store listings, privacy labels, Play declarations (exact alarm, full-screen intent), TestFlight & Play internal testing | Store accounts, screenshots approval; **Production Reflection Music Catalogue and Licensing Approval** and **Faith Content Sources and Review Approval** (before public beta) |
+
+## Preserved future items (after Phase 6A)
+
+Recorded at the close of 6A (14 Oct 2026); none are started.
+- **Phase 6B: UI/UX Design Review** using the UI Preview iteration loop (next; screens listed in docs/UX-INVENTORY.md → "Phase 6B UI Preview: screens to review").
+- Bahasa Melayu / localisation.
+- Notifications, including the Gentle/Reward timing rules.
+- Terbitan: the midday Circle report.
+- Terbit+ entitlement and paywall implementation (6A's generated routine is already tagged for it).
+- Available Sleep Window / sleep-progress polish.
+- Beta infrastructure, and the deferred live account and Circles testing ("Beta requirements").
+- Production Faith content sources and APIs.
+- Islam Hadith mission.
+- Broader Education content expansion.
+- Daily Crossword.
+- Daily Book Recommendation / bite-size book summaries.
+- Progressive learning tracks.
+- Source-backed, current learning content.
+- Final release polish.
+- Deferred physical Chair Sit-to-Stand camera check (unit-tested; not in the Phase 4.5 physical run).

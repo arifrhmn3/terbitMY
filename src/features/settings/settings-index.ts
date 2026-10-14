@@ -1,7 +1,7 @@
 import type { SymbolViewProps } from 'expo-symbols';
 
 /** Every Settings sub-screen. Each setting lives on exactly one of them. */
-export type SettingsPage = 'account' | 'faith' | 'screen-time' | 'notifications' | 'accessibility' | 'permissions' | 'privacy' | 'developer';
+export type SettingsPage = 'account' | 'personalise' | 'faith' | 'screen-time' | 'notifications' | 'accessibility' | 'permissions' | 'privacy' | 'developer';
 
 export type SettingsRow = {
   page: SettingsPage;
@@ -37,7 +37,10 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     id: 'alarms_missions',
     title: 'Alarms & missions',
     footer: 'Each alarm’s time, mission and mode are set on the alarm itself (Alarms tab).',
-    rows: [row('faith', 'Faith', { ios: 'book', android: 'menu_book', web: 'menu_book' })],
+    rows: [
+      row('personalise', 'Personalise Terbit', { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }),
+      row('faith', 'Faith', { ios: 'book', android: 'menu_book', web: 'menu_book' }),
+    ],
   },
   {
     id: 'night',

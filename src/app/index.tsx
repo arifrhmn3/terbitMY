@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { launchRoute } from '@/features/alarms/alarm-presenter';
 import { handOff } from '@/features/alarms/alarms';
 import { alarmPresenter, LAUNCH_WAIT_MS } from '@/features/alarms/use-alarm-handoff';
+import { personalisation } from '@/features/personalisation/personalisation';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -29,9 +30,12 @@ export default function Index() {
     handOff
       .sync()
       .catch(() => null)
-      .then((occurrence) => {
+      .then(async (occurrence) => {
         if (decided) return;
-        decide(launchRoute(alarmPresenter.takeForLaunch(occurrence)));
+        const route = launchRoute(alarmPresenter.takeForLaunch(occurrence));
+        // A fresh install is offered personalisation once (never after an alarm, never for existing installs).
+        const offer = route === '/today' && (await personalisation.takeAutoOffer().catch(() => false));
+        decide(offer ? '/personalise' : route);
       });
     return () => clearTimeout(timer);
   }, []);

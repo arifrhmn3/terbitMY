@@ -296,3 +296,47 @@ Circles screens (src/app/(tabs)/circles: index, create, join, [id], name)
 - **Owner/member.** The creator is the one owner (a partial unique index). Members can leave; the owner deletes the Circle instead (transfer later). Deleting an account deletes the Circles it owns.
 - **Local-first boundary.** The store follows the account but fetches only when a Circles screen is focused; start-up never imports Circles (tested). Failures affect Circles only. The last list and member names are cached in `app_settings` (`circles.cache`, per account), shown read-only offline, and removed at sign-out.
 - Schema, RLS and invite details: [CLOUD.md](CLOUD.md) → "Circles (Phase 5B)".
+
+## Personalisation & onboarding (Phase 6A)
+
+_Complete and physically verified on iPhone (14 Oct 2026). The `/personalise` modal draws its own top bar (no native header), like the alarm screen._
+
+"Tell us what you want to achieve, and we'll build an accountability routine around you." Personalisation turns a few answers into a **real** routine: ordinary saved alarms and the Night Routine, written through the normal stores. There is no separate onboarding-only schedule.
+
+```
+/personalise (full-screen modal, one route; steps are data)
+   └► features/personalisation
+        flow.ts        THE ORDER, progress, back/forward, skip (+ warn once), Adjust, resume
+        baseline.ts    prefill from the phone (Faith, Mobility, Main Wake-Ups via resolvedMainWakeUp, Night Routine) + skip defaults
+        recommend.ts   THE GOAL → MISSION POLICY (deterministic, existing catalogue only, Easy)
+        plan.ts        THE SCHEDULE GENERATOR (answers → alarm drafts + Night Routine times), pure
+        preview.ts     weekly preview (days grouped generically) + wind-down, bedtime, Available Sleep Window
+        apply.ts       "what will change" + accept through alarmStore / nightStore / Faith / Mobility (idempotent)
+        storage.ts     personalisation.state / .profile / .draft in app_settings (phone only)
+        personalisation-service.ts   new vs existing install, auto-offer once, begin/resume, review, accept, skip all
+```
+
+- **Order (fixed):** 1 About you (gender, Faith, Mobility) → 2 Goals (Education, Fitness, Faith) → 3 Accountability mode per goal → 4 Morning / Afternoon / Night per goal → 5 Wake-up (weekday, weekend) + snooze → 6 Wind-down + bedtime → 7 Review ("Your Terbit plan" + weekly schedule) → "Use this routine" / "Adjust". Steps 3–4 are hidden when no goal is chosen.
+- **Modes:** shown everywhere in the order Gentle → Reward → Challenge (`COMPLETION_MODES`; Reward stays the default). Explanations are built from `MODE_POLICIES` and `MISSION_WINDOW_MS`. Challenge is premium-capable: the entitlement layer decides (`isModeAvailable`); onboarding shows 🔒 and explains Terbit+ is coming, exactly like the alarm editor. No purchase flow.
+- **Day parts:** users see Morning / Afternoon / Night; internally the existing `RoutineContext` (`morning` / `day` / `night`).
+- **Recommendation policy** (`recommend.ts`, all Easy, 3 questions):
+
+  | Category | Goal → mission |
+  |---|---|
+  | Education | General knowledge → General Knowledge quiz · Know the world → Geography · Vocabulary → Vocabulary · Challenge my thinking → Logic · Mental maths → Maths |
+  | Fitness (Standard / Reduced mobility) | Move every day → Walk in place / Seated marching · More active → Jumping jacks / Step-out · Basic strength → Squats / Chair sit-to-stand · Loosen up → Stretch / Seated stretch |
+  | Wake-up activity (Non-physical) | Calm → Controlled breathing · Focus → Number focus · Release tension → Hold and release · Grounded → Grounding |
+  | Faith (with a tradition) | Recitation → Daily Recitation · Reflection → Reflection · Both → Recitation + Reflection |
+  | Reflection (Non-religious / Prefer not to say / not chosen) | Daily reflection habit, Slow down → Reflection (no recitation or prayer wording) |
+
+  A goal that no longer fits the profile or faith falls back to that category's first option. Camera counting is mentioned only when the activity is camera-enabled (never Non-physical). The Mobility Profile never changes XP. Future (6E): Free = Easy only, applied by the entitlement layer, not here.
+- **Schedule generation** (`plan.ts`):
+  1. Main Wake-Up: Mon–Fri + Sat–Sun alarms, or one every-day alarm ("same time"), or weekdays only ("no alarm" at weekends). Days never overlap, so each date has at most one resolved Main Wake-Up. Only these carry the snooze answer.
+  2. The first Morning goal (Education → Fitness → Faith order) is the Main Wake-Up's mission and mode. Further Morning goals are ordinary alarms 15, 30… minutes later on the same days. No Morning goal: the Main Wake-Up has no mission.
+  3. Afternoon / Night goals: ordinary alarms every day, at the chosen time or the suggestion (Afternoon 12:30; Night 30 min before wind-down, 21:00 without one). Same-time clashes are spaced 15 minutes apart.
+  4. Sleep targets vs Night Routine: wind-down and bedtime are always saved as **personalisation targets** (`personalisation.profile.sleep`; the preview, the Available Sleep Window, the Night suggestion and future insights use them). They create or change a Night Routine **only** when the user turns on "Add a Night Routine" / "Update my Night Routine" (`answers.nightRoutine`, off at the start of every session). An existing routine is otherwise left exactly as it is; when updated, it keeps its apps, nights, end rule, activity and reminder.
+  5. **Terbit+ readiness** (`plan-entitlements.ts`, no gating in 6A): the generator always builds the full routine; `planPlusReasons` tags each item with why it would need Terbit+ — `challenge` (`challenge_mode`), `extra_alarm` (any alarm except `wake:weekday`, the one basic alarm; `multiple_alarms`), `difficulty` (Medium/Hard; `all_difficulties`), `premium_content` (any premium feature the alarm's mission or sound needs, via `requiredFeatures`), `night_routine` (`night_routine`). Whether each is premium comes from the access policy, so 6E can mark "Terbit+" or limit the Free routine (Gentle/Reward, Easy, one basic alarm, no Night Routine) without changing the engine. The preview items carry these reasons as data; 6A shows no Terbit+ tags or paywall (Challenge keeps its existing 🔒).
+- **Idempotent acceptance** (`apply.ts`): each generated alarm is remembered by its plan slot (`wake:weekday`, `wake:weekend`, `morning:<category>:<weekday|weekend>`, `goal:<category>`) → alarm id in `personalisation.state.generated`. A rerun updates those alarms in place, deletes generated alarms the new plan doesn't have (first, so the Main Wake-Up rule never trims Terbit's own alarms), and recreates any the user deleted. One Night Routine (`NIGHT_ROUTINE_ID`). The user's own alarms are untouched except for the existing Main Wake-Up replacement rule (`resolveMainWakeUpOverlaps`), which is shown under "What will change" and confirmed first. History, XP and streaks are never touched.
+- **New vs existing installs:** the first time state is read, an install with no alarms, no history and no Night Routine is `new` and is offered onboarding once at launch (only when no alarm is opening; recorded immediately, so it never nags). Anything else is `existing`: never forced; Settings → Personalise Terbit. If the launch check is slower than `LAUNCH_WAIT_MS`, Today opens and the offer isn't made (Settings still has it).
+- **Skip:** every step can be skipped; "Skip this step?" is asked once per step per session. Skipped values: no gender; Faith and Mobility unchanged; no goals; Reward; Morning; the current wake-up (or 06:30, 10 min × 3); no Night Routine change. Close = skip personalisation entirely (with its own warning); nothing changes.
+- **Privacy / storage:** local only, guest-friendly, no network. `personalisation.profile` holds the only new personal data: gender, goals (goal, mode, part, time) and sleep targets (wind-down, bedtime). Faith and Mobility stay in their own stores and are written there only on acceptance (Faith keeps its existing private-profile backup). `personalisation.state` (audience, status, version, generated ids) and `personalisation.draft` (resume) are phone-only. None of these are synced (the sync engine reads only Faith) or visible in Circles; tests check both.

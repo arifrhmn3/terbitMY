@@ -68,7 +68,8 @@ export type SnoozePreference = {
  * control works in every mode. See `src/features/alarms/accountability.ts`.
  */
 export type CompletionMode = 'reward' | 'challenge' | 'gentle';
-export const COMPLETION_MODES: readonly CompletionMode[] = ['reward', 'challenge', 'gentle'];
+/** Always shown in this order, everywhere in the app: Gentle → Reward → Challenge. (Reward stays the default.) */
+export const COMPLETION_MODES: readonly CompletionMode[] = ['gentle', 'reward', 'challenge'];
 
 /** Provisional beta values; changing them needs no database change (stored as a plain number). */
 export type GentleReminderMinutes = 5 | 10 | 15;
