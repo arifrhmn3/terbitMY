@@ -119,4 +119,76 @@ export class CloudError extends Error {
   }
 }
 
-export type Cloud = { auth: AuthService; store: CloudStore };
+// ── Circles (Phase 5B) ─────────────────────────────────────────────────────
+
+/**
+ * The SHAREABLE identity other Circle members see: a display name and
+ * nothing else. Separate from `CloudProfile`, which is private.
+ */
+export type CircleIdentity = { displayName: string };
+
+export type CircleRole = 'owner' | 'member';
+
+export type CircleSummary = {
+  id: string;
+  name: string;
+  /** The signed-in user's role in this Circle. */
+  role: CircleRole;
+  memberCount: number;
+};
+
+export type CircleMember = {
+  userId: string;
+  /** From the member's Circle identity; null if it couldn't be read. */
+  displayName: string | null;
+  role: CircleRole;
+  joinedAt: string;
+};
+
+export type CircleDetail = { circle: CircleSummary; members: CircleMember[] };
+
+export type CircleInvite = { code: string; expiresAt: string };
+
+export type SetIdentityResult = { status: 'saved'; displayName: string } | { status: 'invalid_name' };
+
+export type CreateCircleResult =
+  | { status: 'created'; circleId: string; invite: CircleInvite }
+  | { status: 'needs_name' | 'invalid_name' | 'limit_reached' };
+
+/** Before joining, only the Circle's name is revealed. */
+export type InvitePreview =
+  | { status: 'valid'; circleName: string; alreadyMember: boolean }
+  | { status: 'invalid' | 'rate_limited' };
+
+export type JoinCircleResult =
+  | { status: 'joined' | 'already_member'; circleId: string; circleName: string }
+  | { status: 'invalid' | 'rate_limited' | 'needs_name' | 'full' };
+
+/**
+ * Private, invite-only Circles. The server (Row Level Security + the Circle
+ * functions) decides what each user can see; the app never filters for
+ * privacy. Every call needs a signed-in user.
+ */
+export interface CirclesApi {
+  getMyIdentity(userId: string): Promise<CircleIdentity | null>;
+  setMyIdentity(displayName: string): Promise<SetIdentityResult>;
+  /** Only Circles the user belongs to. */
+  listCircles(userId: string): Promise<CircleSummary[]>;
+  /** Null when the user isn't a member (or it was dissolved). */
+  getCircle(userId: string, circleId: string): Promise<CircleDetail | null>;
+  /** The current code. Owner only; null for members. */
+  getInvite(circleId: string): Promise<CircleInvite | null>;
+  createCircle(name: string): Promise<CreateCircleResult>;
+  previewInvite(code: string): Promise<InvitePreview>;
+  joinByCode(code: string): Promise<JoinCircleResult>;
+  /** Owner only: replaces the code (the old one stops working). Null if not the owner. */
+  newInvite(circleId: string): Promise<CircleInvite | null>;
+  /** Owner only. False if nothing changed (not the owner, or gone). */
+  renameCircle(circleId: string, name: string): Promise<boolean>;
+  /** Members only (owners dissolve instead). False if nothing changed. */
+  leaveCircle(userId: string, circleId: string): Promise<boolean>;
+  /** Owner only: removes the Circle, its members and its invite. False if nothing changed. */
+  dissolveCircle(circleId: string): Promise<boolean>;
+}
+
+export type Cloud = { auth: AuthService; store: CloudStore; circles: CirclesApi };

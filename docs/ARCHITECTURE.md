@@ -277,4 +277,22 @@ Optional accounts (email one-time code) and a private Supabase **backup** of the
 - **Live verification:** deferred to beta by owner decision (domain, SMTP, branded templates, live OTP, real-iPhone sign-in, two-account RLS, restore). See PROJECT_STATUS.md → Beta requirements.
 - **Circles groundwork:** the user ID (`auth.users.id` = `profiles.id`) is stable. Shareable identity must be a separate allow-listed view or table, never `profiles` itself (it holds the private Faith preference).
 
-Planned later, with RLS and explicit opt-in sharing: `circles`, `circle_members`, `circle_checkins`. Membership is checked with RLS. Nothing private (alarms, mission history, streaks, XP, faith settings) is visible to other users unless the user explicitly shares it.
+## Circles (Phase 5B: membership foundation)
+
+Status: ✅ complete and merged (14 Oct 2026). The schema is live and checked against the repository (`supabase/tests/circles_live_verify.sql`); the RLS check passes on the live project. Signed-in, end-to-end tests are a beta requirement.
+
+Private, invite-only accountability groups. 5B is membership only; check-ins, feed and reactions (5C) and push notifications (5D) come later and must be explicit opt-in. Nothing private (alarms, mission history, streaks, XP, camera, Night Routine, Faith settings) is visible to other users.
+
+```
+Circles screens (src/app/(tabs)/circles: index, create, join, [id], name)
+   └► features/circles: circles-store (state, offline cache, outcomes in plain words)
+                         validation · messages · labels (pure, tested)
+         └► services/cloud CirclesApi (supabase-cloud.ts → tables under RLS + 5 functions)
+```
+
+- **Two identities, never mixed.** `profiles` (private, owner-only: account name, time zone, Faith preference) and `circle_identities` (shareable: display name only). Circles code and SQL never read `profiles`; tests check both.
+- **The server decides visibility** (RLS). Members see their Circles, those Circles' members and members' Circle names. Non-members and signed-out users see nothing; there's no directory.
+- **Writes go through narrow paths.** Create, join, preview and new invite are server functions. Rename, delete, leave and setting your own name use owner-only or self-only RLS, with column grants.
+- **Owner/member.** The creator is the one owner (a partial unique index). Members can leave; the owner deletes the Circle instead (transfer later). Deleting an account deletes the Circles it owns.
+- **Local-first boundary.** The store follows the account but fetches only when a Circles screen is focused; start-up never imports Circles (tested). Failures affect Circles only. The last list and member names are cached in `app_settings` (`circles.cache`, per account), shown read-only offline, and removed at sign-out.
+- Schema, RLS and invite details: [CLOUD.md](CLOUD.md) → "Circles (Phase 5B)".

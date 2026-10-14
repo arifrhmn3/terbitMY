@@ -108,6 +108,70 @@ services/cloud  AuthService + CloudStore interfaces
 - **Not ready for social use as-is:** `profiles` is owner-only and holds the PRIVATE `faith_preference`. Circles must add a **separate, allow-listed** shareable identity (minimum: a display name, already on the profile, exposed through a view or table that never includes `faith_preference`, `timezone` or `avatar_url` unless chosen). No usernames, bios, avatars or followers until Circles needs them.
 - **One person per phone:** if a different account signs in on the same phone, this phone's data is backed up to that account too (known limit above). Circles should show which account is signed in.
 
+## Circles (Phase 5B)
+
+Private, invite-only accountability groups. **5B is membership only:** no feed, check-ins, reactions (5C) or push notifications (5D), and no activity is shared. Migration: `supabase/migrations/20261013120000_circles_foundation.sql`. Security check: `supabase/tests/circles_rls_check.sql`.
+
+### Schema
+
+| Table | Key | Contents | Who can do what (RLS + grants) |
+|---|---|---|---|
+| `circle_identities` | `user_id` | `display_name` (1–40, trimmed, not unique), created/updated_at. **Nothing else.** | Read: yourself, and people you share a Circle with. Insert/update: your own row, `display_name` only (through `set_circle_identity`) |
+| `circles` | `id` (random uuid) | `name` (1–40, not unique), `owner_user_id`, created/updated_at | Read: members. Update `name` only: owner. Delete: owner. No client insert |
+| `circle_members` | (`circle_id`, `user_id`) | `role` (`owner` / `member`), joined_at | Read: members of that Circle. Delete: your own row if you're a `member`. No client insert or update |
+| `circle_invites` | `code` | one current code per Circle (`circle_id` unique), created_by, expires_at | Read: the Circle's owner. No client writes |
+| `circle_join_failures` | — | user_id, failed_at | No client access at all |
+
+- **Database-enforced rules:** one membership per person per Circle (primary key); exactly one owner per Circle (partial unique index); roles limited to owner/member; names checked (length, trimmed, no control characters); code format checked.
+- **Anonymous clients:** all privileges revoked on every Circles table and function.
+- **Supabase's default grants are removed first** (`revoke all … from public, anon, authenticated`), then exactly the operations above are granted back.
+
+### Shareable vs private identity
+- `profiles` is **private** (owner-only): account display name, time zone, the Faith preference. Circles never read it: no Circles SQL, policy, function or app code mentions it, and tests check this (`circles-schema.test.ts`, `circles.test.ts`, and the SQL check reads `pg_proc` / `pg_policies`).
+- `circle_identities` is the **only** thing other members see. It's chosen in Circles ("How should people in your Circles see you?"), not copied from the account, and editable in Circles → Your name in Circles.
+
+### Functions (all `set search_path = ''`, all check `auth.uid()`)
+
+| Function | Runs as | Does | Returns |
+|---|---|---|---|
+| `set_circle_identity(new_display_name)` | caller (RLS applies) | saves your name | `saved` / `invalid_name` |
+| `create_circle(circle_name)` | definer | Circle + owner row + first invite, together | `created` (id, code, expiry) / `needs_name` / `invalid_name` / `limit_reached` (20 owned) |
+| `preview_circle_invite(invite_code)` | definer | checks a code | `valid` + **the Circle name only** + `already_member` / `invalid` / `rate_limited` |
+| `join_circle_by_code(invite_code)` | definer | adds you as a member (locks the Circle row; `on conflict do nothing`) | `joined` / `already_member` (both with id and name) / `invalid` / `rate_limited` / `needs_name` / `full` (50) |
+| `new_circle_invite(target_circle)` | definer | owner only: replaces the code | `ok` (code, expiry) / `not_owner` |
+
+Two small definer helpers (`is_circle_member`, `shares_circle_with`) are used by the policies; they only answer yes/no about the caller. The internal helpers (code generation, normalising, issuing, rate limit) aren't callable by clients. Expected outcomes are returned as a status rather than raised as errors, so a wrong code is still recorded for the rate limit.
+
+### Invites
+- **Code:** 8 characters from Crockford base32 (`0-9 A-Z` without I, L, O, U), drawn from `gen_random_uuid()`'s strongly random bytes (the fixed UUID version/variant bytes are skipped): 40 bits, about 1.1 trillion codes. Never derived from the Circle id. Typed codes ignore case, spaces and dashes; O reads as 0, I/L as 1. Shown as `ABCD-EFGH`.
+- **Expiry:** 7 days. One current code per Circle; "New code" replaces it and the old one stops working at once. People already in the Circle stay.
+- **Brute force:** 10 wrong codes per user in 15 minutes, then preview and join are refused for that user. With 40-bit codes this makes guessing impractical. **Later hardening (not built):** per-IP limits through an Edge Function, and invite links (deep links) on top of the same codes.
+- **Before joining,** only the Circle's name is revealed (not members, owner or count).
+
+### Owner / member and leaving
+- The creator is the owner and a member (one row, role `owner`).
+- **Members** can leave; the Circle disappears from their list, and nothing on their phone changes.
+- **The owner can't leave**; they can **delete the Circle** (with confirmation), which removes all memberships and the invite through cascades. Chosen as the least surprising rule: "Leave" never silently deletes a group or hands it to someone. **Ownership transfer** and removing a member are later additions.
+- **Account deletion** (`delete_my_account`): the user's identity, memberships and failed attempts cascade; **Circles they own are deleted** (with their members and invites). Other users' accounts, profiles and identities are untouched. If transfer is added later, it can run before deletion.
+
+### In the app
+- `services/cloud` → `CirclesApi` (`supabase-cloud.ts`; `testing/memory-cloud.ts` mirrors the same rules for tests).
+- `features/circles/circles-store.ts` follows the account and fetches only when a Circles screen is focused. Nothing runs at start-up, and alarms, missions, XP, Night Routine and camera missions never wait for Circles.
+- **Offline:** the last list, your name and the member lists are cached on the phone (`app_settings` → `circles.cache`, for the signed-in account only) and shown read-only with an "Offline" banner. Actions say "You're offline. Try again when you're connected." **The cache is deleted at sign-out**, so other people's Circle names don't stay on a shared phone.
+- Errors are plain words; developer builds add the technical detail in brackets.
+
+### Setup (one time, about 5 minutes)
+1. Supabase → **SQL Editor** → **New query**.
+2. Open `supabase/migrations/20261013120000_circles_foundation.sql` in VS Code, select everything (Ctrl+A), copy, paste it into the query, and click **Run**. Expected: "Success. No rows returned".
+3. New query → paste the whole of `supabase/tests/circles_rls_check.sql` → **Run**. Expected last result: **"All Circles security checks passed"**. It uses three throwaway test users and rolls everything back, so nothing is kept and no email is needed. If it stops with `CHECK FAILED: …`, copy that line and send it to Claude.
+4. New query → paste the whole of `supabase/tests/circles_live_verify.sql` → **Run**. It's **read-only**. It compares the live database with the repository: the Circles tables, columns, RLS, policies, function code, privileges and indexes, and that the 2B/5A tables, policies, functions and sign-up trigger are unchanged. Expected last row: **"ALL CHECKS MATCH THE REPOSITORY"**. A `false` row names what differs.
+5. Nothing else: no new build, no new keys.
+
+**Status (14 Oct 2026): ✅ done on the live project.** Step 3 passed ("All Circles security checks passed") and step 4 passed ("ALL CHECKS MATCH THE REPOSITORY"). An anonymous probe with the public key also shows every Circles and 2B/5A table and function refusing anonymous access ("permission denied"; a made-up name gives "not found"). The SQL Editor doesn't record migration versions (`supabase_migrations` is used only by the Supabase CLI), so step 4 checks the schema itself instead. A migration can't be applied twice: its `create table` statements fail on a second run.
+
+### Rollback
+The end of the migration has a commented-out rollback block (drop the five functions, the five tables, then the helpers). It deletes every Circle. The earlier tables are unaffected either way, because nothing outside Circles references them.
+
 ## Account deletion
 
 `delete_my_account()` deletes the auth user. Every table references `auth.users … on delete cascade`, which removes:
@@ -116,6 +180,7 @@ services/cloud  AuthService + CloudStore interfaces
 - cloud occurrences;
 - the XP ledger;
 - achievements;
+- Circles data: the Circle identity, memberships and failed join attempts, and **the Circles the user owns** (with their members and invites);
 - any future social data (future tables **must** also cascade).
 
 Settings → Account → Delete account calls it, signs out, and **keeps the phone's data**. Deleting local data stays a separate, explicit choice (for now, by deleting the app).
@@ -140,6 +205,7 @@ Settings → Account → Delete account calls it, signs out, and **keeps the pho
 6. *(Before beta)* **Email delivery:** Supabase's built-in email sends only a few messages per hour, which is fine for testing. Set up custom SMTP (Authentication → Emails → SMTP Settings) before inviting testers.
 7. *(Optional)* **Check the security rules:** run `supabase/tests/rls_check.sql` after two test accounts exist.
 8. **Phase 3C (Faith):** SQL Editor → run `supabase/migrations/20261012120000_faith_preference_and_reflection_music.sql` (adds the PRIVATE `profiles.faith_preference` column and the public, read-only `reflection-music` Storage bucket). Then Storage → `reflection-music` → upload the three files in `supabase/storage/reflection-music/` (development placeholder music).
+9. **Phase 5B (Circles):** run the Circles migration, then the Circles security check and the live schema check. See "Circles (Phase 5B)" → Setup. ✅ Done on the live project (14 Oct 2026).
 
 For EAS cloud builds, add the same two variables as EAS environment variables (`EXPO_PUBLIC_…`). `.env.local` stays on your computer.
 
@@ -152,6 +218,8 @@ For EAS cloud builds, add the same two variables as EAS environment variables (`
 
 **Phase 5A (13 Oct 2026):** complete on the repository side. The architecture is unit-tested, and a live probe confirmed that anonymous access is refused and both migrations are applied.
 
+**Phase 5B (14 Oct 2026):** complete. The Circles migration is live; `circles_rls_check.sql` and `circles_live_verify.sql` both pass on the live project. Signed-in Circles testing is deferred to beta (item 8 below).
+
 **Beta-stage verification: deferred by owner decision (13 Oct 2026), required before beta.** Terbit MY is a working name, so no domain is bought and no custom email sender exists. Real email delivery and live sign-in testing wait until then. This was a deliberate choice, not a blocker. Before beta testers are invited, do all of these (the detailed steps follow):
 
 1. **Final name and domain** chosen and bought.
@@ -161,6 +229,19 @@ For EAS cloud builds, add the same two variables as EAS environment variables (`
 5. **Real iPhone sign-in with production-style email**, then the full account checklist: guest → account (existing alarms, history, XP, achievements appear once in the Table Editor), sync twice and restart (no duplicates), sign out (local data stays), sign back in (no duplicates), airplane mode → reconnect (Offline → Synced), delete account (cloud rows gone, local data kept).
 6. **Two-account live RLS check:** `supabase/tests/rls_check.sql` with two real accounts.
 7. **New-device / cloud restore**, once restore is built (the cloud is backup-only today).
+8. **Circles, live and account-dependent (Phase 5B; deferred by owner decision):**
+   - live OTP delivery for both test accounts;
+   - real iPhone sign-in with a real account;
+   - setting a Circles display name through the live app;
+   - creating, renaming and sharing a live Circle (you're the owner; invite code and expiry shown; Share invite; New code; Rename);
+   - joining with an invite code on a second account (preview shows the name only; join; joining again makes no duplicate; wrong code → "That invite code isn't valid");
+   - two accounts on two phones (or one phone, switching accounts);
+   - live member-list privacy: both Circles names and the owner badge, and no email, Faith, time zone or progress;
+   - leave (member) and delete (owner) flows, and the owner can't leave;
+   - the authenticated offline Circles cache (Airplane mode: last list shown, actions say "You're offline");
+   - the Circles cache cleared at sign-out.
+
+   Until then the rules are covered by unit tests and `supabase/tests/circles_rls_check.sql` (no email needed). Full list: PROJECT_STATUS.md → Beta requirements → item 8.
 
 Detailed steps:
 1. Set up a custom SMTP provider, a sender domain and a branded sender address (step 6 above). Confirm the email templates show the `{{ .Token }}` code.

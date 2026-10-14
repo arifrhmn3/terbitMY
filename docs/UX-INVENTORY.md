@@ -2,7 +2,7 @@
 
 A map of every screen and journey, with known usability issues. **It isn't a redesign.** It's the input for the dedicated UX/UI architecture phase.
 
-Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase 4 (Night Routine and Screen Time)** are verified on iPhone. Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
+Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase 4 (Night Routine and Screen Time)** are verified on iPhone. **Phase 5B (Circles Foundation)** is complete (14 Oct 2026): the signed-out state is verified on iPhone; the signed-in screens are tested in beta (owner decision). Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
 
 ## Tab roles
 
@@ -12,7 +12,7 @@ Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase
 | **Alarms** | What do I want Terbit to hold me accountable for? |
 | **Progress** | How am I doing over time? |
 | **Settings** | How should Terbit behave for me? |
-| Circles | (Placeholder, Phase 5) |
+| **Circles** | Who keeps me accountable? (Phase 5B: private groups and members only) |
 
 ## Navigation map
 
@@ -29,7 +29,11 @@ Status: 13 Oct 2026. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase
 │  │   ├─ missions                   Practice hub (same catalogues as creation)
 │  │   ├─ practice                   practise one mission (no XP)
 │  │   └─ faith/                     Faith hub: day (Daily Recitation), archive
-│  ├─ circles/                       Circles (placeholder, Phase 5)
+│  ├─ circles/                       Circles: signed-out state, name prompt, list, Create / Join
+│  │   ├─ create                     name a new Circle (you become the owner)
+│  │   ├─ join                       invite code → Circle name → Join
+│  │   ├─ [id]                       members, your role, invite (owner), rename / delete (owner), leave (member)
+│  │   └─ name                       your name in Circles
 │  ├─ progress/                      Progress
 │  │   └─ history                    Recent mornings
 │  └─ settings/                      Settings index and sub-screens (Phase 3D)
@@ -139,8 +143,13 @@ Same screen and data as before (a navigation move, not a data migration). It's r
 - **Shows:** mornings (streak, longest streak, successful mornings, Recent mornings), all alarms, XP by discipline, ranks, achievements, recent XP. The Sleep placeholder was removed.
 - **Remaining:** it's still a long list with no visual hierarchy or summary header.
 
-### Circles (`circles/index`)
-Placeholder rows (Phase 5).
+### Circles (Phase 5B, complete 14 Oct 2026; signed-out state verified on iPhone, signed-in screens in beta)
+- **Tab states:** unavailable (no cloud in this build) · signed out ("Sign in to create or join Circles." → Settings → Account; nothing else is blocked) · loading · first visit: "How should people in your Circles see you?" (Display name) · list (name, member count, "Owner") · empty ("No Circles yet") · offline (banner, last known list) · error (banner, Try again).
+- **Create:** Circle name (1–40 characters, duplicates allowed) → Creating… → the new Circle's detail screen; failures in plain words.
+- **Join:** invite code (ABCD-EFGH; case, spaces and dashes ignored) → Continue → "Join this Circle?" with the name only → Join / Open Circle (already a member) / Use a different code. Messages: invalid code, already a member, too many tries, full, offline.
+- **Detail:** name and member count, your role, members (Circle names only, "(you)", Owner). Owner: invite code + expiry, Share invite (share sheet), New code, Rename, Delete Circle (confirmation). Member: Leave Circle (confirmation). Offline: cached members with a "Not up to date" banner.
+- **Your name in Circles:** edit the shareable name (separate from the private account name in Settings → Account).
+- **Known gaps (later):** no ownership transfer or member removal; no deep-link invite; no avatar; Circles have no activity yet (5C).
 
 ### Settings (Phase 3D)
 - **Index groups:** Account; Alarms & missions (Faith); Notifications (Reminders); Accessibility; Privacy & data (Permissions, Your data); Developer (development builds only); About.
@@ -264,11 +273,11 @@ Settings → Account & backup → email code → signed in.
 - **Non-physical activity naming:** these activities currently earn Fitness XP; a neutral name is still to be decided.
 - **More camera-verified activities** (Phase 4.5 covers push-ups, squats, jumping jacks and chair sit-to-stand). Deferred for reliability testing: wall push, step-out movement, walk in place and seated marching (continuous-movement mode). Also a possible Challenge-mode rule (recommended / required / verified badge).
 - **Night Routine follow-ups:** a Sleep Focus setup helper (App Shortcuts / Shortcuts), Available Sleep Window analytics, possible Apple Health sleep integration (see "Night Routine" → Future).
-- **Android parity** (phase A) and **Circles** (Phase 5).
+- **Android parity** (phase A) and **Circles check-ins, feed and notifications** (Phases 5C/5D).
 - **Weekly schedule sections:** Morning / Throughout the Day / Night sections in the weekly view (the structure is ready; `sectionOf` in `weekly-schedule.ts`).
 - **Skipping one ring (AlarmKit limitation):** a one-off Main Wake-Up override doesn't silence the usual repeating alarm that date. AlarmKit can't skip a single day of a repeating alarm, so it still rings physically, but it isn't the Main Wake-Up and doesn't count as the morning. An option to silence it needs calendar-based scheduling later.
 - Final Faith content placement (Today, its own area, or a tab).
-- Final tab and navigation architecture (Circles placeholder, cross-tab links from Today).
+- Final tab and navigation architecture (cross-tab links from Today).
 - Morning / Throughout the Day / Night routine selection (not built in Phase 4, which added the Night Routine only; the creation flow is ready for it).
 - Onboarding (Phase 6), including the Mobility Profile question (`MOBILITY_PROFILE_OPTIONS`).
 - The final visual system: a timeline on Today, visual mission pickers, Progress hierarchy, result styling.

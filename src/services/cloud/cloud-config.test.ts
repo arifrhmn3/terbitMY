@@ -148,14 +148,23 @@ describe('Supabase schema (supabase/migrations)', () => {
     .join('\n')
     .toLowerCase();
   const tables = [...sql.matchAll(/create table public\.(\w+)/g)].map((m) => m[1]);
+  /** The private backup tables (Phase 2B): own rows only. Circles tables have their own rules (circles-schema.test.ts). */
+  const backupTables = tables.filter((t) => !t.startsWith('circle'));
 
   it('creates the expected private tables', () => {
-    expect(tables.sort()).toEqual(['achievements', 'alarm_occurrences', 'alarms', 'profiles', 'xp_ledger']);
+    expect(backupTables.sort()).toEqual(['achievements', 'alarm_occurrences', 'alarms', 'profiles', 'xp_ledger']);
+    expect(tables.filter((t) => t.startsWith('circle')).sort()).toEqual([
+      'circle_identities',
+      'circle_invites',
+      'circle_join_failures',
+      'circle_members',
+      'circles',
+    ]);
   });
 
   it('enables Row Level Security on every table, with own-rows-only policies for all four operations', () => {
-    for (const table of tables) {
-      expect(sql).toContain(`alter table public.${table} enable row level security`);
+    for (const table of tables) expect(sql).toContain(`alter table public.${table} enable row level security`);
+    for (const table of backupTables) {
       const owner = table === 'profiles' ? 'id' : 'user_id';
       for (const op of ['select', 'insert', 'update', 'delete']) {
         const policy = new RegExp(`create policy "[^"]+" on public\\.${table} for ${op} to authenticated[^;]*\\(select auth\\.uid\\(\\)\\) = ${owner}`);
@@ -175,7 +184,17 @@ describe('Supabase schema (supabase/migrations)', () => {
 
   it('sync functions run as the caller (RLS applies); only signup and account deletion are privileged', () => {
     const definers = [...sql.matchAll(/create function public\.(\w+)\([^)]*\)[^$]*?security definer/g)].map((m) => m[1]);
-    expect(definers.sort()).toEqual(['delete_my_account', 'handle_new_user']);
+    expect(definers.sort()).toEqual([
+      // Circles (Phase 5B): each checks auth.uid() itself (circles-schema.test.ts).
+      'create_circle',
+      'delete_my_account',
+      'handle_new_user',
+      'is_circle_member',
+      'join_circle_by_code',
+      'new_circle_invite',
+      'preview_circle_invite',
+      'shares_circle_with',
+    ]);
     expect(sql).toMatch(/create function public\.sync_alarms\(items jsonb\)[\s\S]*?security invoker/);
     expect(sql).toMatch(/create function public\.sync_alarm_occurrences\(items jsonb\)[\s\S]*?security invoker/);
     // Newest wins on the server too.
