@@ -17,7 +17,7 @@ export type FeatureKey =
   | 'advanced_analytics'
   | 'social_share_templates'
   | 'multiple_accountability_circles'
-  // Prepared in 6A for the generated routine (nothing checks these yet; gating comes in 6E)
+  // Prepared in 6A for the generated routine (nothing checks these yet; gating comes in 6F)
   | 'multiple_alarms'
   | 'all_difficulties'
   | 'night_routine';

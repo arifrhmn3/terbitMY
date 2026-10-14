@@ -110,7 +110,7 @@ services/cloud  AuthService + CloudStore interfaces
 
 ## Circles (Phase 5B)
 
-Private, invite-only accountability groups. **5B is membership only:** no feed, check-ins, reactions (5C) or push notifications (5D), and no activity is shared. Migration: `supabase/migrations/20261013120000_circles_foundation.sql`. Security check: `supabase/tests/circles_rls_check.sql`.
+Private, invite-only accountability groups. **5B is membership only:** no feed, check-ins, reactions or push notifications, and no activity is shared. (The old 5C/5D plans are superseded; Terbitan and notifications are Phase 6E in docs/ROADMAP.md.) Migration: `supabase/migrations/20261013120000_circles_foundation.sql`. Security check: `supabase/tests/circles_rls_check.sql`.
 
 ### Schema
 

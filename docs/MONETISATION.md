@@ -1,6 +1,8 @@
 # Monetisation Architecture (provisional)
 
-**No billing exists.** There's no App Store purchase, Google Play Billing or RevenueCat, and no paywall. The business model **hasn't been decided**. The app is structured so either model below can be chosen during beta by changing policy, not by rewriting features or the database.
+**No billing exists.** There's no App Store purchase, Google Play Billing or RevenueCat, and no paywall. The app is structured so the model can be chosen by changing policy, not by rewriting features or the database.
+
+**Planned direction (Phase 6F, not built):** Free = Gentle and Reward, Easy only, limited missions, one basic alarm, no Night Routine; Terbit+ = everything. Intended 3-day trial (payment details required, converts to monthly unless cancelled); tentative RM0.99/month, RM9.99/year, to be checked against the current App Store rules first. The canonical version is in [ROADMAP.md](ROADMAP.md) → 6F; the provisional policies below are what the code runs today.
 
 ## How it works
 
@@ -13,7 +15,7 @@ Screen / feature code
 ```
 
 - **Feature keys** (`features.ts`): `reward_mode`, `gentle_mode`, `basic_missions`, `basic_alarm_sounds`, `basic_progress`, `challenge_mode`, `premium_alarm_sounds`, `advanced_missions`, `advanced_analytics`, `social_share_templates`, `multiple_accountability_circles`, and (added in 6A for generated routines; nothing checks them yet) `multiple_alarms`, `all_difficulties`, `night_routine`.
-- **Generated routines (6A):** `features/personalisation/plan-entitlements.ts` says which parts of a personalised routine would need Terbit+ (Challenge, every alarm after the one basic Main Wake-Up, Medium/Hard, premium content, Night Routine). Planned Free routine: Gentle and Reward, Easy, limited missions, one basic alarm, no Night Routine. Terbit+: the full routine. Not gated yet (6A is complete; the entitlement/paywall implementation is a preserved future item).
+- **Generated routines (6A):** `features/personalisation/plan-entitlements.ts` says which parts of a personalised routine would need Terbit+ (Challenge, every alarm after the one basic Main Wake-Up, Medium/Hard, premium content, Night Routine). Planned Free routine: Gentle and Reward, Easy, limited missions, one basic alarm, no Night Routine. Terbit+: the full routine. Not gated yet (gating and the paywall are Phase 6F).
 - **No scattered premium checks.** Screens never test "is premium". Alarms don't store "premium required": `requiredFeatures(alarm)` works out what an alarm relies on from its settings (`src/features/alarms/alarm-features.ts`).
 - **Alarms always ring.** If an alarm's saved mode isn't available (for example a trial ended), it behaves as Reward (`effectiveCompletionMode`). The saved setting is kept and comes back with access. The same applies to sounds.
 - **Entitlement source:** `EntitlementService` (`src/services/entitlements`). Phase 1 uses a local mock saved in SQLite (`app_settings`), switchable under Alarms → "Test plan (developer)" in development builds. A store-backed implementation can replace it later behind the same interface.

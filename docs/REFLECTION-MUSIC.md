@@ -68,7 +68,7 @@ Cached files live in the app's cache folder; if iOS clears them, nothing breaks.
 - **One player per session**, owned by the session screen, looping. Prompt changes never touch it. It fades in at the start and fades out at the end.
 - **No background audio** (`shouldPlayInBackground: false`; the config plugin has `enableBackgroundPlayback: false`). Leaving the app pauses both the session and the music; the user taps Resume.
 - **No microphone:** the config plugin sets `microphonePermission: false` and `recordAudioAndroid: false`.
-- This needed a native package (`expo-audio`, plus `expo-file-system` and `expo-asset`), so **a new iOS development build is required**. No Android work was done; Android follows in the parity phase.
+- This needed a native package (`expo-audio`, plus `expo-file-system` and `expo-asset`), so **a new iOS development build is required**. No Android work was done; Android follows in Phase 7.
 
 ### Track metadata (licensing)
 

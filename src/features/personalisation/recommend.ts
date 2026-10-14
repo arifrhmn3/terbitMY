@@ -15,7 +15,7 @@ import type { EducationGoal, FaithGoal, FitnessGoal, FocusGoal, GoalId, Movement
  * offline catalogue. Nothing is generated (no AI, no invented missions, no
  * scripture). Changing a mapping means editing this file only.
  *
- * Difficulty starts conservatively at Easy. Future Terbit+ packaging (6E)
+ * Difficulty starts conservatively at Easy. Future Terbit+ packaging (6F)
  * is expected to keep Free at Easy only; that gate belongs to the
  * entitlement layer, so recommendations never decide it.
  */

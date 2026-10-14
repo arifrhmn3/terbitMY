@@ -4,7 +4,7 @@ Saved Terbit MY alarms are scheduled as genuine system alarms: AlarmKit on iOS 2
 
 > **Status:**
 > - **Milestone 1** (one-time native test alarm): physically verified on an iPhone and an Android phone.
-> - **Saved alarms + hand-off + accountability modes** (Phase 1): ✅ physically verified on iPhone (11 Oct 2026). The alarm button opens the configured mission whether Terbit MY was closed or in the background. Android: built and unit-tested; device test in the Android parity phase. Accepted iOS limitations: see PROJECT_STATUS.md.
+> - **Saved alarms + hand-off + accountability modes** (Phase 1): ✅ physically verified on iPhone (11 Oct 2026). The alarm button opens the configured mission whether Terbit MY was closed or in the background. Android: built and unit-tested; device test in Phase 7 (Android parity & Android beta). Accepted iOS limitations: see PROJECT_STATUS.md.
 
 ## Platform limitation: the system Stop control can't be prevented
 
@@ -23,7 +23,7 @@ Each alarm has a `completionMode`, copied onto every occurrence. The rules live 
 |---|---|---|---|
 | **Reward** *(free/core; existing alarms migrated here)* | One-tap **Stop & Open Terbit** → straight into the mission; or Skip (no reward) | Mission completed, then or later that morning | — |
 | **Challenge** *(premium-capable)* | One-tap **Stop & Start Mission** → straight into the mission; "Give up" = incomplete Challenge morning | Mission completed | Needs the `challenge_mode` entitlement; otherwise the alarm behaves as Reward (it still rings) |
-| **Gentle** *(free/core)* | One-tap **Stop & Open Terbit** → the mission; or Later | Mission completed, including after the follow-up | Local reminder notification `gentleReminderMinutes` (5/10/15) after the alarm stops (iOS; Android in the parity phase) |
+| **Gentle** *(free/core)* | One-tap **Stop & Open Terbit** → the mission; or Later | Mission completed, including after the follow-up | Local reminder notification `gentleReminderMinutes` (5/10/15) after the alarm stops (iOS; Android in Phase 7) |
 
 The mode belongs to **each alarm**, so different alarms can use different modes. Availability comes from the entitlement layer (see [MONETISATION.md](MONETISATION.md)).
 
@@ -88,12 +88,12 @@ App opens / returns to foreground → handOff.sync()                  src/featur
   - The alarm sound is a repeating alarm-category notification, not yet a foreground service.
   - Saved alarms are put back after a restart (`RescheduleReceiver`), but not before the first unlock after a restart.
 - **Snooze:** not available on either platform yet. Its behaviour will be decided later **per mode** (Reward, Gentle, Challenge): whether snooze is allowed, how many snoozes, how long, and whether Challenge has stricter rules.
-- **Gentle:** the follow-up is a local notification on iOS. It's scheduled when Terbit MY learns the alarm stopped (normally when the app opens via Stop & Open Terbit or afterwards), not by the system Stop alone. Android shows it in the app only, until the parity phase.
+- **Gentle:** the follow-up is a local notification on iOS. It's scheduled when Terbit MY learns the alarm stopped (normally when the app opens via Stop & Open Terbit or afterwards), not by the system Stop alone. Android shows it in the app only, until Phase 7.
 
 ## Android notes
 
 - Permissions: `USE_EXACT_ALARM` (13+), `SCHEDULE_EXACT_ALARM` up to 12L, `POST_NOTIFICATIONS`, `USE_FULL_SCREEN_INTENT`, `VIBRATE` and `RECEIVE_BOOT_COMPLETED`. They're declared in the module's own manifest, so `app.json` doesn't change.
-- Google Play will need declarations for exact alarms and full-screen intents before release.
+- Google Play will need declarations for exact alarms and full-screen intents before release (Phase 7).
 
 ## iOS notes
 

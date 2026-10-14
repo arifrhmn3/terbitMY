@@ -2,7 +2,7 @@
 
 A map of every screen and journey, with known usability issues. **It isn't a redesign.** It's the input for the dedicated UX/UI architecture phase.
 
-Status: 14 Oct 2026. **Phase 6A (Personalisation & onboarding)** is complete, physically verified on iPhone and merged into `main`; its screens are the first for the 6B UI Preview review. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase 4 (Night Routine and Screen Time)** are verified on iPhone. **Phase 5B (Circles Foundation)** is complete (14 Oct 2026): the signed-out state is verified on iPhone; the signed-in screens are tested in beta (owner decision). Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
+Status: 14 Oct 2026. **Phase 6A (Personalisation & onboarding)** is complete, physically verified on iPhone and merged into `main`; 6B UI/UX Design Review is next (not started); the canonical order is in docs/ROADMAP.md. Phase 3D, **Phase 3.5 (Core UX Consolidation)** and **Phase 4 (Night Routine and Screen Time)** are verified on iPhone. **Phase 5B (Circles Foundation)** is complete (14 Oct 2026): the signed-out state is verified on iPhone; the signed-in screens are tested in beta (owner decision). Phase 3.5 resolved four issues: the Today placeholder, the complex alarm creation, where Recent mornings lives, and inconsistent results. Each is marked ✅ below.
 
 ## Tab roles
 
@@ -150,7 +150,7 @@ Same screen and data as before (a navigation move, not a data migration). It's r
 - **Join:** invite code (ABCD-EFGH; case, spaces and dashes ignored) → Continue → "Join this Circle?" with the name only → Join / Open Circle (already a member) / Use a different code. Messages: invalid code, already a member, too many tries, full, offline.
 - **Detail:** name and member count, your role, members (Circle names only, "(you)", Owner). Owner: invite code + expiry, Share invite (share sheet), New code, Rename, Delete Circle (confirmation). Member: Leave Circle (confirmation). Offline: cached members with a "Not up to date" banner.
 - **Your name in Circles:** edit the shareable name (separate from the private account name in Settings → Account).
-- **Known gaps (later):** no ownership transfer or member removal; no deep-link invite; no avatar; Circles have no activity yet (5C).
+- **Known gaps (later):** no ownership transfer or member removal; no deep-link invite; no avatar; Circles have no activity yet (the midday Terbitan report comes in 6E; no real-time feed).
 
 ### Settings (Phase 3D)
 - **Index groups:** Account; Alarms & missions (Personalise Terbit, Faith); Notifications (Reminders); Accessibility; Privacy & data (Permissions, Your data); Developer (development builds only); About.
@@ -286,7 +286,7 @@ Built with the existing components only (Section, ListRow, ChoiceRow, TimeField,
 7. **Review:** the most important screen: weekly grouping, Main Wake-Up emphasis, Available Sleep Window, "What will change" wording, Use this routine / Adjust.
 8. **Progress bar and header buttons** (Close / Skip) and the Settings → Personalise Terbit screen.
 9. **First-launch moment:** whether a short welcome card should come before About you.
-10. **Terbit+ labels (for 6E):** where "Terbit+" should appear beside Challenge, extra alarms, Night Routine and premium content (the preview data already carries the reasons).
+10. **Terbit+ labels (for 6F):** where "Terbit+" should appear beside Challenge, extra alarms, Night Routine and premium content (the preview data already carries the reasons).
 
 ## Deferred to the UX/UI phase
 - **Routine selection:** Morning / Throughout the Day / Night in alarm creation.
@@ -294,7 +294,7 @@ Built with the existing components only (Section, ListRow, ChoiceRow, TimeField,
 - **Non-physical activity naming:** these activities currently earn Fitness XP; a neutral name is still to be decided.
 - **More camera-verified activities** (Phase 4.5 covers push-ups, squats, jumping jacks and chair sit-to-stand). Deferred for reliability testing: wall push, step-out movement, walk in place and seated marching (continuous-movement mode). Also a possible Challenge-mode rule (recommended / required / verified badge).
 - **Night Routine follow-ups:** a Sleep Focus setup helper (App Shortcuts / Shortcuts), Available Sleep Window analytics, possible Apple Health sleep integration (see "Night Routine" → Future).
-- **Android parity** (phase A) and **Circles check-ins, feed and notifications** (Phases 5C/5D).
+- **Android parity** (Phase 7, deferred). Circle activity is the midday **Terbitan** report with notifications (6E); the old 5C/5D feed plans are superseded.
 - **Weekly schedule sections:** Morning / Throughout the Day / Night sections in the weekly view (the structure is ready; `sectionOf` in `weekly-schedule.ts`).
 - **Skipping one ring (AlarmKit limitation):** a one-off Main Wake-Up override doesn't silence the usual repeating alarm that date. AlarmKit can't skip a single day of a repeating alarm, so it still rings physically, but it isn't the Main Wake-Up and doesn't count as the morning. An option to silence it needs calendar-based scheduling later.
 - Final Faith content placement (Today, its own area, or a tab).
